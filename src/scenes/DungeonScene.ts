@@ -1,10 +1,9 @@
 import { Scene, Tilemaps, Physics, GameObjects } from 'phaser';
-import { getCoins, getFloor, setCoins, setFloor, resetRun, hasReviveToken, consumeReviveToken } from '../state/coinState';
+import { getCoins, getFloor, setCoins, setFloor, resetRun } from '../state/coinState';
 import { HUD } from '../ui/HUD';
 import { FLOOR_CONFIG, FloorConfig } from '../data/floorConfig';
 import { drawFramedPanel, neonTitleStyle, bodyTextStyle } from '../ui/theme';
-import { addGameplaySettingsGear } from '../ui/gameplaySettings';
-import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
+import { AudioManager } from '../audio/AudioManager';
 
 // Prop tile indices into dungeon_tileset.png. Floor + walls render as procedural
 // stone sprites (see BootScene); only the table + stairs still come from the tileset.
@@ -70,6 +69,10 @@ export class DungeonScene extends Scene {
   private stairsUnlocked = false;
   private doorTriggered = false;
   private justExitedTable = false;
+  private lastStepAt = 0;
+  private goalSoundsPlayed = false;
+  private fromTransition = false;
+  private envTimer: Phaser.Time.TimerEvent | null = null;
 
   private stairsSprite!: Phaser.GameObjects.Image;
   private uiCam!: Phaser.Cameras.Scene2D.Camera;
@@ -93,8 +96,9 @@ export class DungeonScene extends Scene {
     super({ key: 'DungeonScene' });
   }
 
-  init(data?: { floor?: number }): void {
+  init(data?: { floor?: number; fromTransition?: boolean }): void {
     this.currentFloor = data?.floor ?? getFloor() ?? 1;
+    this.fromTransition = data?.fromTransition ?? false;
     this.config = FLOOR_CONFIG[this.currentFloor] ?? FLOOR_CONFIG[1];
     this.mapLogic = buildMapLogic(this.config.tablePos, this.config.stairsPos);
   }
@@ -103,6 +107,11 @@ export class DungeonScene extends Scene {
     this.stairsUnlocked = false;
     this.doorTriggered = false;
     this.justExitedTable = false;
+    this.goalSoundsPlayed = false;
+    if (this.envTimer) {
+      this.envTimer.remove(false);
+      this.envTimer = null;
+    }
 
     const cfg = this.config;
     const { tablePos, stairsPos, playerStart } = cfg;
@@ -293,15 +302,23 @@ export class DungeonScene extends Scene {
     this.hud.setProgress(getCoins(), cfg.target);
     this._lastHudCoins = getCoins();
     this.cameras.main.ignore(this.hud.getObjects());
-    const settingsGearObjects = addGameplaySettingsGear(this, 'DungeonScene');
-    this.cameras.main.ignore(settingsGearObjects);
-    registerDeveloperUnlockHotkey(this, () => this._onDeveloperUnlock());
 
     // ── game-complete listener ─────────────────────────────────────────────
     this.events.on('game-complete', this._onGameComplete, this);
+    this.events.once('shutdown', () => {
+      if (this.envTimer) {
+        this.envTimer.remove(false);
+        this.envTimer = null;
+      }
+    });
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.uiCam.fadeIn(300, 0, 0, 0);
+    if (this.fromTransition) {
+      AudioManager.playSfx(this, 'transition-exit', { volume: 0.9, cooldownMs: 350, allowOverlap: false });
+      this.fromTransition = false;
+    }
+    this._scheduleEnvironmentSfx();
   }
 
   /** Add a torch flame sprite + flickering pointlight at world position (x, y) */
@@ -385,6 +402,12 @@ export class DungeonScene extends Scene {
       this.player.play('player-walk', true);
       if (vx < 0) this.player.setFlipX(true);
       else if (vx > 0) this.player.setFlipX(false);
+
+      const now = Date.now();
+      if (now - this.lastStepAt > 220) {
+        this.lastStepAt = now;
+        AudioManager.playSfx(this, 'step', { volume: 0.25, cooldownMs: 120, allowOverlap: false });
+      }
     } else {
       this.player.play('player-idle', true);
     }
@@ -411,6 +434,7 @@ export class DungeonScene extends Scene {
   private _onDoorOverlap(): void {
     if (this.doorTriggered || this.justExitedTable) return;
     this.doorTriggered = true;
+    AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 40, allowOverlap: false });
 
     this.player.setVelocity(0, 0);
     this.cameras.main.fadeOut(300, 0, 0, 0);
@@ -476,17 +500,14 @@ export class DungeonScene extends Scene {
     if (won) {
       this.hud.showSpeech('The stairs unlock. Take them.');
       this._unlockStairs();
-    } else if (coins <= 0) {
-      if (hasReviveToken()) {
-        consumeReviveToken();
-        setCoins(50);
-        this.hud.showSpeech('Your revive token shatters. You survive with 50 coins.');
-        this.scene.resume('DungeonScene');
-        this.cameras.main.fadeIn(300, 0, 0, 0);
-        this.doorTriggered = false;
-        return;
+      if (!this.goalSoundsPlayed) {
+        AudioManager.playSfx(this, 'door-open', { volume: 1.8, cooldownMs: 300, allowOverlap: true });
+        AudioManager.playSfx(this, 'goal-victory', { volume: 0.6, cooldownMs: 300, allowOverlap: false });
+        this.goalSoundsPlayed = true;
       }
+    } else if (coins <= 0) {
       this.hud.showSpeech('The house always wins.');
+      AudioManager.playSfx(this, 'game-over', { volume: 1.0, cooldownMs: 300, allowOverlap: false });
       resetRun();
       this.scene.resume('DungeonScene');
       this.cameras.main.fadeOut(500, 0, 0, 0);
@@ -495,6 +516,10 @@ export class DungeonScene extends Scene {
       });
       return;
     }
+    if (!won) {
+      // Allow win fanfare to play again only after objective status is lost.
+      this.goalSoundsPlayed = false;
+    }
 
     // Nudge player 2 tiles south so they exit the trigger zone immediately
     const { tablePos } = this.config;
@@ -502,23 +527,15 @@ export class DungeonScene extends Scene {
     this.justExitedTable = true;
 
     this.scene.resume('DungeonScene');
+    AudioManager.playSfx(this, 'ui-click', { volume: 0.8, cooldownMs: 40, allowOverlap: false });
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.doorTriggered = false;
-  }
-
-  private _onDeveloperUnlock(): void {
-    const boostedCoins = Math.max(getCoins(), this.config.target);
-    setCoins(boostedCoins);
-    this._lastHudCoins = boostedCoins;
-    this.hud.setCoins(boostedCoins);
-    this.hud.setProgress(boostedCoins, this.config.target);
-    this.hud.showSpeech('DEV: floor unlocked.');
-    this._unlockStairs();
   }
 
   private _unlockStairs(): void {
     if (this.stairsUnlocked) return;
     this.stairsUnlocked = true;
+    AudioManager.playSfx(this, 'stairs-unlock', { volume: 0.95, cooldownMs: 250, allowOverlap: false });
 
     if (this.stairsBlocker.body) {
       this.stairsBlocker.destroy();
@@ -583,5 +600,26 @@ export class DungeonScene extends Scene {
 
     // Keep glow objects off the UI camera
     this.uiCam.ignore([glow, flash, ...sparks]);
+  }
+
+  private _scheduleEnvironmentSfx(): void {
+    const delay = Phaser.Math.Between(7000, 14000);
+    this.envTimer = this.time.delayedCall(delay, () => {
+      this._playEnvironmentSfx();
+      this._scheduleEnvironmentSfx();
+    });
+  }
+
+  private _playEnvironmentSfx(): void {
+    const roll = Phaser.Math.Between(0, 2);
+    if (roll === 0) {
+      AudioManager.playSfx(this, 'env-wind', { volume: 0.28, cooldownMs: 4500, allowOverlap: false });
+      return;
+    }
+    if (roll === 1) {
+      AudioManager.playSfx(this, 'env-torch', { volume: 0.2, cooldownMs: 3500, allowOverlap: false });
+      return;
+    }
+    AudioManager.playSfx(this, 'env-casino-murmur', { volume: 0.16, cooldownMs: 5000, allowOverlap: false });
   }
 }

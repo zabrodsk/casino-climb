@@ -9,9 +9,7 @@ import {
   startRound,
 } from '../games/blackjack';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle, drawFramedPanel } from '../ui/theme';
-import { getActiveEffect, clearActiveEffect } from '../state/coinState';
-import { addGameplaySettingsGear } from '../ui/gameplaySettings';
-import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
+import { AudioManager } from '../audio/AudioManager';
 
 const WIN_TARGET = 400;
 const HANDS_TO_WIN = 3;
@@ -172,8 +170,6 @@ export class BlackjackScene extends Scene {
     this.time.delayedCall(400, () => {
       this._showSpeech('Select a bet, then hit DEAL. Get closer to 21 than the dealer without going over. HIT draws a card. STAND lets the dealer play.');
     });
-    addGameplaySettingsGear(this, 'BlackjackScene');
-    registerDeveloperUnlockHotkey(this, () => this.unlockForDevelopers());
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
@@ -235,6 +231,7 @@ export class BlackjackScene extends Scene {
       });
       zone.on('pointerdown', () => {
         if (!this.roundActive) {
+          AudioManager.playSfx(this, 'bet-select', { volume: 1.3, cooldownMs: 50, allowOverlap: false });
           this.selectedBet = this.selectedBet === bet ? 0 : bet;
           this.updateBetButtons();
           this.updateActionButtons();
@@ -270,6 +267,7 @@ export class BlackjackScene extends Scene {
     this.dealZone = this.add.zone(292, dealY, 170, 54).setInteractive({ cursor: 'pointer' });
     this.dealZone.on('pointerdown', () => {
       if (this.canDeal()) {
+        AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 50, allowOverlap: false });
         this.startHand();
       }
     });
@@ -279,6 +277,7 @@ export class BlackjackScene extends Scene {
     this.hitZone = this.add.zone(512, dealY, 170, 54).setInteractive({ cursor: 'pointer' });
     this.hitZone.on('pointerdown', () => {
       if (this.roundActive) {
+        AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 50, allowOverlap: false });
         this.hit();
       }
     });
@@ -288,6 +287,7 @@ export class BlackjackScene extends Scene {
     this.standZone = this.add.zone(732, dealY, 170, 54).setInteractive({ cursor: 'pointer' });
     this.standZone.on('pointerdown', () => {
       if (this.roundActive) {
+        AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 50, allowOverlap: false });
         this.stand();
       }
     });
@@ -309,6 +309,7 @@ export class BlackjackScene extends Scene {
     });
     leaveZone.on('pointerdown', () => {
       if (!this.roundActive) {
+        AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 50, allowOverlap: false });
         this.leave();
       }
     });
@@ -385,6 +386,7 @@ export class BlackjackScene extends Scene {
   }
 
   private startHand(): void {
+    AudioManager.playSfx(this, 'deal-card', { volume: 1.4, cooldownMs: 50, allowOverlap: true });
     const round = startRound();
     this.deck = round.deck;
     this.playerHand = round.player;
@@ -407,6 +409,7 @@ export class BlackjackScene extends Scene {
   }
 
   private hit(): void {
+    AudioManager.playSfx(this, 'deal-card', { volume: 1.4, cooldownMs: 50, allowOverlap: true });
     const drawn = drawCard(this.deck);
     this.deck = drawn.deck;
     this.playerHand = [...this.playerHand, drawn.card];
@@ -418,6 +421,7 @@ export class BlackjackScene extends Scene {
   }
 
   private stand(): void {
+    AudioManager.playSfx(this, 'deal-card', { volume: 1.2, cooldownMs: 40, allowOverlap: false });
     while (dealerShouldHit(this.dealerHand)) {
       const drawn = drawCard(this.deck);
       this.deck = drawn.deck;
@@ -430,14 +434,8 @@ export class BlackjackScene extends Scene {
   private finishRound(): void {
     this.revealDealer = true;
     const result = settleRound(this.currentCoins, this.currentBet, this.playerHand, this.dealerHand);
+    const playerEval = evaluateHand(this.playerHand);
     this.currentCoins = result.newCoins;
-    if (result.outcome === 'win') {
-      const effect = getActiveEffect();
-      if (effect) {
-        const adj = Math.round(this.currentBet * effect.magnitude);
-        this.currentCoins += effect.type === 'buff' ? adj : -adj;
-      }
-    }
     this.roundActive = false;
 
     if (result.outcome === 'win') {
@@ -455,6 +453,16 @@ export class BlackjackScene extends Scene {
             ? COLOR.loseRed
             : COLOR.goldText
       );
+    AudioManager.playSfx(
+      this,
+      result.outcome === 'win' ? 'win' : result.outcome === 'lose' ? 'lose' : 'push',
+      { volume: 1.35, cooldownMs: 100, allowOverlap: false },
+    );
+    if (playerEval.busted) {
+      AudioManager.playSfx(this, 'blackjack-bust', { volume: 1.4, cooldownMs: 120, allowOverlap: false });
+    } else if (result.outcome === 'win' && playerEval.total === 21) {
+      AudioManager.playSfx(this, 'blackjack-hit21', { volume: 1.45, cooldownMs: 120, allowOverlap: false });
+    }
 
     if (this.currentCoins >= WIN_TARGET || this.handsWon >= HANDS_TO_WIN) {
       this.targetReachedText.setText('Target reached! You may advance.').setVisible(true);
@@ -630,20 +638,7 @@ export class BlackjackScene extends Scene {
     });
   }
 
-  private unlockForDevelopers(): void {
-    if (this.roundActive) {
-      return;
-    }
-    this.currentCoins = Math.max(this.currentCoins, WIN_TARGET);
-    this.handsWon = HANDS_TO_WIN;
-    this.coinsText.setText(`Coins: ${this.currentCoins}`);
-    this.handsWonText.setText(`Hands Won: ${this.handsWon}/${HANDS_TO_WIN}`);
-    this.targetReachedText.setText('DEV: target unlocked.').setVisible(true);
-    this.leave();
-  }
-
   private leave(): void {
-    clearActiveEffect();
     const won = this.currentCoins >= WIN_TARGET || this.handsWon >= HANDS_TO_WIN;
 
     try {

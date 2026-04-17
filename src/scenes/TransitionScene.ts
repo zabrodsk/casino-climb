@@ -1,5 +1,6 @@
 import { Scene } from 'phaser';
 import { THEME, COLOR, neonTitleStyle } from '../ui/theme';
+import { AudioManager } from '../audio/AudioManager';
 
 export class TransitionScene extends Scene {
   constructor() {
@@ -28,6 +29,7 @@ export class TransitionScene extends Scene {
 
     // Marquee dots along top and bottom of screen
     this._addMarqueeLights(H);
+    AudioManager.playSfx(this, 'transition-enter', { volume: 0.9, cooldownMs: 300, allowOverlap: false });
 
     // Disable all input during transition
     this.input.enabled = false;
@@ -37,7 +39,7 @@ export class TransitionScene extends Scene {
     this.time.delayedCall(400 + 1200, () => {
       this.cameras.main.fadeOut(400, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.scene.start('DungeonScene', { floor: nextFloor });
+        this.scene.start('DungeonScene', { floor: nextFloor, fromTransition: true });
       });
     });
   }
