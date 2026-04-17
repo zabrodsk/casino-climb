@@ -66,78 +66,139 @@ He does not remember the recruiter, the deal, or why he came. All he knows: this
 ## Premises (Confirmed)
 
 1. Top-down character movement through dungeon rooms is core — not cosmetic.
-2. Ship 3 casino games: **Blackjack** (Floor 1 main), **Slots** (Floor 3 main), **Wheel of Fate** (optional side room — discoverable on any floor, not required to progress).
-3. The House commentary system ships — minimum 8-10 reactive voice lines that change based on player behavior and floor.
-4. 3 floors minimum: Early (hope), Mid (doubt), Late/Boss (desperation + reveal).
-5. Free pixel art packs from itch.io cover dungeon visuals. No custom art for environment.
-6. Starting from scratch. No existing codebase.
-7. **Currency system (one currency — coins):**
+2. **Full game = 6 floors.** Hackathon demo ships Floors 1–3. Floors 4–6 are post-hackathon.
+3. **Games by floor:** Floor 1 — Coin Flip/Dice Duel, Floor 2 — Crash, Floor 3 — Blackjack, Floor 4 — Roulette, Floor 5 — Slots, Floor 6 — Final Mixed Trial. Wheel of Fate is an optional side room on any floor.
+4. The House commentary system ships — minimum 8-10 reactive voice lines that change based on player behavior and floor.
+5. **NPC structure:** Each floor has a Floor Dealer. Support NPCs appear between selected floors only (rare — after Floor 2 and Floor 4). They offer checkpoints, revive tokens, or risky bargains.
+6. Free pixel art packs from itch.io cover dungeon visuals. No custom art for environment.
+7. Starting from scratch. No existing codebase.
+8. **Currency system (one currency — coins):**
    - Player starts with 200 coins. Carries them across all floors — no per-floor reset.
    - Min bet: 5. Max bet: 50.
    - Bonus coin drops between floors (50–100 coins) — floor completion reward, keeps runs alive after a bad game.
-   - At 0 coins: floor resets, The House comments. One bad game doesn't end the run as long as starting stack was healthy.
-8. **Floor layout:** Each floor is a linear corridor — Entrance → one Game Room (doorway triggers game) → Exit stairs (locked until game won). No branching. No multiple rooms per floor.
+   - At 0 coins: run restarts from Floor 1, The House comments.
+9. **Floor layout:** Each floor is a linear corridor — Entrance → one Game Room (doorway triggers game) → Exit stairs (locked until win condition met). Optional Wheel of Fate side door hidden in the corridor wall.
 
 ---
 
 ## Floor Design
 
-### Floor 1: Confusion (Survival)
-- Tone: Flashy, neon, almost welcoming — but wrong somehow. The House sounds smooth and reassuring.
-- Games: Blackjack — familiar, structured, the House as dealer. Easy to understand for a disoriented man.
-- The House lines: "Welcome. Everything you see here is yours to win." Slightly too confident. Too practiced.
-- Memory fragments: None. He just woke up. Pure disorientation.
-- Visual: Bright neon dungeon tiles. Character feels small. No context for where he is or why.
-- Narrative beat: He has no goal except to find an exit. The House acts like his host.
-
-### Floor 2: Doubt (Understanding)
-- Tone: Lighting dimmer. The House becomes less hospitable, more observational.
-- Games: Blackjack — The House as dealer, comments on every decision.
-- The House lines: "You're looking for something. I can tell." / "This wasn't how you imagined it would go, was it?" Implies he had expectations.
-- Memory fragments: A flash of the recruiter's face. A vague sense of a conversation he can't place. The word "winnings" surfaces in his mind unbidden.
-- Visual: Darker tiles. Occasional text glitch on The House's speech bubble.
-- Narrative beat: He starts to suspect he came here by choice. It unsettles him more than the casino does.
-
-### Floor 3: Clarity (Tragedy + Final Choice)
-- Tone: Oppressive, cold, stripped down. Silence between games. The House is direct.
-- Games: Slots (high volatility — 💀 Lose All is active, screen shake on bad outcomes)
-- The House lines: "You remember now, don't you?" / "You came here because you needed this place. Not because you were tricked." / "The door is at the top. It was always at the top."
-- Memory fragments: Full recall. The recruiter. The promise. The desperation. The signature.
-- Visual: Minimal color. Near-monochrome. The neon is almost gone.
-- Narrative beat: He reaches the exit. Memory fully restored. The House presents the choice: leave with what he has, or play again — now knowing everything.
-
-*Post-hackathon: expand to 7-10 floors with granular memory recovery and deeper The House arc.*
+*Hackathon ships Floors 1–3. Floors 4–6 are designed and documented here for post-hackathon build.*
 
 ---
 
-## The Three Games
+### Floor 1 — The Lobby *(hackathon)*
+- **Game:** Coin Flip / Dice Duel — bet size and risk level. Immediately establishes the core loop.
+- **Tone:** Golden lighting, marble or polished stone, clean casino entrance. Friendly but slightly uncanny dealer. The House sounds calm and practiced.
+- **The House lines:** "Welcome. Everything you see here is yours to win." Too smooth. Too prepared.
+- **Memory fragments:** None. He just woke up. Pure disorientation.
+- **Win condition:** Grow coin stack to 300 (from 200 start).
+- **Narrative beat:** He has no goal except to find an exit. The House acts like his host.
 
-### Wheel of Fate (Optional Side Room)
-**Access:** Hidden doorway in the dungeon corridor — discoverable on any floor, not required to progress. The House never mentions it. Finding it is a reward for exploration.
-**Core:** Bet chips on a spinning wheel divided into named segments.
-**Twist — the wheel changes every spin:**
-- Segments shuffle in count and type each spin
-- Segment types:
-  - 💀 **Lose All** — total wipe
-  - 🔥 **Double Everything** — full multiplier
-  - ❓ **Random Effect** — steal chips from The House, screen inversion, mini-curse
-  - Standard: 2x, 1.5x, 0.5x, Push (return bet)
-- Visual: Animated spinning wheel in pixel art style. Segments visibly rearrange between spins with a shuffle animation.
-- Tension: Highest variance game in the casino. No guaranteed path forward — pure risk/reward.
-- The House's reaction: If the player finds and enters this room, The House goes quiet. It doesn't comment during Wheel of Fate spins. The silence is more unsettling than the commentary.
+---
 
-### Blackjack (Mid-Floor Standard)
-- Standard 21 rules
-- Dealer is "The House" — literally labeled as such
+### Floor 2 — The Crash Hall *(hackathon)*
+- **Game:** Crash — multiplier rises, can crash at any moment. Cash out before it crashes to lock in winnings.
+- **Tone:** Neon digital space, giant multiplier displays, reflective dark flooring, red and purple lighting, constant machine-like hum.
+- **The House lines:** "You're looking for something. I can tell." / "This wasn't how you imagined it would go, was it?"
+- **Memory fragments:** A flash of the recruiter's face. The word "winnings" surfaces unbidden.
+- **Win condition:** Successfully cash out 3 times, or reach coin threshold.
+- **NPC beat:** Support NPC appears after this floor — checkpoint, revive token, or room preview.
+- **Narrative beat:** He starts to suspect he came here by choice.
+
+---
+
+### Floor 3 — The Blackjack Parlor *(hackathon)*
+- **Game:** Blackjack — dark wood, brass lamps, green felt. Slower pace. More intimate, more strategic.
+- **Tone:** Quiet luxury. A more human but deeply unsettling dealer. The House becomes more personal.
+- **The House lines:** "You've been cautious. That's new." / "You're starting to remember. I can tell. That's fine."
+- **Memory fragments:** A vague sense of a conversation. Fragments of the contract's terms.
+- **Win condition:** Win enough hands or exit with required coin amount.
+- **Narrative beat:** He is less focused on surviving, more focused on understanding what happened.
+
+---
+
+### Floor 4 — The Roulette Gallery *(post-hackathon)*
+- **Game:** Roulette — structured risk, more betting options, manage bankroll across spins.
+- **Tone:** Red velvet curtains, gold trim, large wheel tables. Surveillance-like presence. Oppressive theatrical energy.
+- **The House lines:** Commenting on betting patterns. "You bet safe again. You always do, until you don't."
+- **Memory fragments:** Stronger images. The recruiter's exact words begin surfacing.
+- **Win condition:** Survive a set number of spins and finish above a coin threshold.
+- **NPC beat:** Second support NPC — curse removal, checkpoint, or risky bargain.
+- **Narrative beat:** The casino is studying his habits. He begins to feel it.
+
+---
+
+### Optional Room — The Wheel of Fate *(any floor)*
+- **Access:** Hidden doorway in the corridor wall — subtle, unlabeled. Player can miss it entirely. Finding it is the reward for looking.
+- **Game:** Giant prize-and-punishment wheel. Segments change every spin.
+- **Tone:** Dark circular chamber. Ceremonial, almost ritual. Less casino, more judgment device.
+- **The House's reaction:** Goes completely silent. No commentary during spins. The silence is more unsettling than the voice.
+- **Outcomes:** Bonus coins, checkpoint, revive token, buff, curse, large coin loss, rare jackpot.
+- **Narrative purpose:** Pure temptation moment. The player doesn't need to enter — but is always given the chance to.
+
+---
+
+### Floor 5 — The Slot Cathedral *(post-hackathon)*
+- **Game:** Slots — high volatility, repeated spins, unpredictable momentum swings.
+- **Tone:** Towering machines, flashing symbols, distorted jackpot sounds, sensory overload. The most addictive-feeling floor.
+- **The House lines:** Aggressive, almost mocking. "Again." / "You know it's coming. You always spin again."
+- **Memory fragments:** He remembers why he needed the money. The weight of the desperation hits.
+- **Win condition:** Trigger enough payouts or grow stack before going broke.
+- **Narrative beat:** He now understands the casino is not just a prison. It is also the answer to a real problem.
+
+---
+
+### Floor 6 — The Vault *(post-hackathon)*
+- **Game:** Final Mixed Trial — one timing challenge, one strategic challenge, one final high-stakes wager.
+- **Tone:** Minimalistic, cold, vast empty space. No neon. No decoration. The House speaks directly and clearly for the first time.
+- **The House lines:** "You remember now, don't you?" / "You came here because you needed this place. Not because you were tricked." / "The door was always at the top."
+- **Memory fragments:** Full recall. The recruiter. The promise. The desperation. The signature on the contract.
+- **Win condition:** Clear the final trial to earn the right to leave.
+- **Narrative beat:** Story reveal. The choice. Leave with what he has — or play again, now knowing everything.
+
+---
+
+## The Games
+
+### Floor 1 — Coin Flip / Dice Duel *(hackathon)*
+- Player chooses bet size and a risk level (coin flip = 50/50, dice duel = choose a number range for varied payout)
+- Simple enough to learn in 10 seconds, establishes the bet-win-lose loop immediately
+- Floor Dealer: overly cheerful, slightly uncanny
+
+### Floor 2 — Crash *(hackathon)*
+- Multiplier rises from 1.0x and can crash at any random moment
+- Player clicks "Cash Out" to lock winnings before the crash
+- If crash happens before cash out: lose the bet
+- Visual: giant multiplier number dominating the screen, rising with tension
+- Win condition: successfully cash out 3 times in a row, or reach coin threshold
+
+### Floor 3 — Blackjack *(hackathon)*
+- Standard 21 rules, dealer is "The House" — literally labeled as such
 - The House comments on every hit, stand, and bust
-- On bust: The House says something from its observational pool — "You knew that was too many." / "Greed is a pattern I recognize."
-- Player starts each floor with 100 chips (fresh reset per floor — see Premises #7)
+- On bust: "You knew that was too many. You chose it anyway."
+- Win condition: win enough hands or exit table with required coin amount
 
-### Slots (Late-Floor Chaos)
-- 3-reel pixel art slots
-- Symbol pool expands on higher floors to include 💀 and 🔥 symbols
-- On Floor 3: Certain combinations trigger atmosphere effects ("The House says something menacing" or screen shake) — no cross-game state effects since Floor 3 has one game room
-- Fast, tense, high variance — matches the desperation tone
+### Floor 4 — Roulette *(post-hackathon)*
+- Classic wheel with inside/outside bets
+- Player manages bankroll across a set number of spins
+- The House comments on betting patterns — safe bets get quiet contempt, big bets get attention
+
+### Floor 5 — Slots *(post-hackathon)*
+- 3-reel pixel art slots, high volatility
+- Symbol pool includes 💀 and 🔥 on later spins
+- Certain combinations trigger atmosphere effects (screen shake, The House line)
+
+### Floor 6 — Final Mixed Trial *(post-hackathon)*
+- One timing challenge (Crash variant)
+- One strategic challenge (Blackjack hand)
+- One final high-stakes single wager — the player bets everything or nothing
+- Win = earn the right to leave. Then the story choice.
+
+### Wheel of Fate — Optional Side Room *(any floor)*
+- Hidden doorway, not labeled, The House goes silent inside
+- Wheel segments change every spin: 💀 Lose All, 🔥 Double Everything, ❓ Random Effect, standard multipliers
+- Pure temptation. Not required. Always available.
 
 ---
 
@@ -175,22 +236,23 @@ Lines stored as JSON. Rendered in a "speech bubble" HUD element, Minecraft font.
 
 **Camera:** Follows player with slight lerp. Dungeon map is larger than viewport.
 
-**Scenes:**
+**Scenes (hackathon build — Floors 1–3):**
 1. `BootScene` — load assets
 2. `MenuScene` — story intro, "You're already playing."
-3. `DungeonScene` — the main floor (reused with different tilemap per floor)
-4. `WheelOfFateScene` — game overlay
-5. `BlackjackScene` — game overlay  
-6. `SlotsScene` — game overlay
-7. `TransitionScene` — memory fragment + The House line between floors
-8. `EndScene` — the contract reveal + escape or reset
+3. `DungeonScene` — reused with different tilemap config per floor
+4. `CoinFlipScene` — Floor 1 game overlay
+5. `CrashScene` — Floor 2 game overlay
+6. `BlackjackScene` — Floor 3 game overlay
+7. `WheelOfFateScene` — optional side room overlay (any floor)
+8. `TransitionScene` — memory fragment + The House line + Support NPC if applicable
+9. `EndScene` — story reveal + escape or play again choice
 
-**Chip state:** Global object passed between scenes. `{ chips: 100, floor: 1, runCount: N }` — chips reset to 100 on each floor entry.
+**Coin state:** Global object passed between scenes. `{ coins: 200, floor: 1 }` — coins carry across all floors, never reset per floor.
 
 **Floor completion conditions:**
-- **Win:** Reach 200 chips (double starting amount).
-- **Lose (floor reset):** Chips hit 0. runCount increments. Memory fragment threshold advances. Floor restarts.
-- **Floor advance:** On win, ExitStairs door unlocks. Player walks to stairs → TransitionScene → next floor.
+- **Win:** Meet floor-specific coin target (Floor 1: 300, Floor 2: cash out 3x or reach 350, Floor 3: win hands or reach 400).
+- **Lose (run restart):** Coins hit 0. Run restarts from Floor 1. The House comments.
+- **Floor advance:** On win condition met, exit stairs unlock. Player walks to stairs → TransitionScene → next floor.
 
 **Scene layout per floor:**
 ```
@@ -207,21 +269,21 @@ One required game room per floor. The Wheel of Fate side room is a hidden doorwa
 ## Build Split (2 People, ~22 hours)
 
 ### Person A: Dungeon + Engine
-- Hour 0-3: Phaser setup, asset loading, tilemap for Floor 1, character movement
-- Hour 3-6: Doorway triggers, scene transitions, chip state management
-- Hour 6-9: Floor 2 + 3 tilemaps, The House HUD component
-- Hour 9-12: Memory fragment system, localStorage persistence, TransitionScene
-- Hour 12-16: The House commentary JSON + trigger logic wired to all games
-- Hour 16-20: Polish — Minecraft font, Phaser camera effects for Floor 3 atmosphere (camera.shake, camera.flash, camera.fade — no custom shader), sound
+- Hour 0-3: Phaser setup, asset loading, tilemap for Floor 1 (The Lobby), character movement
+- Hour 3-6: Doorway triggers, scene transitions, coin state management (`{ coins, floor }`)
+- Hour 6-9: Floor 2 (Crash Hall) + Floor 3 (Blackjack Parlor) tilemaps, The House HUD component
+- Hour 9-12: Memory fragment system, TransitionScene, Support NPC beat after Floor 2
+- Hour 12-16: The House commentary JSON + trigger logic wired to all 3 games
+- Hour 16-20: Polish — Minecraft font, Phaser camera effects (shake/flash/fade for Crash and Floor 3), sound
 - Hour 20-22: Bug fixes, demo path testing
 
 ### Person B: Games
-- Hour 0-4: Wheel of Fate scene (wheel render, spin animation, segment logic, result)
-- Hour 4-7: Blackjack scene (card logic, dealer AI, win/lose state)
-- Hour 7-10: Slots scene (3-reel logic, symbol pool, animations)
-- Hour 10-14: The House line integration into each game (trigger hooks)
-- Hour 14-18: Polish — animations, sounds, pixel art card/chip assets
-- Hour 18-22: Menu scene, End scene, demo path testing
+- Hour 0-3: Coin Flip / Dice Duel scene (bet UI, flip/roll logic, win/lose, payout)
+- Hour 3-7: Crash scene (rising multiplier animation, cash-out button, crash RNG, tension)
+- Hour 7-10: Blackjack scene (card logic, dealer AI, hit/stand/bust, win/lose state)
+- Hour 10-13: Wheel of Fate scene (spinning wheel, segment shuffle, outcome logic)
+- Hour 13-17: The House line integration into all games (trigger hooks), pixel art for game UIs
+- Hour 17-22: Menu scene, End scene (story reveal + choice), demo path testing
 
 **Merge point:** Hour 10 — games integrated into dungeon scene overlay. Both people test full loop together.
 
@@ -235,15 +297,32 @@ One required game room per floor. The Wheel of Fate side room is a hidden doorwa
 
 ## Art Assets
 
-**Free sources:**
-- [Anokolisa 16x16 Dungeon Crawler Pack](https://anokolisa.itch.io/dungeon-crawler-pixel-art-asset-pack) — floor tiles, walls, doors
-- Standard card suits: generate or use any free pixel card set
-- Wheel of Fate: custom draw (simple circle + segments in Phaser Graphics API — no external asset needed)
-- Slot machine: 3 reels + frame, hand-draw in 16x16 (2 hours max)
+**Policy:** Use free packs where available. If a free pack is unavailable, incompatible, or doesn't fit the floor's visual identity — draw it. 16x16 pixel art is fast to produce and consistent with the rest of the aesthetic. A custom-drawn tile that fits the design is better than a free tile that doesn't.
 
-**Minecraft font:** Available as a free bitmap font (`.fnt` + `.png`) — load via Phaser's BitmapText. Search "Minecraft bitmap font Phaser."
+**Dungeon tiles:**
+- First choice: [Anokolisa 16x16 Dungeon Crawler Pack](https://anokolisa.itch.io/dungeon-crawler-pixel-art-asset-pack) — floor tiles, walls, doors
+- If unavailable or unsuitable: draw custom 16x16 floor and wall tiles per floor (The Lobby = warm gold stone, The Crash Hall = dark reflective neon tile, The Blackjack Parlor = dark wood plank). ~1 hour per floor tileset at 16x16 scale.
 
-**Character sprite:** Use any 16x16 top-down character from the Anokolisa pack. No custom character art needed for the hackathon.
+**Game UI art:**
+- Coin Flip: draw a simple 16x16 coin sprite (heads/tails). 30 minutes.
+- Crash: no sprite needed — multiplier number is the visual. Style with Minecraft font.
+- Blackjack: draw a 16x16 card back + 4 suit symbols (♠♥♦♣). 1 hour.
+- Wheel of Fate: draw directly in Phaser Graphics API (circle + colored segments). No external asset needed.
+- Slots (post-hackathon): 3 reels + 6–8 symbol sprites at 16x16. 2 hours.
+
+**Character sprite:** First choice: Anokolisa pack top-down character. If not suitable: draw a simple 3-frame walk cycle at 16x16. 1 hour.
+
+**Minecraft font:** Free bitmap font (`.fnt` + `.png`) — load via Phaser's BitmapText. Search "Minecraft bitmap font Phaser."
+
+**Visual identity per floor (for custom tiles or tinting):**
+| Floor | Palette | Feel |
+|-------|---------|------|
+| 1 — The Lobby | Gold, warm white, marble | Welcoming, deceptive |
+| 2 — The Crash Hall | Purple, red, dark grey | Digital, tense |
+| 3 — The Blackjack Parlor | Dark green, brown, brass | Intimate, strategic |
+| 4 — The Roulette Gallery | Deep red, gold trim | Theatrical, oppressive |
+| 5 — The Slot Cathedral | Neon chaos, oversaturated | Overwhelming, addictive |
+| 6 — The Vault | Near-monochrome, cold blue | Empty, final |
 
 ---
 
@@ -265,7 +344,7 @@ Chosen because: it's the vision, Phaser.js handles it well, and with the build s
 
 1. **Sound:** Decided — Person A owns this, Hour 16-18 block. Use Freesound.org or itch.io game audio packs (license-free). Ambient dungeon loop + win/lose stings.
 2. **Hosting:** Where does the hackathon demo URL come from? GitHub Pages, Vercel, or Itch.io all work for a static Phaser build. Decide at the start and set up deployment pipeline first (15 minutes) so you're not scrambling at Hour 23.
-3. **Game start chips:** Decided — 100 per floor, fresh reset. Min bet 5, max bet 50. See Premises #7.
+3. **Coin economy:** Decided — 200 coins at start, carried across all floors. Floor targets: 300 / 350 / 400. Min bet 5, max bet 50. See Premises #8.
 4. **Memory fragments on first run:** None on run 1. Run 2+: fragments appear based on `localStorage.runCount >= N` thresholds. Simple check, no server needed.
 
 ---
@@ -273,10 +352,11 @@ Chosen because: it's the vision, Phaser.js handles it well, and with the build s
 ## Success Criteria
 
 - Playable demo URL that loads in a browser in under 10 seconds
-- Judges can play 1 full run (Floor 1 through Floor 3) in under 5 minutes
+- Judges can play Floors 1–3 (Coin Flip → Crash → Blackjack) in under 5 minutes
 - The House says at least 3 contextually appropriate things during that run
-- Wheel of Fate spins and produces a visually distinct result
-- The dungeon feels navigable — player can move, find the game table, and understand what to do
+- Each floor has a visually distinct look (palette/tile set differs)
+- Coin state persists correctly across all 3 floors
+- The dungeon feels navigable — player can move, find the game table, understand what to do
 
 ---
 
