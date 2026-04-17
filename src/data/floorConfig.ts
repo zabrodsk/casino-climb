@@ -1,6 +1,8 @@
 export interface FloorConfig {
   name: string;
   target: number;
+  mode?: 'table' | 'crossing';
+  displayFloorNumber?: number;
   gameSceneKey: string;
   propTint: {
     table: number;
@@ -17,12 +19,33 @@ export interface FloorConfig {
   useCompositeTable: boolean;
   compositeTableTexture?: string;
   slotMachines: Array<{ col: number; row: number }>;
+  crossing?: {
+    laneCount: number;
+    laneSpacing: number;
+    columnSpacing: number;
+    startMultiplier: number;
+    multiplierStep: number;
+    speedBase: number;
+    speedStep: number;
+    speedVariance: number;
+    respawnJitter: number;
+    cardWidth: number;
+    cardHeight: number;
+    chipX: number;
+    laneTop: number;
+    laneBottom: number;
+    cameraZoom: number;
+    startPromptRadius: number;
+    barricadeWidth: number;
+    defaultBet: number;
+  };
 }
 
 export const FLOOR_CONFIG: Record<number, FloorConfig> = {
   1: {
     name: 'THE LOBBY',
     target: 300,
+    mode: 'table',
     gameSceneKey: 'CoinFlipScene',
     propTint: { table: 0xc9a66b, stairsLocked: 0x6a4a2a, stairsOpen: 0xffdd88 },
     torchColor: 0xff8833,
@@ -46,6 +69,7 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
   2: {
     name: 'THE CRASH HALL',
     target: 350,
+    mode: 'table',
     gameSceneKey: 'CrashScene',
     propTint: { table: 0xaa4466, stairsLocked: 0x4a2a3a, stairsOpen: 0xff6688 },
     torchColor: 0xaa3366,
@@ -66,30 +90,10 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
       { col: 12, row: 9 },
     ],
   },
-  4: {
-    name: 'THE FATE CHAMBER',
-    target: 0,
-    gameSceneKey: 'WheelScene',
-    propTint: { table: 0x9933cc, stairsLocked: 0x2a1040, stairsOpen: 0xcc88ff },
-    torchColor: 0x6600cc,
-    torchGlow: 0xcc44ff,
-    tablePos: { col: 8, row: 6 },
-    stairsPos: { col: 14, row: 2 },
-    playerStart: { col: 4, row: 10 },
-    tableLabel: 'WHEEL',
-    floorTextures: { primary: 'fate-floor-a', accent: 'fate-floor-b' },
-    useCompositeTable: true,
-    compositeTableTexture: 'table-wheel',
-    slotMachines: [
-      { col: 3,  row: 2 },
-      { col: 13, row: 2 },
-      { col: 4,  row: 9 },
-      { col: 12, row: 9 },
-    ],
-  },
   3: {
     name: 'THE BLACKJACK PARLOR',
     target: 400,
+    mode: 'table',
     gameSceneKey: 'BlackjackScene',
     propTint: { table: 0x1d6b47, stairsLocked: 0x5a4630, stairsOpen: 0xf5cf7f },
     torchColor: 0xd8a24b,
@@ -107,5 +111,42 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
       { col: 4,  row: 9 },
       { col: 12, row: 9 },
     ],
+  },
+  4: {
+    name: 'THE CHIP CROSS',
+    target: 500,
+    mode: 'crossing',
+    displayFloorNumber: 5,
+    gameSceneKey: '',
+    propTint: { table: 0xb03a5b, stairsLocked: 0x4e1830, stairsOpen: 0xf6cf79 },
+    torchColor: 0xe45f78,
+    torchGlow: 0xffd9a3,
+    tablePos: { col: 8, row: 6 },
+    stairsPos: { col: 14, row: 2 },
+    playerStart: { col: 2, row: 10 },
+    tableLabel: 'CHIP CROSS',
+    floorTextures: { primary: 'poker-floor-a', accent: 'poker-floor-b' },
+    useCompositeTable: false,
+    slotMachines: [],
+    crossing: {
+      laneCount: 6,
+      laneSpacing: 22,
+      columnSpacing: 32,
+      startMultiplier: 1,
+      multiplierStep: 0.35,
+      speedBase: 118,
+      speedStep: 18,
+      speedVariance: 34,
+      respawnJitter: 56,
+      cardWidth: 18,
+      cardHeight: 12,
+      chipX: 64,
+      laneTop: 92,
+      laneBottom: 194,
+      cameraZoom: 5.85,
+      startPromptRadius: 22,
+      barricadeWidth: 24,
+      defaultBet: 25,
+    },
   },
 };
