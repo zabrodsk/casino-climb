@@ -796,6 +796,11 @@ export class BootScene extends Scene {
     g.fillRect(12, 7, 3, 2);
     g.generateTexture('slot-machine', 16, 32);
 
+    g.clear();
+    g.fillStyle(0xffffff);
+    g.fillCircle(4, 4, 4);
+    g.generateTexture('particle-dot', 8, 8);
+
     g.destroy();
   }
 }

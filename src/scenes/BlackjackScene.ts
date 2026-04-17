@@ -12,6 +12,7 @@ import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle,
 import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
+import { winBurst, betFlash } from '../ui/particles';
 import { getDiscountedBetAmount, hasDiscountForFloor } from '../state/coinState';
 
 const WIN_TARGET = 400;
@@ -287,6 +288,7 @@ export class BlackjackScene extends Scene {
     this.dealZone.on('pointerdown', () => {
       if (this.canDeal()) {
         AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 50, allowOverlap: false });
+        betFlash(this);
         this.startHand();
       }
     });
@@ -463,6 +465,7 @@ export class BlackjackScene extends Scene {
 
     if (result.outcome === 'win') {
       this.handsWon += 1;
+      winBurst(this, 512, 440);
     }
 
     this.coinsText.setText(`Coins: ${this.currentCoins}`);

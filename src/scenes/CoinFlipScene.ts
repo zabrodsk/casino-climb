@@ -4,6 +4,7 @@ import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle 
 import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
+import { winBurst, betFlash } from '../ui/particles';
 import { getDiscountedBetAmount, hasDiscountForFloor } from '../state/coinState';
 
 const WIN_TARGET = 300;
@@ -392,6 +393,7 @@ export class CoinFlipScene extends Scene {
 
   private startPlay() {
     AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 40, allowOverlap: false });
+    betFlash(this);
     this.animating = true;
     this.resultText.setText('');
     this.targetReachedText.setVisible(false);
@@ -532,6 +534,7 @@ export class CoinFlipScene extends Scene {
       cooldownMs: 120,
       allowOverlap: false,
     });
+    if (result.won) winBurst(this, 1024 / 2, 450);
 
     if (this.currentCoins >= WIN_TARGET) {
       this.targetReachedText.setText('Target reached! You may advance.').setVisible(true);
