@@ -1,4 +1,4 @@
-1. Complete the poker-cross level
+
 2. Complete the final level where the exit vault is
 3. Show the choice, start again to earn more, or exit and be free
 4. Implement the story elemet
