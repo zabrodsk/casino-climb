@@ -4,48 +4,46 @@ import { getCoins, getFloor, setCoins, setFloor, resetRun } from '../state/coinS
 // ── Tile indices into dungeon_tileset.png (304×208, 19 cols × 13 rows, 16×16 tiles)
 // Index = row * 19 + col
 //
-// Visual layout (from image inspection):
-//   Cols 0-5, rows 0-3:  Blue/teal dungeon floor area
-//   Cols 6-12, rows 0-3: Pink/mauve wall face tiles (3/4 vertical face)
-//   Col 3,13,15 rows 0+: Teal cyan accent (wall top edge / trim)
-//   Rows 4-6, cols 6-10: Bright green decorative tiles (carpet/felt)
-//   Rows 7-8:            Dark floor / wall bottom transition
-//   Rows 8+:             Props, barrels, chests (right side)
-//
-// Chosen tile indices:
-const TILE_VOID        = -1;  // empty (no tile rendered)
+// Verified via pixel analysis (PIL color extraction):
+//   idx=76  (r4,c0): blue-gray floor tile, dom=(52,74,97)
+//   idx=95  (r5,c0): blue-gray floor tile variant, dom=(52,74,97)
+//   idx=114 (r6,c0): blue-gray floor tile variant, dom=(52,74,97)
+//   idx=20  (r1,c1): pure near-black (13,7,17) — solid wall fill
+//   idx=57  (r3,c0): teal/neon-green wall top accent, dom=(79,144,149)
+//   idx=58  (r3,c1): teal wall top mid
+//   idx=59  (r3,c2): teal wall top right
+//   idx=6   (r0,c6): solid pink/mauve wall face (179,136,162)
+//   idx=7   (r0,c7): pink wall face mid
+//   idx=142 (r7,c9): highest neon-green count — casino table tile
+//   idx=73  (r3,c16): strong teal accent — stairs tile (locked)
+//   idx=92  (r4,c16): teal accent — stairs open variant
+const TILE_VOID          = -1;
 
-// Floor: col 0, row 0 = index 0  (dark blue stone floor)
-const TILE_FLOOR_A     = 0;   // col 0, row 0 — dark blue floor
-const TILE_FLOOR_B     = 1;   // col 1, row 0 — slightly darker variant
-const TILE_FLOOR_C     = 4;   // col 4, row 0 — another floor variant
+// Floor
+const TILE_FLOOR_A       = 76;   // r4,c0 — blue-gray stone
+const TILE_FLOOR_B       = 95;   // r5,c0 — floor variant
+const TILE_FLOOR_C       = 114;  // r6,c0 — floor variant
 
-// Wall top (horizontal cap, seen from 3/4 above) — teal cyan top edge
-const TILE_WALL_TOP_L  = 57;  // col 0, row 3 — teal, left wall top
-const TILE_WALL_TOP_M  = 58;  // col 1, row 3 — teal, mid wall top
-const TILE_WALL_TOP_R  = 59;  // col 2, row 3 — teal, right wall top
+// Wall — solid fill (Option A: single layer, no 3/4 split)
+const TILE_WALL_SOLID    = 20;   // r1,c1 — near-black solid wall
 
-// Wall face (vertical 3/4 face visible below the top) — pink/mauve
-const TILE_WALL_FACE_L = 25;  // col 6, row 1 — pink, left wall face
-const TILE_WALL_FACE_M = 26;  // col 7, row 1 — pink, mid wall face
-const TILE_WALL_FACE_R = 30;  // col 11, row 1 — pink, right wall face
+// Wall top cap (teal accent row at top edge of a wall block, facing floor below)
+const TILE_WALL_TOP_L    = 57;   // r3,c0
+const TILE_WALL_TOP_M    = 58;   // r3,c1
+const TILE_WALL_TOP_R    = 59;   // r3,c2
 
-// Solid dark wall (upper void — above top edge)
-const TILE_WALL_DARK   = 20;  // col 1, row 1 — near-black
+// Wall face (pink mauve row drawn on the floor tile just below the wall top)
+const TILE_WALL_FACE_L   = 6;    // r0,c6
+const TILE_WALL_FACE_M   = 7;    // r0,c7
+const TILE_WALL_FACE_R   = 8;    // r0,c8
 
-// Door / casino table: bright green felt tiles
-const TILE_TABLE       = 103; // col 8, row 5 — bright green
-
-// Stairs locked / open: generated programmatically (128×128 canvas)
-const TILE_STAIRS_L    = 149; // col 16, row 7 — teal accent (locked placeholder)
-const TILE_STAIRS_O    = 130; // col 16, row 6 — teal (open placeholder)
+// Props
+const TILE_TABLE         = 142;  // r7,c9 — neon green casino table
+const TILE_STAIRS_L      = 73;   // r3,c16 — teal, locked stairs
+const TILE_STAIRS_O      = 92;   // r4,c16 — teal open stairs
 
 // ── 3/4 Perspective Map: 20 wide × 15 tall
-// Encoding (per-cell single value → we will interpret multi-value in create()):
-//   0  = floor
-//   1  = wall (solid top-to-bottom — fills 2 rows visually: wall-top + wall-face)
-//   2  = door / casino table
-//   3  = stairs (locked at start)
+// 0 = floor, 1 = wall, 2 = door/casino table, 3 = stairs (locked)
 const MAP_LOGIC: number[][] = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 1],
@@ -68,53 +66,48 @@ const COLS = 20;
 const ROWS = 15;
 const TILE_SIZE = 16;
 
-// Player entrance: col=2, row=12 (bottom-left area)
 const PLAYER_START_X = 2 * TILE_SIZE + 8;
 const PLAYER_START_Y = 12 * TILE_SIZE + 8;
 
-// Door tile position: col=10, row=7
 const DOOR_COL = 10;
 const DOOR_ROW = 7;
 
-// Stairs tile position: col=17, row=1
 const STAIRS_COL = 17;
 const STAIRS_ROW = 1;
 
-/**
- * Build a 2D tilemap data array for the floor layer (all floor tiles).
- * Walls are transparent on this layer — only floor drawn here.
- */
+// ── Layer builders ────────────────────────────────────────────────────────────
+
+/** Floor layer: every cell gets a floor tile */
 function buildFloorData(): number[][] {
-  return MAP_LOGIC.map(row => row.map(() => TILE_FLOOR_A));
+  const floorVariants = [TILE_FLOOR_A, TILE_FLOOR_B, TILE_FLOOR_C];
+  return MAP_LOGIC.map((row, r) =>
+    row.map((_v, c) => floorVariants[(r * 3 + c * 7) % 3])
+  );
 }
 
-/**
- * Build wall-top layer data (the teal horizontal cap row of each wall).
- * Only places a tile on the TOP row of each wall block.
+/** Wall layer (Option A — solid single layer):
+ *  Walls that have no wall above them get the WALL_TOP tile (teal cap).
+ *  Walls that have wall above get WALL_SOLID (near-black fill).
  */
-function buildWallTopData(): number[][] {
+function buildWallData(): number[][] {
   const data: number[][] = Array.from({ length: ROWS }, () =>
-    new Array(COLS).fill(-1)
+    new Array(COLS).fill(TILE_VOID)
   );
 
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       if (MAP_LOGIC[r][c] !== 1) continue;
 
-      // Determine if top-cap should show: yes if cell above is not also a wall
-      // (or we're at top edge)
       const aboveIsWall = r > 0 && MAP_LOGIC[r - 1][c] === 1;
       if (!aboveIsWall) {
-        // This is the exposed top of a wall — use wall-top tile
+        // Exposed top — use teal cap tile
         const leftIsWall  = c > 0 && MAP_LOGIC[r][c - 1] === 1;
         const rightIsWall = c < COLS - 1 && MAP_LOGIC[r][c + 1] === 1;
-        if (!leftIsWall && !rightIsWall) data[r][c] = TILE_WALL_TOP_M; // isolated
-        else if (!leftIsWall)            data[r][c] = TILE_WALL_TOP_L;
-        else if (!rightIsWall)           data[r][c] = TILE_WALL_TOP_R;
-        else                             data[r][c] = TILE_WALL_TOP_M;
+        if      (!leftIsWall && rightIsWall)  data[r][c] = TILE_WALL_TOP_L;
+        else if (leftIsWall && !rightIsWall)  data[r][c] = TILE_WALL_TOP_R;
+        else                                  data[r][c] = TILE_WALL_TOP_M;
       } else {
-        // Interior wall body — use dark tile (visible only if not overdrawn)
-        data[r][c] = TILE_WALL_DARK;
+        data[r][c] = TILE_WALL_SOLID;
       }
     }
   }
@@ -122,42 +115,33 @@ function buildWallTopData(): number[][] {
   return data;
 }
 
-/**
- * Build wall-face layer data (the pink vertical face row, drawn one row BELOW
- * the wall-top row, giving 3/4 perspective illusion).
- */
+/** Wall face layer: placed on floor cells directly below a wall row, giving 3/4 depth */
 function buildWallFaceData(): number[][] {
   const data: number[][] = Array.from({ length: ROWS }, () =>
-    new Array(COLS).fill(-1)
+    new Array(COLS).fill(TILE_VOID)
   );
 
-  for (let r = 0; r < ROWS; r++) {
+  for (let r = 1; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       if (MAP_LOGIC[r][c] !== 0 && MAP_LOGIC[r][c] !== 2 && MAP_LOGIC[r][c] !== 3) continue;
+      if (MAP_LOGIC[r - 1][c] !== 1) continue;
 
-      // If the cell directly ABOVE is a wall, this floor cell shows the wall face
-      const aboveIsWall = r > 0 && MAP_LOGIC[r - 1][c] === 1;
-      if (!aboveIsWall) continue;
+      const leftAbove  = c > 0 && MAP_LOGIC[r - 1][c - 1] === 1;
+      const rightAbove = c < COLS - 1 && MAP_LOGIC[r - 1][c + 1] === 1;
 
-      const leftAboveIsWall  = c > 0 && MAP_LOGIC[r - 1][c - 1] === 1;
-      const rightAboveIsWall = c < COLS - 1 && MAP_LOGIC[r - 1][c + 1] === 1;
-
-      if (!leftAboveIsWall && !rightAboveIsWall) data[r][c] = TILE_WALL_FACE_M; // isolated
-      else if (!leftAboveIsWall)                 data[r][c] = TILE_WALL_FACE_L;
-      else if (!rightAboveIsWall)                data[r][c] = TILE_WALL_FACE_R;
-      else                                       data[r][c] = TILE_WALL_FACE_M;
+      if      (!leftAbove && rightAbove)  data[r][c] = TILE_WALL_FACE_L;
+      else if (leftAbove && !rightAbove)  data[r][c] = TILE_WALL_FACE_R;
+      else                                data[r][c] = TILE_WALL_FACE_M;
     }
   }
 
   return data;
 }
 
-/**
- * Build prop/door/stairs layer data.
- */
+/** Prop layer: table and stairs */
 function buildPropData(stairsOpen = false): number[][] {
   const data: number[][] = Array.from({ length: ROWS }, () =>
-    new Array(COLS).fill(-1)
+    new Array(COLS).fill(TILE_VOID)
   );
 
   for (let r = 0; r < ROWS; r++) {
@@ -206,35 +190,31 @@ export class DungeonScene extends Scene {
     const floorTs = floorMap.addTilesetImage('dungeon-tiles', 'dungeon-tiles', TILE_SIZE, TILE_SIZE, 0, 0)!;
     const floorLayer = floorMap.createLayer(0, floorTs, 0, 0)!;
     floorLayer.setDepth(0);
-    // Warm gold tint for Floor 1 — The Lobby
-    floorLayer.setTint(0xffe0b0);
+    floorLayer.setTint(0xffeecc); // warm gold tint, reduced intensity
 
-    // ── Layer 1: Wall tops (depth 1) ─────────────────────────────────────
-    const wallTopMap = this.make.tilemap({ data: buildWallTopData(), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
-    const wallTopTs = wallTopMap.addTilesetImage('dungeon-tiles', 'dungeon-tiles', TILE_SIZE, TILE_SIZE, 0, 0)!;
-    const wallTopLayer = wallTopMap.createLayer(0, wallTopTs, 0, 0)!;
-    wallTopLayer.setDepth(1);
+    // ── Layer 1: Wall solid (depth 1) ─────────────────────────────────────
+    const wallMap = this.make.tilemap({ data: buildWallData(), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
+    const wallTs = wallMap.addTilesetImage('dungeon-tiles', 'dungeon-tiles', TILE_SIZE, TILE_SIZE, 0, 0)!;
+    const wallLayer = wallMap.createLayer(0, wallTs, 0, 0)!;
+    wallLayer.setDepth(1);
 
-    // ── Layer 2: Wall faces — 3/4 perspective (depth 2) ──────────────────
+    // ── Layer 2: Wall face 3/4 perspective (depth 2) ─────────────────────
     const wallFaceMap = this.make.tilemap({ data: buildWallFaceData(), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
     const wallFaceTs = wallFaceMap.addTilesetImage('dungeon-tiles', 'dungeon-tiles', TILE_SIZE, TILE_SIZE, 0, 0)!;
     const wallFaceLayer = wallFaceMap.createLayer(0, wallFaceTs, 0, 0)!;
     wallFaceLayer.setDepth(2);
 
-    // ── Layer 3: Props — doors / stairs (depth 3) ─────────────────────────
+    // ── Layer 3: Props (depth 3) ──────────────────────────────────────────
     this.propMap = this.make.tilemap({ data: buildPropData(false), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
     const propTs = this.propMap.addTilesetImage('dungeon-tiles', 'dungeon-tiles', TILE_SIZE, TILE_SIZE, 0, 0)!;
     this.propLayer = this.propMap.createLayer(0, propTs, 0, 0)!;
     this.propLayer.setDepth(3);
 
-    // ── Collision layer: wall solid + door/stairs block (use wallTopLayer geometry) ──
-    // We need a separate collision map based on the logical MAP_LOGIC
-    // Build a collision tilemap that has index 1 for walls, -1 for rest
+    // ── Collision layer (invisible, logical map) ──────────────────────────
     const collisionData = MAP_LOGIC.map(row =>
       row.map(v => (v === 1 ? 1 : v === 2 ? 2 : v === 3 ? 3 : 0))
     );
     const collMap = this.make.tilemap({ data: collisionData, tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
-    // We need a tileset for it — reuse dungeon-tiles but make it invisible
     const collTs = collMap.addTilesetImage('dungeon-tiles', 'dungeon-tiles', TILE_SIZE, TILE_SIZE, 0, 0)!;
     this.wallCollisionLayer = collMap.createLayer(0, collTs, 0, 0)!;
     this.wallCollisionLayer.setVisible(false);
@@ -247,10 +227,8 @@ export class DungeonScene extends Scene {
     this.player = this.physics.add.sprite(PLAYER_START_X, PLAYER_START_Y, 'player');
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(5);
-    // Adjust collision body to feet area for 3/4 perspective feel
     this.player.body!.setSize(14, 16);
     this.player.body!.setOffset(9, 28);
-    // Scale down sprite slightly so it fits nicely in 16×16 tiles at 2× zoom
     this.player.setScale(0.7);
     this.player.play('player-idle');
 
@@ -270,20 +248,18 @@ export class DungeonScene extends Scene {
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.cameras.main.setZoom(2);
 
-    // ── Atmosphere: vignette ──────────────────────────────────────────────
-    // Full-screen dark rectangle with inner transparent region — stays fixed to camera
+    // ── Atmosphere: vignette (reduced intensity, max alpha 0.4) ──────────
     const { width: sw, height: sh } = this.scale;
     const vignette = this.add.graphics();
     vignette.setScrollFactor(0);
     vignette.setDepth(50);
     this._drawVignette(vignette, sw, sh);
 
-    // ── Atmosphere: warm torchlight flicker near casino table ─────────────
+    // ── Atmosphere: torchlight flicker near casino table ──────────────────
     const torchX = DOOR_COL * TILE_SIZE + 8;
     const torchY = DOOR_ROW * TILE_SIZE + 8;
     const torchLight = this.add.pointlight(torchX, torchY, 0xffaa33, 60, 0.08, 0.05);
     torchLight.setDepth(4);
-    // Flicker by oscillating intensity
     this.tweens.add({
       targets: torchLight,
       intensity: { from: 0.05, to: 0.12 },
@@ -294,7 +270,7 @@ export class DungeonScene extends Scene {
       ease: 'Sine.easeInOut',
     });
 
-    // ── HUD (camera-fixed) ────────────────────────────────────────────────
+    // ── HUD ───────────────────────────────────────────────────────────────
     this.coinText = this.add
       .text(8, 8, `Coins: ${getCoins()}`, {
         fontSize: '12px',
@@ -343,30 +319,27 @@ export class DungeonScene extends Scene {
     // ── game-complete listener ─────────────────────────────────────────────
     this.events.on('game-complete', this._onGameComplete, this);
 
-    // Fade in
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
 
   private _drawVignette(g: GameObjects.Graphics, w: number, h: number): void {
-    // Layered dark bands from edges inward, creating a vignette effect
     g.clear();
     const steps = 12;
     const cx = w / 2;
     const cy = h / 2;
-    const rx = w * 0.55;
-    const ry = h * 0.55;
+    const rx = w * 0.6;  // larger clear center
+    const ry = h * 0.6;
 
     for (let i = 0; i < steps; i++) {
       const t = i / steps;
-      const alpha = t * t * 0.75; // quadratic falloff, max 0.75
+      const alpha = t * t * 0.4; // reduced max from 0.75 to 0.4
       g.fillStyle(0x000000, alpha);
       const innerRx = rx * (1 - t);
       const innerRy = ry * (1 - t);
-      // Draw bands outside the inner ellipse region at this step
-      g.fillRect(0, 0, w, cy - innerRy);                              // top band
-      g.fillRect(0, cy + innerRy, w, h - cy - innerRy);              // bottom band
-      g.fillRect(0, cy - innerRy, cx - innerRx, innerRy * 2);        // left band
-      g.fillRect(cx + innerRx, cy - innerRy, w - cx - innerRx, innerRy * 2); // right band
+      g.fillRect(0, 0, w, cy - innerRy);
+      g.fillRect(0, cy + innerRy, w, h - cy - innerRy);
+      g.fillRect(0, cy - innerRy, cx - innerRx, innerRy * 2);
+      g.fillRect(cx + innerRx, cy - innerRy, w - cx - innerRx, innerRy * 2);
     }
   }
 
@@ -383,7 +356,6 @@ export class DungeonScene extends Scene {
     if (this.cursors.up.isDown || this.wasd.up.isDown) vy = -speed;
     else if (this.cursors.down.isDown || this.wasd.down.isDown) vy = speed;
 
-    // Normalize diagonal movement
     if (vx !== 0 && vy !== 0) {
       const norm = Math.SQRT2;
       vx = vx / norm;
@@ -392,18 +364,15 @@ export class DungeonScene extends Scene {
 
     body.setVelocity(vx, vy);
 
-    // ── Animation ─────────────────────────────────────────────────────────
     const moving = vx !== 0 || vy !== 0;
     if (moving) {
       this.player.play('player-walk', true);
-      // Flip sprite for left movement (sprite faces right by default)
       if (vx < 0) this.player.setFlipX(true);
       else if (vx > 0) this.player.setFlipX(false);
     } else {
       this.player.play('player-idle', true);
     }
 
-    // Update HUD
     this.coinText.setText(`Coins: ${getCoins()}`);
   }
 
@@ -461,16 +430,13 @@ export class DungeonScene extends Scene {
     if (this.stairsUnlocked) return;
     this.stairsUnlocked = true;
 
-    // Remove stairs from collision
     this.wallCollisionLayer.setCollision([1, 2]);
 
-    // Swap stairs tile to open variant on prop layer
     const stairsTile = this.propLayer.getTileAt(STAIRS_COL, STAIRS_ROW);
     if (stairsTile) {
       stairsTile.index = TILE_STAIRS_O;
     }
 
-    // Gold glow particle effect on stairs
     const sx = STAIRS_COL * TILE_SIZE + 8;
     const sy = STAIRS_ROW * TILE_SIZE + 8;
     const glowLight = this.add.pointlight(sx, sy, 0xffdd00, 50, 0.15, 0.04);
