@@ -1,17 +1,13 @@
-import { Scene, GameObjects, Input, Math as PhaserMath } from 'phaser';
-import {
-  SoundLevels,
-  SoundSliderKey,
-  applySoundLevels,
-  getMusicVolume,
-  getSoundLevels,
-  updateSoundLevel,
-} from '../state/audioSettings';
+import Phaser, { Scene, GameObjects, Input, Math as PhaserMath } from 'phaser';
+import { AudioLevels, AudioManager } from '../audio/AudioManager';
 
 type MenuButtonId = 'play' | 'settings';
+type SoundSliderKey = keyof AudioLevels;
 
 type SliderUi = {
   key: SoundSliderKey;
+  trackX: number;
+  trackWidth: number;
   track: GameObjects.Rectangle;
   fill: GameObjects.Rectangle;
   knob: GameObjects.Rectangle;
@@ -21,37 +17,46 @@ type SliderUi = {
 export class MenuScene extends Scene {
   private readonly baseWidth = 1024;
   private readonly baseHeight = 768;
-  private readonly pixel = 4;
-  private readonly panelX = 212;
-  private readonly panelY = 206;
-  private readonly panelWidth = 600;
-  private readonly panelHeight = 320;
 
   private settingsVisible = false;
   private settingsBackdrop?: GameObjects.Rectangle;
-  private settingsObjects: GameObjects.GameObject[] = [];
+  private settingsPanel?: GameObjects.Container;
   private sliderUis: SliderUi[] = [];
   private draggingSlider?: SoundSliderKey;
-  private soundLevels!: SoundLevels;
+  private lastSliderSfxAt = 0;
+
+  private introTargets: GameObjects.GameObject[] = [];
+  private ambientDriftTweens: Phaser.Tweens.Tween[] = [];
+
+  private soundLevels: AudioLevels = {
+    master: 100,
+    music: 100,
+    sfx: 100,
+  };
 
   constructor() {
     super('MenuScene');
   }
 
   create(): void {
-    this.soundLevels = getSoundLevels(this.game);
+    const levels = AudioManager.init(this);
+    this.soundLevels = {
+      master: levels.master,
+      music: levels.music,
+      sfx: levels.sfx,
+    };
+
     this.cameras.main.setRoundPixels(true);
+
     this.drawBackground();
-    this.drawDecor();
-    this.createNeonSign();
+    this.createAtmosphere();
+    this.createHeroTitle();
+    this.createPokerTableDecor();
     this.createButtons();
     this.createSettingsPanel();
 
     this.input.on('pointermove', (pointer: Input.Pointer) => {
-      if (!this.draggingSlider) {
-        return;
-      }
-
+      if (!this.draggingSlider) return;
       this.updateSliderFromPointer(this.draggingSlider, pointer.x);
     });
 
@@ -63,29 +68,22 @@ export class MenuScene extends Scene {
       this.scene.restart();
     });
 
+    this.events.once('shutdown', () => {
+      this.ambientDriftTweens.forEach((tween) => tween.stop());
+      this.ambientDriftTweens = [];
+    });
+
     this.startMenuMusic();
+    this.finalizeMenuLayout();
   }
 
   private startMenuMusic(): void {
-    // Avoid double-starting if scene restarts (e.g. on resize)
-    const existing = this.game.registry.get('music') as Phaser.Sound.BaseSound | null;
-    if (existing?.isPlaying) return;
-    if (existing) {
-      existing.destroy();
+    const existing = AudioManager.getMusic(this);
+    if (existing?.key === 'menu-music' && existing.isPlaying) {
+      AudioManager.applyMusicVolume(this);
+      return;
     }
-
-    const music = this.sound.add('menu-music', { loop: true, volume: getMusicVolume(this.soundLevels) }) as
-      | Phaser.Sound.WebAudioSound
-      | Phaser.Sound.HTML5AudioSound;
-    this.game.registry.set('music', music);
-
-    const play = () => music.play();
-    if (this.sound.locked) {
-      this.sound.once('unlocked', play);
-    } else {
-      play();
-    }
-    applySoundLevels(this);
+    AudioManager.playMusic(this, 'menu-music', { loop: true });
   }
 
   private drawBackground(): void {
@@ -93,286 +91,309 @@ export class MenuScene extends Scene {
     const w = this.baseWidth;
     const h = this.baseHeight;
 
-    g.fillStyle(0x182b8b);
+    g.fillStyle(0x090707, 1);
     g.fillRect(0, 0, w, h);
 
-    g.fillStyle(0x1d37a4);
-    g.fillRect(0, 0, w, h * 0.52);
+    g.fillStyle(0x140b0f, 1);
+    g.fillRect(0, 0, w, h * 0.36);
 
-    g.fillStyle(0x2f1328);
-    g.fillRect(0, h * 0.52, w, h * 0.48);
+    g.fillStyle(0x1c0d13, 1);
+    g.fillRect(0, h * 0.36, w, h * 0.34);
 
-    for (let y = h * 0.55; y < h; y += this.pixel * 3) {
-      for (let x = 0; x < w; x += this.pixel * 4) {
-        const alt = (Math.floor(x / (this.pixel * 4)) + Math.floor(y / (this.pixel * 3))) % 2;
-        g.fillStyle(alt === 0 ? 0xbc2f35 : 0x9d1f2d);
-        g.fillRect(x, y, this.pixel * 4, this.pixel * 3);
+    g.fillStyle(0x10080c, 1);
+    g.fillRect(0, h * 0.7, w, h * 0.3);
 
-        if ((x + y) % 48 === 0) {
-          g.fillStyle(0xf5b85b);
-          g.fillRect(x + this.pixel, y + this.pixel, this.pixel, this.pixel);
-        }
-      }
+    // Marble-like floor grid lines
+    g.lineStyle(1, 0x5b3b2a, 0.25);
+    for (let y = h * 0.72; y < h; y += 18) {
+      g.lineBetween(0, y, w, y);
     }
-  }
-
-  private drawDecor(): void {
-    const g = this.add.graphics();
-    const w = this.baseWidth;
-    const h = this.baseHeight;
-
-    this.drawCeilingBeams(g);
-    this.drawBackWall(g);
-    this.drawMachineRow(g, 72, 272, 6, 0.8);
-    this.drawMachineRow(g, 54, 352, 7, 1.1);
-    this.drawMachineRow(g, 726, 302, 3, 1);
-
-    g.fillStyle(0xff9b50, 0.15);
-    g.fillRect(150, h - 148, 240, 24);
-    g.fillRect(560, h - 178, 280, 22);
-    g.fillStyle(0xffd990, 0.16);
-    g.fillRect(300, h - 98, 330, 18);
-
-    g.fillStyle(0x2a0d1c);
-    g.fillRect(0, h - 32, w, 32);
-
-    this.createLightSprites();
-  }
-
-  private drawCeilingBeams(g: GameObjects.Graphics): void {
-    const w = this.baseWidth;
-    g.fillStyle(0x5336d2);
-    g.fillRect(0, 0, w, 38);
-
-    for (let x = -10; x < w; x += 112) {
-      g.fillStyle(0xe95063);
-      g.fillRect(x, 36, 76, 24);
-      g.fillStyle(0x7036d6);
-      g.fillRect(x + 18, 60, 76, 14);
+    for (let x = 0; x < w; x += 28) {
+      g.lineBetween(x, h * 0.72, x + 24, h);
     }
+
+    // Top vignette and side darkness
+    g.fillStyle(0x000000, 0.35);
+    g.fillRect(0, 0, w, 64);
+    g.fillRect(0, 0, 80, h);
+    g.fillRect(w - 80, 0, 80, h);
   }
 
-  private drawBackWall(g: GameObjects.Graphics): void {
-    const w = this.baseWidth;
+  private createAtmosphere(): void {
+    const spotlight = this.add.ellipse(this.baseWidth / 2, 220, 760, 280, 0xc29a58, 0.08);
+    spotlight.setBlendMode(Phaser.BlendModes.SCREEN);
 
-    g.fillStyle(0x2648cd);
-    g.fillRect(0, 118, w, 210);
-    g.fillStyle(0x3b66ee);
-    g.fillRect(0, 118, w, 12);
+    const curtainLeft = this.add.rectangle(90, 350, 140, 520, 0x2b1016, 0.75).setOrigin(0.5);
+    const curtainRight = this.add.rectangle(934, 350, 140, 520, 0x2b1016, 0.75).setOrigin(0.5);
 
-    g.fillStyle(0x1c328d);
-    g.fillRect(424, 156, 176, 142);
-    g.fillStyle(0xff6f6b);
-    g.fillRect(448, 184, 128, 26);
-    g.fillStyle(0x2c57d6);
-    g.fillRect(454, 216, 116, 56);
-
-    for (let i = 0; i < 5; i++) {
-      g.fillStyle(0xfff284, 0.9);
-      g.fillRect(462 + i * 22, 224, 10, 10);
-    }
-  }
-
-  private drawMachineRow(
-    g: GameObjects.Graphics,
-    startX: number,
-    y: number,
-    count: number,
-    scale = 1,
-  ): void {
-    const width = Math.floor(78 * scale);
-    const height = Math.floor(116 * scale);
-    const spacing = Math.floor(92 * scale);
-    const screenW = Math.floor(42 * scale);
-    const screenH = Math.floor(42 * scale);
-
-    for (let i = 0; i < count; i++) {
-      const x = startX + i * spacing;
-      g.fillStyle(0x2a3f9f);
-      g.fillRect(x, y, width, height);
-      g.fillStyle(0x506de5);
-      g.fillRect(x + 6, y + 6, width - 12, 12);
-
-      g.fillStyle(0x111f61);
-      g.fillRect(x + 10, y + 24, screenW, screenH);
-      g.fillStyle(0xf86f65);
-      g.fillRect(x + 13, y + 27, screenW - 6, 8);
-      g.fillStyle(0xf7d760);
-      g.fillRect(x + 13, y + 37, 12, 8);
-      g.fillRect(x + 29, y + 37, 12, 8);
-
-      g.fillStyle(0x20327f);
-      g.fillRect(x + 14, y + height - 28, width - 28, 16);
-      g.fillStyle(0xffd47c);
-      g.fillRect(x + width - 14, y + 42, 6, 18);
-    }
-  }
-
-  private createLightSprites(): void {
-    const lightPositions: Array<[number, number]> = [
-      [150, 132],
-      [210, 132],
-      [270, 132],
-      [330, 132],
-      [684, 132],
-      [744, 132],
-      [804, 132],
-      [864, 132],
+    const lampPositions: Array<[number, number]> = [
+      [172, 112],
+      [252, 120],
+      [332, 108],
+      [692, 108],
+      [772, 120],
+      [852, 112],
     ];
 
-    lightPositions.forEach(([x, y], idx) => {
-      const orb = this.add.rectangle(x, y, 10, 10, 0xffe17d).setOrigin(0.5);
-      this.tweens.add({
-        targets: orb,
-        alpha: { from: 0.35, to: 1 },
-        duration: 360,
+    lampPositions.forEach(([x, y], idx) => {
+      const glow = this.add.circle(x, y, 7, 0xffd18a, 0.85);
+      const halo = this.add.circle(x, y + 8, 26, 0xffbf73, 0.08);
+      halo.setBlendMode(Phaser.BlendModes.SCREEN);
+
+      const tw = this.tweens.add({
+        targets: [glow, halo],
+        alpha: { from: 0.45, to: 1 },
+        duration: 1200,
         yoyo: true,
         repeat: -1,
-        delay: idx * 70,
+        delay: idx * 120,
       });
+      this.ambientDriftTweens.push(tw);
     });
+
+    // Low-amplitude parallax drift for depth
+    const depthOrbs = [
+      this.add.circle(200, 620, 36, 0x8a5a3b, 0.08),
+      this.add.circle(780, 605, 42, 0xa16b45, 0.07),
+      this.add.circle(500, 640, 32, 0x71472f, 0.06),
+    ];
+
+    depthOrbs.forEach((orb, i) => {
+      const drift = this.tweens.add({
+        targets: orb,
+        x: orb.x + (i % 2 === 0 ? 8 : -8),
+        y: orb.y + (i % 2 === 0 ? -5 : 5),
+        duration: 3800 + i * 400,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+      this.ambientDriftTweens.push(drift);
+      this.introTargets.push(orb);
+    });
+
+    this.introTargets.push(spotlight, curtainLeft, curtainRight);
   }
 
-  private createNeonSign(): void {
-    const signBack = this.add.graphics();
-    signBack.fillStyle(0x1c2f87, 0.9);
-    signBack.fillRect(284, 136, 456, 92);
-    signBack.fillStyle(0x3958d8, 0.95);
-    signBack.fillRect(294, 146, 436, 72);
+  private createHeroTitle(): void {
+    const crest = this.add.graphics();
+    crest.fillStyle(0x3a1c12, 0.9);
+    crest.fillRoundedRect(250, 90, 524, 128, 12);
+    crest.lineStyle(3, 0xc9a66b, 0.9);
+    crest.strokeRoundedRect(250, 90, 524, 128, 12);
 
-    const neon = this.add.text(this.baseWidth / 2, 182, 'CASINO CLIMB', {
-      fontFamily: 'Courier New',
-      fontSize: '58px',
-      color: '#ff9cdc',
-      stroke: '#ff3b96',
-      strokeThickness: 10,
-      letterSpacing: 3,
-    });
-    neon.setOrigin(0.5);
-    neon.setResolution(0.5);
-    neon.setShadow(0, 0, '#ff3b96', 26, false, true);
+    const title = this.add.text(this.baseWidth / 2, 154, 'CASINO CLIMB', {
+      fontFamily: 'Georgia',
+      fontSize: '64px',
+      color: '#ffd8a2',
+      stroke: '#8c4d2a',
+      strokeThickness: 6,
+      letterSpacing: 1,
+    }).setOrigin(0.5);
+    title.setShadow(0, 0, '#ffb874', 22, false, true);
 
-    this.tweens.add({
-      targets: neon,
-      alpha: { from: 0.72, to: 1 },
-      duration: 650,
+    const tw = this.tweens.add({
+      targets: title,
+      alpha: { from: 0.82, to: 1 },
+      duration: 1500,
       yoyo: true,
       repeat: -1,
+      ease: 'Sine.easeInOut',
     });
+    this.ambientDriftTweens.push(tw);
+
+    this.introTargets.push(crest, title);
+  }
+
+  private createPokerTableDecor(): void {
+    const tableX = this.baseWidth / 2;
+    const tableY = 792;
+
+    const table = this.add.graphics();
+    table.fillStyle(0x1e1009, 0.92);
+    table.fillEllipse(tableX, tableY, 1780, 470);
+
+    table.fillStyle(0x4d2d1c, 0.95);
+    table.fillEllipse(tableX, tableY, 1700, 418);
+
+    table.fillStyle(0x0f5a32, 0.92);
+    table.fillEllipse(tableX, tableY, 1580, 360);
+
+    table.lineStyle(3, 0xd2b06e, 0.65);
+    table.strokeEllipse(tableX, tableY, 1580, 360);
+
+    table.fillStyle(0xffffff, 0.08);
+    table.fillEllipse(tableX, tableY - 54, 1120, 96);
+
+    const cardY = 706;
+    const cardStartX = 258;
+    const cardStep = 62;
+    const cards = ['A♠', 'K♦', 'Q♣', 'J♥', '10♠', '9♦', '8♣'];
+
+    cards.forEach((card, index) => {
+      const x = cardStartX + index * cardStep;
+      const cardRect = this.add.rectangle(x, cardY, 52, 72, 0xf8efdc, 0.92);
+      cardRect.setStrokeStyle(2, 0xb28a5a, 0.68);
+      cardRect.setAngle((index - 3) * 1.2);
+
+      const isRed = card.includes('♦') || card.includes('♥');
+      const cardText = this.add.text(x, cardY - 2, card, {
+        fontFamily: 'Georgia',
+        fontSize: '19px',
+        color: isRed ? '#b2303b' : '#222226',
+      }).setOrigin(0.5);
+      cardText.setAngle((index - 3) * 1.2);
+
+      this.introTargets.push(cardRect, cardText);
+    });
+
+    const stackCenterX = cardStartX + cards.length * cardStep + 78;
+    const stackBaseY = cardY + 58;
+    const palette = [0xe3b74b, 0xbe2138, 0x1f56ab, 0x1f8a4b];
+
+    const stackSpecs = [
+      { x: stackCenterX - 72, chips: 9, radius: 18 },
+      { x: stackCenterX - 36, chips: 15, radius: 19 },
+      { x: stackCenterX, chips: 12, radius: 19 },
+      { x: stackCenterX + 36, chips: 10, radius: 18 },
+      { x: stackCenterX + 72, chips: 6, radius: 17 },
+    ];
+
+    stackSpecs.forEach((stack, stackIndex) => {
+      for (let i = 0; i < stack.chips; i += 1) {
+        const chip = this.add.circle(
+          stack.x,
+          stackBaseY - i * 9,
+          stack.radius,
+          palette[(i + stackIndex) % palette.length],
+          0.95,
+        );
+        chip.setStrokeStyle(3, 0xf6e6c6, 0.78);
+
+        const centerDot = this.add.circle(
+          stack.x,
+          stackBaseY - i * 9,
+          Math.max(4, stack.radius * 0.28),
+          0xf3dcaf,
+          0.72,
+        );
+
+        this.introTargets.push(chip, centerDot);
+      }
+    });
+
+    this.introTargets.push(table);
   }
 
   private createButtons(): void {
-    this.createButton(this.baseWidth / 2, 560, 230, 56, 'PLAY', 'play');
-    this.createButton(this.baseWidth / 2, 632, 230, 56, 'SETTINGS', 'settings');
+    this.createButton(this.baseWidth / 2, 340, 380, 98, 'PLAY', 'play', true);
+    this.createButton(this.baseWidth / 2, 454, 300, 74, 'SETTINGS', 'settings', false);
   }
 
   private createSettingsPanel(): void {
-    const panelX = this.panelX;
-    const panelY = this.panelY;
-    const panelW = this.panelWidth;
-    const panelH = this.panelHeight;
+    const panelW = 628;
+    const panelH = 338;
+    const panelX = (this.baseWidth - panelW) / 2;
+    const panelY = 212;
 
-    const backdrop = this.add.rectangle(0, 0, this.baseWidth, this.baseHeight, 0x06030f, 0.65);
-    backdrop.setOrigin(0);
-    backdrop.setDepth(40);
-    backdrop.setInteractive();
-    backdrop.on('pointerdown', () => this.toggleSettings(false));
-    this.settingsBackdrop = backdrop;
-    this.settingsObjects.push(backdrop);
+    this.settingsBackdrop = this.add.rectangle(0, 0, this.baseWidth, this.baseHeight, 0x050303, 0.68);
+    this.settingsBackdrop.setOrigin(0);
+    this.settingsBackdrop.setDepth(60);
+    this.settingsBackdrop.setInteractive();
+    this.settingsBackdrop.on('pointerdown', () => this.toggleSettings(false));
+    this.settingsBackdrop.setVisible(false).setAlpha(0);
+    this.settingsBackdrop.disableInteractive();
 
-    const panel = this.add.graphics();
-    panel.fillStyle(0x45143c, 0.98);
-    panel.fillRect(panelX, panelY, panelW, panelH);
-    panel.fillStyle(0x9d2b6d, 1);
-    panel.fillRect(panelX + 8, panelY + 8, panelW - 16, panelH - 16);
-    panel.fillStyle(0x25134d, 1);
-    panel.fillRect(panelX + 14, panelY + 14, panelW - 28, panelH - 28);
-    panel.fillStyle(0xe6ba57, 1);
-    panel.fillRect(panelX + 18, panelY + 18, panelW - 36, 42);
-    panel.setDepth(41);
-    this.settingsObjects.push(panel);
+    const panel = this.add.container(0, 0);
+    panel.setDepth(61);
+    panel.setVisible(false).setAlpha(0).setScale(0.96);
 
-    const title = this.add.text(panelX + panelW / 2, panelY + 39, 'SOUND SETTINGS', {
-      fontFamily: 'Courier New',
-      fontSize: '28px',
-      color: '#3f1702',
-      stroke: '#f7d591',
-      strokeThickness: 4,
-    });
-    title.setOrigin(0.5);
-    title.setResolution(0.5);
-    title.setDepth(42);
-    this.settingsObjects.push(title);
+    const frame = this.add.graphics();
+    frame.fillStyle(0x1a0c11, 0.98);
+    frame.fillRoundedRect(panelX, panelY, panelW, panelH, 12);
+    frame.lineStyle(3, 0xc8a364, 1);
+    frame.strokeRoundedRect(panelX, panelY, panelW, panelH, 12);
+    frame.lineStyle(1, 0x6c4832, 0.65);
+    frame.strokeRoundedRect(panelX + 10, panelY + 10, panelW - 20, panelH - 20, 10);
 
-    const closeButton = this.add.rectangle(panelX + panelW - 30, panelY + 39, 30, 24, 0x8b1b42);
-    closeButton.setDepth(42);
+    const ribbon = this.add.graphics();
+    ribbon.fillStyle(0x4d1f2f, 0.92);
+    ribbon.fillRoundedRect(panelX + 18, panelY + 18, panelW - 36, 46, 6);
+    ribbon.lineStyle(2, 0xd4b27b, 1);
+    ribbon.strokeRoundedRect(panelX + 18, panelY + 18, panelW - 36, 46, 6);
+
+    const title = this.add.text(panelX + panelW / 2, panelY + 41, 'SOUND SETTINGS', {
+      fontFamily: 'Georgia',
+      fontSize: '30px',
+      color: '#f7ddb0',
+      stroke: '#35150f',
+      strokeThickness: 3,
+      letterSpacing: 1,
+    }).setOrigin(0.5);
+
+    const closeButton = this.add.rectangle(panelX + panelW - 34, panelY + 42, 30, 24, 0x5d2237, 1);
     closeButton.setInteractive({ useHandCursor: true });
+    closeButton.on('pointerover', () => this.playUiHover());
     closeButton.on('pointerdown', () => this.toggleSettings(false));
-    this.settingsObjects.push(closeButton);
 
-    const closeText = this.add.text(panelX + panelW - 30, panelY + 39, 'X', {
+    const closeText = this.add.text(panelX + panelW - 34, panelY + 42, 'X', {
       fontFamily: 'Courier New',
-      fontSize: '18px',
-      color: '#ffe9bd',
-    });
-    closeText.setOrigin(0.5);
-    closeText.setResolution(0.5);
-    closeText.setDepth(43);
-    this.settingsObjects.push(closeText);
+      fontSize: '16px',
+      color: '#ffe8be',
+    }).setOrigin(0.5);
 
-    this.createSoundSlider('MASTER', 'master', panelY + 118);
-    this.createSoundSlider('MUSIC', 'music', panelY + 184);
-    this.createSoundSlider('SFX', 'sfx', panelY + 250);
+    panel.add([frame, ribbon, title, closeButton, closeText]);
 
-    this.toggleSettings(false);
+    this.settingsPanel = panel;
+
+    this.createSoundSlider('MASTER', 'master', panelY + 126, panelX, panel);
+    this.createSoundSlider('MUSIC', 'music', panelY + 198, panelX, panel);
+    this.createSoundSlider('SFX', 'sfx', panelY + 270, panelX, panel);
+
+    this.settingsVisible = false;
   }
 
-  private createSoundSlider(label: string, key: SoundSliderKey, y: number): void {
-    const labelText = this.add.text(this.panelX + 62, y, label, {
+  private createSoundSlider(
+    label: string,
+    key: SoundSliderKey,
+    y: number,
+    panelX: number,
+    panel: GameObjects.Container,
+  ): void {
+    const labelText = this.add.text(panelX + 58, y, label, {
       fontFamily: 'Courier New',
       fontSize: '24px',
-      color: '#ffd98d',
-    });
-    labelText.setOrigin(0, 0.5);
-    labelText.setResolution(0.5);
-    labelText.setDepth(42);
-    this.settingsObjects.push(labelText);
+      color: '#f0cf98',
+    }).setOrigin(0, 0.5);
 
-    const trackX = this.panelX + 318;
-    const trackW = 250;
-    const trackH = 14;
+    const trackX = panelX + 338;
+    const trackW = 255;
 
-    const track = this.add.rectangle(trackX, y, trackW, trackH, 0x4e2d79);
-    track.setDepth(42);
+    const track = this.add.rectangle(trackX, y, trackW, 14, 0x3f2533, 1);
     track.setInteractive({ useHandCursor: true });
-    this.settingsObjects.push(track);
 
-    const fill = this.add.rectangle(trackX - trackW / 2, y, trackW, trackH - 4, 0xff6f7a);
+    const fill = this.add.rectangle(trackX - trackW / 2, y, trackW, 10, 0xca8b58, 1);
     fill.setOrigin(0, 0.5);
-    fill.setDepth(43);
-    this.settingsObjects.push(fill);
 
-    const knob = this.add.rectangle(trackX, y, 18, 24, 0xf9d36e);
-    knob.setDepth(44);
+    const knob = this.add.rectangle(trackX, y, 20, 26, 0xf0c476, 1);
+    knob.setStrokeStyle(2, 0x6a4126, 1);
     knob.setInteractive({ useHandCursor: true });
-    this.settingsObjects.push(knob);
 
-    const valueText = this.add.text(this.panelX + 532, y, '0%', {
+    const valueText = this.add.text(panelX + 560, y, '0%', {
       fontFamily: 'Courier New',
       fontSize: '22px',
-      color: '#ffe8be',
-    });
-    valueText.setOrigin(1, 0.5);
-    valueText.setResolution(0.5);
-    valueText.setDepth(42);
-    this.settingsObjects.push(valueText);
+      color: '#ffe4b9',
+    }).setOrigin(1, 0.5);
 
-    const sliderUi: SliderUi = { key, track, fill, knob, valueText };
+    panel.add([labelText, track, fill, knob, valueText]);
+
+    const sliderUi: SliderUi = { key, trackX, trackWidth: trackW, track, fill, knob, valueText };
     this.sliderUis.push(sliderUi);
     this.updateSliderVisual(sliderUi, this.soundLevels[key]);
 
     const beginDrag = (pointerX: number): void => {
       this.draggingSlider = key;
+      this.playUiClick();
       this.updateSliderFromPointer(key, pointerX);
     };
 
@@ -382,41 +403,81 @@ export class MenuScene extends Scene {
 
   private updateSliderFromPointer(key: SoundSliderKey, pointerX: number): void {
     const slider = this.sliderUis.find((entry) => entry.key === key);
-    if (!slider) {
-      return;
-    }
+    if (!slider) return;
 
     const bounds = slider.track.getBounds();
     const ratio = PhaserMath.Clamp((pointerX - bounds.left) / bounds.width, 0, 1);
     const value = Math.round(ratio * 100);
 
-    this.soundLevels = updateSoundLevel(this.game, key, value);
+    this.soundLevels[key] = value;
     this.updateSliderVisual(slider, value);
-    applySoundLevels(this);
+    this.applySoundLevels();
+    this.playSliderMoveSfx();
   }
 
   private updateSliderVisual(slider: SliderUi, value: number): void {
     const ratio = value / 100;
-    const bounds = slider.track.getBounds();
-    const fillWidth = Math.max(4, bounds.width * ratio);
+    const fillWidth = Math.max(4, slider.trackWidth * ratio);
 
     slider.fill.setSize(fillWidth, slider.fill.height);
-    slider.knob.x = bounds.left + (bounds.width * ratio);
+    slider.knob.x = slider.trackX - slider.trackWidth / 2 + slider.trackWidth * ratio;
     slider.valueText.setText(`${value}%`);
   }
 
+  private applySoundLevels(): void {
+    AudioManager.setLevels(this, this.soundLevels);
+  }
+
   private toggleSettings(visible: boolean): void {
+    if (!this.settingsBackdrop || !this.settingsPanel) return;
+
+    if (this.settingsVisible !== visible) {
+      this.playUiClick();
+    }
     this.settingsVisible = visible;
     this.draggingSlider = undefined;
 
-    this.settingsObjects.forEach((obj) => obj.setVisible(visible));
+    this.tweens.killTweensOf([this.settingsBackdrop, this.settingsPanel]);
 
-    if (this.settingsBackdrop) {
-      this.settingsBackdrop.disableInteractive();
-      if (visible) {
-        this.settingsBackdrop.setInteractive();
-      }
+    if (visible) {
+      this.settingsBackdrop.setVisible(true).setAlpha(0);
+      this.settingsPanel.setVisible(true).setAlpha(0).setScale(0.96);
+      this.settingsBackdrop.setInteractive();
+
+      this.tweens.add({
+        targets: this.settingsBackdrop,
+        alpha: 0.68,
+        duration: 180,
+        ease: 'Quad.easeOut',
+      });
+
+      this.tweens.add({
+        targets: this.settingsPanel,
+        alpha: 1,
+        scale: 1,
+        duration: 220,
+        ease: 'Back.easeOut',
+      });
+      return;
     }
+
+    this.settingsBackdrop.disableInteractive();
+    this.tweens.add({
+      targets: this.settingsBackdrop,
+      alpha: 0,
+      duration: 140,
+      ease: 'Quad.easeIn',
+      onComplete: () => this.settingsBackdrop?.setVisible(false),
+    });
+
+    this.tweens.add({
+      targets: this.settingsPanel,
+      alpha: 0,
+      scale: 0.96,
+      duration: 140,
+      ease: 'Quad.easeIn',
+      onComplete: () => this.settingsPanel?.setVisible(false),
+    });
   }
 
   private createButton(
@@ -426,55 +487,79 @@ export class MenuScene extends Scene {
     height: number,
     label: string,
     id: MenuButtonId,
+    primary: boolean,
   ): void {
+    const container = this.add.container(x, y);
     const frame = this.add.graphics();
+
+    const baseY = y;
 
     const redraw = (hovered: boolean): void => {
       frame.clear();
-      frame.fillStyle(hovered ? 0xfed36f : 0xe1b85a);
-      frame.fillRect(x - width / 2, y - height / 2, width, height);
-      frame.fillStyle(0x4d2d10);
-      frame.fillRect(x - width / 2 + 6, y - height / 2 + 6, width - 12, height - 12);
-      frame.fillStyle(hovered ? 0x7f163d : 0x651232);
-      frame.fillRect(x - width / 2 + 10, y - height / 2 + 10, width - 20, height - 20);
+      frame.fillStyle(primary ? (hovered ? 0xe3bb75 : 0xcda062) : (hovered ? 0xbe8a54 : 0xa37245), 1);
+      frame.fillRoundedRect(-width / 2, -height / 2, width, height, 8);
+
+      frame.fillStyle(0x3b2316, 1);
+      frame.fillRoundedRect(-width / 2 + 6, -height / 2 + 6, width - 12, height - 12, 7);
+
+      frame.fillStyle(primary ? (hovered ? 0x612834 : 0x4b1e28) : (hovered ? 0x4b1f2a : 0x3f1a24), 1);
+      frame.fillRoundedRect(-width / 2 + 10, -height / 2 + 10, width - 20, height - 20, 6);
+
+      if (primary) {
+        frame.lineStyle(2, hovered ? 0xffdfa2 : 0xd8b279, 0.85);
+        frame.strokeRoundedRect(-width / 2 + 10, -height / 2 + 10, width - 20, height - 20, 6);
+      }
     };
 
     redraw(false);
 
-    const text = this.add.text(x, y, label, {
-      fontFamily: 'Courier New',
-      fontSize: '28px',
-      color: '#fff4d2',
-      stroke: '#2e1b00',
-      strokeThickness: 5,
-    });
-    text.setOrigin(0.5);
-    text.setResolution(0.5);
+    const text = this.add.text(0, 0, label, {
+      fontFamily: primary ? 'Georgia' : 'Courier New',
+      fontSize: primary ? '46px' : '34px',
+      color: '#fff1d3',
+      stroke: '#2a160f',
+      strokeThickness: primary ? 6 : 5,
+      letterSpacing: primary ? 2 : 1,
+    }).setOrigin(0.5);
 
-    const hitArea = this.add.rectangle(x, y, width, height, 0x000000, 0);
+    const hitArea = this.add.rectangle(0, 0, width, height, 0x000000, 0);
     hitArea.setInteractive({ useHandCursor: true });
-    hitArea.on('pointerover', () => redraw(true));
-    hitArea.on('pointerout', () => redraw(false));
+
+    let hoverTween: Phaser.Tweens.Tween | null = null;
+
+    hitArea.on('pointerover', () => {
+      this.playUiHover();
+      redraw(true);
+      hoverTween?.stop();
+      hoverTween = this.tweens.add({
+        targets: container,
+        y: baseY - 6,
+        duration: 140,
+        ease: 'Quad.easeOut',
+      });
+    });
+
+    hitArea.on('pointerout', () => {
+      redraw(false);
+      hoverTween?.stop();
+      hoverTween = this.tweens.add({
+        targets: container,
+        y: baseY,
+        duration: 140,
+        ease: 'Quad.easeOut',
+      });
+    });
+
     hitArea.on('pointerdown', () => this.onButtonClick(id));
+
+    container.add([frame, text, hitArea]);
+    this.introTargets.push(container);
   }
 
   private onButtonClick(id: MenuButtonId): void {
+    this.playUiClick();
     if (id === 'play') {
-      // Stop menu music and switch to ambient track
-      const menuMusic = this.game.registry.get('music') as
-        | Phaser.Sound.WebAudioSound
-        | Phaser.Sound.HTML5AudioSound
-        | undefined;
-      if (menuMusic) {
-        menuMusic.stop();
-      }
-      const ambientMusic = this.sound.add('casino-music', {
-        loop: true,
-        volume: getMusicVolume(getSoundLevels(this.game)),
-      });
-      this.game.registry.set('music', ambientMusic);
-      ambientMusic.play();
-      applySoundLevels(this);
+      AudioManager.playMusic(this, 'casino-music', { loop: true, restart: true });
 
       this.cameras.main.fadeOut(250, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
@@ -484,5 +569,24 @@ export class MenuScene extends Scene {
     }
 
     this.toggleSettings(!this.settingsVisible);
+  }
+
+  private finalizeMenuLayout(): void {
+    this.introTargets.forEach((obj) => obj.setAlpha(1));
+  }
+
+  private playUiHover(): void {
+    AudioManager.playSfx(this, 'ui-hover', { volume: 0.85, cooldownMs: 45, allowOverlap: false });
+  }
+
+  private playUiClick(): void {
+    AudioManager.playSfx(this, 'ui-click', { volume: 0.95, cooldownMs: 25, allowOverlap: false });
+  }
+
+  private playSliderMoveSfx(): void {
+    const now = Date.now();
+    if (now - this.lastSliderSfxAt < 90) return;
+    this.lastSliderSfxAt = now;
+    AudioManager.playSfx(this, 'ui-hover', { volume: 0.5, cooldownMs: 50, allowOverlap: false });
   }
 }

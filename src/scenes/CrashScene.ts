@@ -1,9 +1,7 @@
 import { Scene, GameObjects } from 'phaser';
 import { resolve, nextCrashPoint, isValidBet } from '../games/crash';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle } from '../ui/theme';
-import { getActiveEffect, clearActiveEffect } from '../state/coinState';
-import { addGameplaySettingsGear } from '../ui/gameplaySettings';
-import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
+import { AudioManager } from '../audio/AudioManager';
 
 const WIN_TARGET = 350;
 const BET_OPTIONS = [10, 25, 50];
@@ -18,6 +16,7 @@ export class CrashScene extends Scene {
   private crashPoint: number = 2.0;
   private cashedOut: boolean = false;
   private successfulCashOuts: number = 0;
+  private warningPlayed: boolean = false;
 
   // Ticker
   private tickEvent: Phaser.Time.TimerEvent | null = null;
@@ -54,6 +53,7 @@ export class CrashScene extends Scene {
     this.currentMult = 1.0;
     this.cashedOut = false;
     this.successfulCashOuts = 0;
+    this.warningPlayed = false;
     this.graphPoints = [];
     this.tickEvent = null;
   }
@@ -222,8 +222,10 @@ export class CrashScene extends Scene {
 
     this.updatePlayButton();
     this.refreshBetButtons();
-    addGameplaySettingsGear(this, 'CrashScene');
-    registerDeveloperUnlockHotkey(this, () => this.unlockForDevelopers());
+    AudioManager.playMusic(this, 'crash-game', { loop: true, restart: true });
+    this.events.once('shutdown', () => {
+      AudioManager.playMusic(this, 'casino-music', { loop: true, restart: true });
+    });
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
@@ -253,6 +255,7 @@ export class CrashScene extends Scene {
 
   private selectBet(bet: number) {
     this.selectedBet = this.selectedBet === bet ? 0 : bet;
+    AudioManager.playSfx(this, 'bet-select', { volume: 1.3, cooldownMs: 50, allowOverlap: false });
     this.refreshBetButtons();
     this.updatePlayButton();
   }
@@ -308,8 +311,10 @@ export class CrashScene extends Scene {
   // ---- Round logic ----
 
   private startRound() {
+    AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 50, allowOverlap: false });
     this.playing = true;
     this.cashedOut = false;
+    this.warningPlayed = false;
     this.currentMult = 1.0;
     this.graphPoints = [];
 
@@ -352,6 +357,12 @@ export class CrashScene extends Scene {
     const color = this.multColor(this.currentMult);
     this.multDisplay.setText(this.currentMult.toFixed(2) + 'x');
     this.multDisplay.setColor(color);
+    AudioManager.playSfx(this, 'ui-hover', {
+      volume: Math.min(0.16 + this.currentMult * 0.02, 0.28),
+      rate: Math.min(1 + this.currentMult * 0.03, 1.35),
+      cooldownMs: 180,
+      allowOverlap: false,
+    });
 
     this.tweens.add({
       targets: this.multDisplay,
@@ -362,6 +373,11 @@ export class CrashScene extends Scene {
     });
 
     this._drawGraph();
+
+    if (!this.warningPlayed && this.crashPoint - this.currentMult <= 0.35) {
+      this.warningPlayed = true;
+      AudioManager.playSfx(this, 'crash-warning', { volume: 1.35, cooldownMs: 200, allowOverlap: false });
+    }
 
     if (this.currentMult >= this.crashPoint) {
       this._doCrash();
@@ -405,6 +421,7 @@ export class CrashScene extends Scene {
   }
 
   private _doCrash() {
+    AudioManager.playSfx(this, 'crash', { volume: 1.45, cooldownMs: 250, allowOverlap: false });
     this.playing = false;
 
     if (this.tickEvent) {
@@ -472,16 +489,13 @@ export class CrashScene extends Scene {
     });
 
     this.currentCoins = result.newCoins;
-    const winnings = result.payout - this.selectedBet;
-    const effect = getActiveEffect();
-    if (effect) {
-      const adj = Math.round(winnings * effect.magnitude);
-      this.currentCoins += effect.type === 'buff' ? adj : -adj;
-    }
     this.coinsText.setText(`Coins: ${this.currentCoins}`);
 
+    const winnings = result.payout - this.selectedBet;
     this.resultText.setText(`+${winnings} coins at ${mult.toFixed(2)}x`);
     this.resultText.setColor(COLOR.winGreen);
+    AudioManager.playSfx(this, 'cashout', { volume: 1.45, cooldownMs: 120, allowOverlap: false });
+    AudioManager.playSfx(this, 'win', { volume: 1.2, cooldownMs: 120, allowOverlap: false });
 
     this.successfulCashOuts++;
 
@@ -506,19 +520,8 @@ export class CrashScene extends Scene {
     this.updatePlayButton();
   }
 
-  private unlockForDevelopers(): void {
-    if (this.playing) {
-      return;
-    }
-    this.currentCoins = Math.max(this.currentCoins, WIN_TARGET);
-    this.successfulCashOuts = Math.max(this.successfulCashOuts, 3);
-    this.coinsText.setText(`Coins: ${this.currentCoins}`);
-    this.targetReachedText.setText('DEV: target unlocked.').setVisible(true);
-    this.leave();
-  }
-
   leave() {
-    clearActiveEffect();
+    AudioManager.playSfx(this, 'ui-click', { volume: 0.8, cooldownMs: 50, allowOverlap: false });
     const won = this.currentCoins >= WIN_TARGET || this.successfulCashOuts >= 3;
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {

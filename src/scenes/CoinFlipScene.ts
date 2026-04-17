@@ -1,9 +1,7 @@
 import { Scene, GameObjects } from 'phaser';
 import { play, isValidBet, RiskType } from '../games/coinFlip';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle } from '../ui/theme';
-import { getActiveEffect, clearActiveEffect } from '../state/coinState';
-import { addGameplaySettingsGear } from '../ui/gameplaySettings';
-import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
+import { AudioManager } from '../audio/AudioManager';
 
 const WIN_TARGET = 300;
 const BET_OPTIONS = [5, 25, 50];
@@ -248,8 +246,6 @@ export class CoinFlipScene extends Scene {
 
     this.updatePlayButton();
     this.refreshBetButtons();
-    addGameplaySettingsGear(this, 'CoinFlipScene');
-    registerDeveloperUnlockHotkey(this, () => this.unlockForDevelopers());
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
@@ -280,6 +276,7 @@ export class CoinFlipScene extends Scene {
 
   private selectBet(bet: number) {
     this.selectedBet = this.selectedBet === bet ? 0 : bet;
+    AudioManager.playSfx(this, 'bet-select', { volume: 1.3, cooldownMs: 50, allowOverlap: false });
     this.refreshBetButtons();
     this.updatePlayButton();
   }
@@ -312,6 +309,7 @@ export class CoinFlipScene extends Scene {
 
   private selectMode(mode: RiskType) {
     this.riskType = mode;
+    AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 50, allowOverlap: false });
 
     if (mode === 'flip') {
       drawNestedButton(this.flipBtn.bg, 1024 / 2 - 110, 305, 180, 50, true);
@@ -334,6 +332,7 @@ export class CoinFlipScene extends Scene {
 
   private selectGuess(guess: 'low' | 'high') {
     this.diceGuess = guess;
+    AudioManager.playSfx(this, 'ui-click', { volume: 0.75, cooldownMs: 50, allowOverlap: false });
     const guessY = 376;
     const guessBtnW = 130;
     const guessBtnH = 40;
@@ -369,6 +368,7 @@ export class CoinFlipScene extends Scene {
   // ---- Game logic ----
 
   private startPlay() {
+    AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 40, allowOverlap: false });
     this.animating = true;
     this.resultText.setText('');
     this.targetReachedText.setVisible(false);
@@ -386,6 +386,7 @@ export class CoinFlipScene extends Scene {
   }
 
   private runCoinAnimation(cx: number, cy: number) {
+    AudioManager.playSfx(this, 'coin-flip', { volume: 1.4, cooldownMs: 120, allowOverlap: true });
     const frames = Math.floor(ANIM_DURATION / 80);
     let frame = 0;
     const sides = ['H', 'T'];
@@ -395,6 +396,7 @@ export class CoinFlipScene extends Scene {
       repeat: frames - 1,
       callback: () => {
         frame++;
+        AudioManager.playSfx(this, 'coin-flip', { volume: 0.85, cooldownMs: 120, allowOverlap: false });
         const side = sides[frame % 2];
         this.animGraphic.clear();
 
@@ -416,6 +418,7 @@ export class CoinFlipScene extends Scene {
   }
 
   private runDiceAnimation(cx: number, cy: number) {
+    AudioManager.playSfx(this, 'dice-roll', { volume: 1.25, cooldownMs: 120, allowOverlap: true });
     const frames = Math.floor(ANIM_DURATION / 80);
     let frame = 0;
 
@@ -424,6 +427,7 @@ export class CoinFlipScene extends Scene {
       repeat: frames - 1,
       callback: () => {
         frame++;
+        AudioManager.playSfx(this, 'dice-roll', { volume: 0.78, cooldownMs: 120, allowOverlap: false });
         const roll = Math.floor(Math.random() * 6) + 1;
         this.drawDieFace(cx, cy, roll);
         this.animText.setText(String(roll));
@@ -480,22 +484,18 @@ export class CoinFlipScene extends Scene {
       this.animGraphic.lineStyle(3, THEME.goldDim, 1);
       this.animGraphic.strokeEllipse(cx, cy, 80, 80);
       this.animText.setText(side).setPosition(cx, cy);
+      AudioManager.playSfx(this, 'coin-settle', { volume: 1.35, cooldownMs: 120, allowOverlap: false });
     } else {
       const match = result.displayResult.match(/Rolled (\d+)/);
       if (match) {
         const finalRoll = parseInt(match[1], 10);
         this.drawDieFace(1024 / 2, 450, finalRoll);
         this.animText.setText(String(finalRoll)).setPosition(1024 / 2, 450);
+        AudioManager.playSfx(this, 'dice-land', { volume: 1.35, cooldownMs: 120, allowOverlap: false });
       }
     }
 
     this.currentCoins = result.newCoins;
-    const effect = getActiveEffect();
-    if (effect && result.won) {
-      const gain = result.payout - this.selectedBet;
-      const adj = Math.round(gain * effect.magnitude);
-      this.currentCoins += effect.type === 'buff' ? adj : -adj;
-    }
     this.coinsText.setText(`Coins: ${this.currentCoins}`);
 
     this.resultText.setText(
@@ -504,6 +504,11 @@ export class CoinFlipScene extends Scene {
         : `${result.displayResult} — Lost ${this.selectedBet} coins`
     );
     this.resultText.setColor(result.won ? COLOR.winGreen : COLOR.loseRed);
+    AudioManager.playSfx(this, result.won ? 'win' : 'lose', {
+      volume: result.won ? 1.35 : 1.3,
+      cooldownMs: 120,
+      allowOverlap: false,
+    });
 
     if (this.currentCoins >= WIN_TARGET) {
       this.targetReachedText.setText('Target reached! You may advance.').setVisible(true);
@@ -523,18 +528,8 @@ export class CoinFlipScene extends Scene {
     this.updatePlayButton();
   }
 
-  private unlockForDevelopers(): void {
-    if (this.animating) {
-      return;
-    }
-    this.currentCoins = Math.max(this.currentCoins, WIN_TARGET);
-    this.coinsText.setText(`Coins: ${this.currentCoins}`);
-    this.targetReachedText.setText('DEV: target unlocked.').setVisible(true);
-    this.leaveTable();
-  }
-
   private leaveTable() {
-    clearActiveEffect();
+    AudioManager.playSfx(this, 'ui-click', { volume: 0.8, cooldownMs: 50, allowOverlap: false });
     const won = this.currentCoins >= WIN_TARGET;
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
