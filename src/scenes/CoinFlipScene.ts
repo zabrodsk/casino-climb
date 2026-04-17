@@ -2,6 +2,8 @@ import { Scene, GameObjects } from 'phaser';
 import { play, isValidBet, RiskType } from '../games/coinFlip';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle } from '../ui/theme';
 import { getActiveEffect, clearActiveEffect } from '../state/coinState';
+import { addGameplaySettingsGear } from '../ui/gameplaySettings';
+import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 
 const WIN_TARGET = 300;
 const BET_OPTIONS = [5, 25, 50];
@@ -246,6 +248,8 @@ export class CoinFlipScene extends Scene {
 
     this.updatePlayButton();
     this.refreshBetButtons();
+    addGameplaySettingsGear(this, 'CoinFlipScene');
+    registerDeveloperUnlockHotkey(this, () => this.unlockForDevelopers());
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
@@ -517,6 +521,16 @@ export class CoinFlipScene extends Scene {
       this.selectedBet = 0;
     }
     this.updatePlayButton();
+  }
+
+  private unlockForDevelopers(): void {
+    if (this.animating) {
+      return;
+    }
+    this.currentCoins = Math.max(this.currentCoins, WIN_TARGET);
+    this.coinsText.setText(`Coins: ${this.currentCoins}`);
+    this.targetReachedText.setText('DEV: target unlocked.').setVisible(true);
+    this.leaveTable();
   }
 
   private leaveTable() {

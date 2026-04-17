@@ -5,6 +5,8 @@ import {
   hasReviveToken,
 } from '../state/coinState';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle, drawFramedPanel } from '../ui/theme';
+import { addGameplaySettingsGear } from '../ui/gameplaySettings';
+import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 
 const WHEEL_CX = 512;
 const WHEEL_CY = 330;
@@ -90,6 +92,8 @@ export class WheelScene extends Scene {
 
     // ── Choice screen ─────────────────────────────────────────────────────
     this._showChoicePhase();
+    addGameplaySettingsGear(this, 'WheelScene');
+    registerDeveloperUnlockHotkey(this, () => this.unlockForDevelopers());
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
@@ -313,6 +317,12 @@ export class WheelScene extends Scene {
       this.continueZone.disableInteractive();
       this._leave();
     });
+  }
+
+  private unlockForDevelopers(): void {
+    this.currentCoins = Math.max(this.currentCoins, 999);
+    this.coinsText.setText(`Coins: ${this.currentCoins}`);
+    this._leave();
   }
 
   // ── Leave ──────────────────────────────────────────────────────────────
