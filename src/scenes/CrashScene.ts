@@ -4,6 +4,7 @@ import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle 
 import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
+import { winBurst, addCrtScanlines } from '../ui/particles';
 import { getDiscountedBetAmount, hasDiscountForFloor } from '../state/coinState';
 import { HouseController } from '../ui/HouseController';
 
@@ -234,6 +235,7 @@ export class CrashScene extends Scene {
     leaveZone.on('pointerout', () => { if (!this.playing) drawNestedButton(this.leaveBtn, W / 2, leaveY, 220, 46, false); });
     leaveZone.on('pointerdown', () => { if (!this.playing) this.leave(); });
 
+    addCrtScanlines(this);
     this.updatePlayButton();
     this.refreshBetButtons();
     AudioManager.playMusic(this, 'crash-game', { loop: true, restart: true });
@@ -527,6 +529,7 @@ export class CrashScene extends Scene {
     this.resultText.setColor(COLOR.winGreen);
     AudioManager.playSfx(this, 'cashout', { volume: 1.45, cooldownMs: 120, allowOverlap: false });
     AudioManager.playSfx(this, 'win', { volume: 1.2, cooldownMs: 120, allowOverlap: false });
+    winBurst(this, 1024 / 2, 310);
 
     this.successfulCashOuts++;
 
