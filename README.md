@@ -1,4 +1,4 @@
-# The House Always Wins
+# Casino Climb
 
 Browser pixel art casino dungeon crawler. A desperate man wakes inside a casino, climbs floor by floor to escape, and uncovers the truth at the top — he came here willingly.
 
