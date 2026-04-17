@@ -2,7 +2,7 @@ import { Scene, Tilemaps, Physics, GameObjects } from 'phaser';
 import { getCoins, getFloor, setCoins, setFloor, resetRun } from '../state/coinState';
 import { HUD } from '../ui/HUD';
 import { FLOOR_CONFIG, FloorConfig } from '../data/floorConfig';
-import { drawFramedPanel, neonTitleStyle, bodyTextStyle } from '../ui/theme';
+import { drawFramedPanel, drawNestedButton, buttonLabelStyle, neonTitleStyle, bodyTextStyle } from '../ui/theme';
 import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
@@ -18,6 +18,18 @@ const TILE_STAIRS_O     = 92;
 const COLS = 18;
 const ROWS = 13;
 const TILE_SIZE = 16;
+const CROSSING_BET_OPTIONS = [10, 25, 50];
+
+interface CrossingColumn {
+  x: number;
+  direction: 1 | -1;
+  speed: number;
+  cardTexture: string;
+  chip: Phaser.GameObjects.Image;
+  blockade: Phaser.GameObjects.Rectangle;
+  laneLine: Phaser.GameObjects.Rectangle;
+  sprites: Phaser.GameObjects.Image[];
+}
 
 // ── Seeded PRNG for consistent floor tile variation
 function pseudoRandom(x: number, y: number): number {
@@ -27,7 +39,11 @@ function pseudoRandom(x: number, y: number): number {
 
 // ── Build logical map given table and stairs positions
 // 0 = floor, 1 = wall, 2 = casino table, 3 = stairs
-function buildMapLogic(tablePos: { col: number; row: number }, stairsPos: { col: number; row: number }): number[][] {
+function buildMapLogic(
+  tablePos: { col: number; row: number },
+  stairsPos: { col: number; row: number },
+  includeTable = true,
+): number[][] {
   const map: number[][] = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 
   // 1-cell thick perimeter walls
@@ -39,7 +55,9 @@ function buildMapLogic(tablePos: { col: number; row: number }, stairsPos: { col:
     }
   }
 
-  map[tablePos.row][tablePos.col] = 2;
+  if (includeTable) {
+    map[tablePos.row][tablePos.col] = 2;
+  }
   map[stairsPos.row][stairsPos.col] = 3;
 
   return map;
@@ -93,6 +111,24 @@ export class DungeonScene extends Scene {
   private config!: FloorConfig;
   private currentFloor!: number;
   private mapLogic!: number[][];
+  private displayFloorNumber!: number;
+
+  private crossingMode = false;
+  private crossingColumns: CrossingColumn[] = [];
+  private crossingBoardObjects: Phaser.GameObjects.GameObject[] = [];
+  private crossingButtons: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; bet: number }> = [];
+  private selectedCrossingBet = 0;
+  private crossingInteractKey!: Phaser.Input.Keyboard.Key;
+  private crossingCashOutKey!: Phaser.Input.Keyboard.Key;
+  private crossingStatusText!: GameObjects.Text;
+  private crossingPromptText!: GameObjects.Text;
+  private crossingHomeChip!: Phaser.GameObjects.Image;
+  private crossingRunActive = false;
+  private crossingBusy = false;
+  private crossingReturning = false;
+  private crossingMultiplier = 1;
+  private crossingBaseY = 0;
+  private crossingCurrentColumnIndex = 0;
 
   constructor() {
     super({ key: 'DungeonScene' });
@@ -102,7 +138,9 @@ export class DungeonScene extends Scene {
     this.currentFloor = data?.floor ?? getFloor() ?? 1;
     this.fromTransition = data?.fromTransition ?? false;
     this.config = FLOOR_CONFIG[this.currentFloor] ?? FLOOR_CONFIG[1];
-    this.mapLogic = buildMapLogic(this.config.tablePos, this.config.stairsPos);
+    this.displayFloorNumber = this.config.displayFloorNumber ?? this.currentFloor;
+    this.crossingMode = this.config.mode === 'crossing';
+    this.mapLogic = buildMapLogic(this.config.tablePos, this.config.stairsPos, !this.crossingMode);
   }
 
   create(): void {
@@ -226,7 +264,7 @@ export class DungeonScene extends Scene {
     // ── Camera ────────────────────────────────────────────────────────────
     this.cameras.main.setBounds(-TILE_SIZE, -TILE_SIZE, mapW + TILE_SIZE * 2, mapH + TILE_SIZE * 2);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.cameras.main.setZoom(5);
+    this.cameras.main.setZoom(this.crossingMode ? (this.config.crossing?.cameraZoom ?? 5.6) : 5);
 
     // ── Atmosphere: vignette ───────────────────────────────────────────────
     const { width: sw, height: sh } = this.scale;
@@ -261,23 +299,24 @@ export class DungeonScene extends Scene {
     this._addTorch(eastTorchCol * TILE_SIZE + 8, southTorchRow * TILE_SIZE + 4, cfg.torchColor, cfg.torchGlow);
 
     // ── Table label ───────────────────────────────────────────────────────
-    const tableLabelY = tablePos.row * TILE_SIZE - (cfg.useCompositeTable ? 20 : 4);
-    this.add
-      .text(tablePos.col * TILE_SIZE + 8, tableLabelY, cfg.tableLabel, {
-        fontSize: '5px',
-        color: '#c9a66b',
-        fontFamily: 'monospace',
-        shadow: { offsetX: 0, offsetY: 1, color: '#000000', blur: 0, fill: true },
-      })
-      .setOrigin(0.5, 1)
-      .setDepth(6);
+    if (!this.crossingMode) {
+      const tableLabelY = tablePos.row * TILE_SIZE - (cfg.useCompositeTable ? 20 : 4);
+      this.add
+        .text(tablePos.col * TILE_SIZE + 8, tableLabelY, cfg.tableLabel, {
+          fontSize: '5px',
+          color: '#c9a66b',
+          fontFamily: 'monospace',
+          shadow: { offsetX: 0, offsetY: 1, color: '#000000', blur: 0, fill: true },
+        })
+        .setOrigin(0.5, 1)
+        .setDepth(6);
 
-    // ── Door overlap zone ──────────────────────────────────────────────────
-    const doorZone = this.add
-      .zone(tablePos.col * TILE_SIZE + 8, tablePos.row * TILE_SIZE + 8, 3 * TILE_SIZE, 3 * TILE_SIZE)
-      .setDepth(1);
-    this.physics.add.existing(doorZone, true);
-    this.physics.add.overlap(this.player, doorZone, this._onDoorOverlap, undefined, this);
+      const doorZone = this.add
+        .zone(tablePos.col * TILE_SIZE + 8, tablePos.row * TILE_SIZE + 8, 3 * TILE_SIZE, 3 * TILE_SIZE)
+        .setDepth(1);
+      this.physics.add.existing(doorZone, true);
+      this.physics.add.overlap(this.player, doorZone, this._onDoorOverlap, undefined, this);
+    }
 
     // ── Stairs overlap zone ───────────────────────────────────────────────
     const stairsZone = this.add
@@ -301,7 +340,7 @@ export class DungeonScene extends Scene {
 
     this.hud = new HUD(this, { target: cfg.target });
     this.hud.setCoins(getCoins());
-    this.hud.setFloor(this.currentFloor, cfg.name);
+    this.hud.setFloor(this.displayFloorNumber, cfg.name);
     this.hud.setProgress(getCoins(), cfg.target);
     this._lastHudCoins = getCoins();
     this.cameras.main.ignore(this.hud.getObjects());
@@ -327,6 +366,335 @@ export class DungeonScene extends Scene {
     registerDeveloperUnlockHotkey(this, () => {
       setCoins(999);
       this._unlockStairs();
+    });
+
+    if (this.crossingMode) {
+      this._setupCrossingMode();
+    } else {
+      this.hud.hideRunPanel();
+    }
+  }
+
+  private _setupCrossingMode(): void {
+    const crossing = this.config.crossing;
+    if (!crossing) return;
+
+    this.crossingBaseY = this.player.y;
+    this.player.play('player-idle');
+
+    const laneTop = crossing.laneTop;
+    const laneBottom = crossing.laneBottom;
+    const laneHeight = laneBottom - laneTop;
+    const centerY = laneTop + laneHeight / 2;
+    const boardLeft = crossing.chipX - 16;
+    const boardWidth = crossing.columnSpacing * crossing.laneCount + 32;
+
+    const boardGlow = this.add.rectangle(
+      boardLeft + boardWidth / 2,
+      centerY,
+      boardWidth,
+      laneHeight + 22,
+      0xf6cf79,
+      0.08,
+    ).setDepth(2.5);
+    this.crossingBoardObjects.push(boardGlow);
+
+    this.crossingHomeChip = this.add.image(crossing.chipX, this.crossingBaseY, 'poker-chip-safe')
+      .setDepth(4)
+      .setScale(1.15);
+    this.crossingBoardObjects.push(this.crossingHomeChip);
+
+    for (let i = 0; i < crossing.laneCount; i++) {
+      const x = crossing.chipX + (i + 1) * crossing.columnSpacing;
+      const laneLine = this.add.rectangle(x, centerY, 2, laneHeight + 8, 0xd7b56a, 0.18).setDepth(3);
+      const chip = this.add.image(x, this.crossingBaseY, 'poker-chip-safe')
+        .setDepth(4)
+        .setScale(1);
+      const blockade = this.add.rectangle(
+        x,
+        this.crossingBaseY,
+        crossing.barricadeWidth,
+        6,
+        0xf6cf79,
+        0.92,
+      ).setDepth(4.6).setVisible(false);
+      const column: CrossingColumn = {
+        x,
+        direction: i % 2 === 0 ? 1 : -1,
+        speed: crossing.speedBase + i * crossing.speedStep,
+        cardTexture: i % 2 === 0 ? 'poker-card-red' : 'poker-card-black',
+        chip,
+        blockade,
+        laneLine,
+        sprites: [],
+      };
+      this._resetCrossingColumn(column, true);
+      this.crossingColumns.push(column);
+      this.crossingBoardObjects.push(laneLine, blockade, chip, ...column.sprites);
+    }
+
+    this.selectedCrossingBet = crossing.defaultBet;
+
+    const betY = this.scale.height - 122;
+    const betStartX = this.scale.width / 2 - 150;
+    CROSSING_BET_OPTIONS.forEach((bet, idx) => {
+      const x = betStartX + idx * 150;
+      const bg = this.add.graphics().setScrollFactor(0).setDepth(HUD.DEPTH + 1);
+      const label = this.add.text(x, betY, `BET ${bet}`, buttonLabelStyle(18))
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(HUD.DEPTH + 2);
+      const zone = this.add.zone(x, betY, 112, 48).setScrollFactor(0).setDepth(HUD.DEPTH + 3).setInteractive({ cursor: 'pointer' });
+      zone.on('pointerdown', () => {
+        if (this.crossingRunActive || this.crossingBusy) return;
+        this.selectedCrossingBet = this.selectedCrossingBet === bet ? 0 : bet;
+        this._refreshCrossingButtons();
+        this._refreshCrossingHud();
+        AudioManager.playSfx(this, 'bet-select', { volume: 1.2, cooldownMs: 50, allowOverlap: false });
+      });
+      this.crossingButtons.push({ bg, label, bet });
+    });
+
+    this.crossingStatusText = this.add.text(this.scale.width / 2, this.scale.height - 162, '', {
+      fontSize: '14px',
+      fontFamily: 'monospace',
+      color: '#f7dc96',
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD.DEPTH + 2);
+
+    this.crossingPromptText = this.add.text(crossing.chipX, this.crossingBaseY - 18, '', {
+      fontSize: '9px',
+      fontFamily: 'monospace',
+      color: '#f7dc96',
+      stroke: '#2c120d',
+      strokeThickness: 3,
+      align: 'center',
+    }).setOrigin(0.5, 1).setDepth(6).setVisible(false);
+    this.crossingBoardObjects.push(this.crossingPromptText);
+
+    this.crossingInteractKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.crossingCashOutKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.C);
+    const crossingUi = [
+      this.crossingStatusText,
+      ...this.crossingButtons.flatMap(({ bg, label }) => [bg, label]),
+    ];
+    this.uiCam.ignore(this.crossingBoardObjects);
+    this.cameras.main.ignore(crossingUi);
+
+    this.hud.showSpeech('You can roam freely here. Go straight up for the stairs when they unlock, or head to the first chip and press E to play.');
+    this._refreshCrossingButtons();
+    this._refreshCrossingHud();
+    this._refreshCrossingFrontier();
+  }
+
+  private _resetCrossingColumn(column: CrossingColumn, initial = false): void {
+    const crossing = this.config.crossing;
+    if (!crossing) return;
+
+    const laneTop = crossing.laneTop;
+    const laneBottom = crossing.laneBottom;
+    column.direction = Phaser.Math.Between(0, 1) === 0 ? 1 : -1;
+    column.speed = crossing.speedBase
+      + Math.min(6, this.crossingCurrentColumnIndex) * crossing.speedStep
+      + Phaser.Math.Between(-crossing.speedVariance, crossing.speedVariance);
+    column.cardTexture = Phaser.Math.Between(0, 1) === 0 ? 'poker-card-red' : 'poker-card-black';
+    column.chip.setTexture('poker-chip-safe');
+    column.chip.setPosition(column.x, this.crossingBaseY);
+    column.chip.setScale(1);
+    column.blockade.setVisible(false);
+
+    const cardCount = 2;
+    if (initial && column.sprites.length === 0) {
+      for (let i = 0; i < cardCount; i++) {
+        const sprite = this.add.image(column.x, 0, column.cardTexture).setDepth(4);
+        column.sprites.push(sprite);
+      }
+    }
+
+    let cursor = column.direction > 0
+      ? laneTop - Phaser.Math.Between(12, crossing.respawnJitter)
+      : laneBottom + Phaser.Math.Between(12, crossing.respawnJitter);
+
+    column.sprites.forEach((sprite) => {
+      const nextGap = crossing.laneSpacing * Phaser.Math.FloatBetween(1.15, 2.5);
+      sprite.setTexture(column.cardTexture);
+      sprite.setData('speedScale', Phaser.Math.FloatBetween(0.82, 1.28));
+      sprite.setData('xOffset', Phaser.Math.Between(-4, 4));
+      sprite.setPosition(
+        column.x + (((sprite.getData('xOffset') as number | undefined) ?? 0)),
+        cursor,
+      );
+      sprite.setAlpha(1);
+      cursor += column.direction > 0 ? -nextGap : nextGap;
+    });
+  }
+
+  private _refreshCrossingButtons(): void {
+    this.crossingButtons.forEach(({ bg, label, bet }) => {
+      drawNestedButton(bg, label.x, label.y, 112, 48, this.selectedCrossingBet === bet);
+      label.setAlpha(this.crossingRunActive || this.crossingReturning ? 0.65 : 1);
+    });
+  }
+
+  private _refreshCrossingHud(): void {
+    const projectedPayout = this.selectedCrossingBet > 0
+      ? Math.max(this.selectedCrossingBet, Math.round(this.selectedCrossingBet * this.crossingMultiplier))
+      : 0;
+    this.hud.showRunPanel('CHIP CROSS', [
+      `Bet ${this.selectedCrossingBet || '--'}  |  Bank ${projectedPayout || '--'}`,
+      `Run x${this.crossingMultiplier.toFixed(2)}  |  Chips ${this.crossingCurrentColumnIndex}/${this.crossingColumns.length}`,
+      this.crossingRunActive
+        ? 'Press E to jump right  |  C to bank and walk back'
+        : (this.stairsUnlocked
+          ? 'Stairs are live above the action. Press your luck or head north.'
+          : 'Roam freely. Press E on the first chip when you want to start.'),
+    ]);
+
+    if (this.crossingRunActive) {
+      this.crossingStatusText.setText(`Run live  x${this.crossingMultiplier.toFixed(2)}  |  projected ${projectedPayout}`);
+      return;
+    }
+    if (this.crossingReturning) {
+      this.crossingStatusText.setText('Walking back to the start with your stack secured.');
+      return;
+    }
+    if (this.stairsUnlocked) {
+      this.crossingStatusText.setText('The stairs are live above the card band. Play again or just walk north and leave.');
+      return;
+    }
+    this.crossingStatusText.setText('Walk around freely. Head to the first chip and press E when you want to start the crossing.');
+  }
+
+  private _startCrossingRun(): void {
+    if (this.crossingBusy || this.crossingReturning || this.selectedCrossingBet <= 0) return;
+    this.crossingRunActive = true;
+    this.crossingMultiplier = this.config.crossing?.startMultiplier ?? 1;
+    this.crossingCurrentColumnIndex = 0;
+    this.player.setPosition(this.config.crossing?.chipX ?? this.player.x, this.crossingBaseY);
+    this.crossingColumns.forEach((column) => this._resetCrossingColumn(column));
+    this._refreshCrossingFrontier();
+    this._refreshCrossingButtons();
+    this._refreshCrossingHud();
+    AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 40, allowOverlap: false });
+  }
+
+  private _attemptCrossingStep(): void {
+    if (!this.crossingRunActive || this.crossingBusy) return;
+
+    const nextIndex = this.crossingCurrentColumnIndex + 1;
+    const column = this.crossingColumns[nextIndex - 1];
+    const crossing = this.config.crossing;
+    if (!crossing || !column) {
+      this._refreshCrossingButtons();
+      return;
+    }
+
+    this.crossingBusy = true;
+    const safe = this._columnIsSafe(column);
+    this.player.play('player-walk', true);
+    this.player.setFlipX(false);
+
+    this.tweens.add({
+      targets: this.player,
+      x: column.x,
+      duration: 150,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        if (!safe) {
+          this._bustCrossingRun();
+          return;
+        }
+
+        this.crossingCurrentColumnIndex = nextIndex;
+        this.crossingMultiplier += crossing.multiplierStep;
+        AudioManager.playSfx(this, 'step', { volume: 0.4, cooldownMs: 80, allowOverlap: false });
+        this._refreshCrossingFrontier();
+        this.crossingBusy = false;
+        this.player.play('player-idle', true);
+        this._refreshCrossingButtons();
+        this._refreshCrossingHud();
+      },
+    });
+  }
+
+  private _columnIsSafe(column: CrossingColumn): boolean {
+    const crossing = this.config.crossing;
+    if (!crossing) return false;
+    const hitHalfHeight = crossing.cardHeight / 2 + 6;
+    return column.sprites.every((sprite) => Math.abs(sprite.y - this.crossingBaseY) > hitHalfHeight);
+  }
+
+  private _cashOutCrossingRun(): void {
+    if (!this.crossingRunActive || this.crossingBusy || this.crossingReturning) return;
+
+    const grossPayout = Math.max(this.selectedCrossingBet, Math.round(this.selectedCrossingBet * this.crossingMultiplier));
+    const profit = grossPayout - this.selectedCrossingBet;
+    setCoins(getCoins() + profit);
+    this.crossingRunActive = false;
+    this.hud.showSpeech(`You bank ${grossPayout}. The House lets you breathe for a second.`);
+    AudioManager.playSfx(this, 'goal-victory', { volume: 0.5, cooldownMs: 250, allowOverlap: false });
+
+    if (getCoins() >= this.config.target) {
+      this._unlockStairs();
+    }
+    this._returnCrossingPlayerToStart(false);
+  }
+
+  private _bustCrossingRun(): void {
+    this.crossingRunActive = false;
+    setCoins(Math.max(0, getCoins() - this.selectedCrossingBet));
+    this.hud.showSpeech('A card clips you. The House drags your bet off the felt.');
+    AudioManager.playSfx(this, 'game-over', { volume: 0.6, cooldownMs: 250, allowOverlap: false });
+
+    if (getCoins() <= 0) {
+      resetRun();
+      this.cameras.main.fadeOut(500, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.restart({ floor: 1 });
+      });
+      return;
+    }
+    this._returnCrossingPlayerToStart(true);
+  }
+
+  private _returnCrossingPlayerToStart(fromBust: boolean): void {
+    const startX = this.config.crossing?.chipX ?? this.player.x;
+    this.crossingBusy = true;
+    this.crossingReturning = true;
+    this._refreshCrossingButtons();
+    this._refreshCrossingHud();
+    this._refreshCrossingFrontier();
+
+    this.player.setFlipX(true);
+    this.player.play('player-walk', true);
+
+    this.tweens.add({
+      targets: this.player,
+      x: startX,
+      duration: 260 + Math.abs(this.player.x - startX) * 4,
+      ease: 'Sine.easeInOut',
+      onComplete: () => {
+        this.player.setFlipX(false);
+        this.player.play('player-idle', true);
+        this.crossingBusy = false;
+        this.crossingReturning = false;
+        this.crossingCurrentColumnIndex = 0;
+        this.crossingMultiplier = this.config.crossing?.startMultiplier ?? 1;
+        this.crossingColumns.forEach((column) => this._resetCrossingColumn(column));
+        this._refreshCrossingFrontier();
+        this._refreshCrossingButtons();
+        this._refreshCrossingHud();
+        if (fromBust) {
+          AudioManager.playSfx(this, 'ui-click', { volume: 0.55, cooldownMs: 50, allowOverlap: false });
+        }
+      },
+    });
+  }
+
+  private _refreshCrossingFrontier(): void {
+    this.crossingColumns.forEach((column, index) => {
+      const cleared = index < this.crossingCurrentColumnIndex;
+      column.blockade.setVisible(cleared);
+      column.sprites.forEach((sprite) => sprite.setAlpha(cleared ? 0.45 : 1));
     });
   }
 
@@ -385,9 +753,39 @@ export class DungeonScene extends Scene {
     }
   }
 
-  update(): void {
+  private _isNearCrossingStartChip(): boolean {
+    const crossing = this.config.crossing;
+    if (!crossing) return false;
+    return Phaser.Math.Distance.Between(this.player.x, this.player.y, crossing.chipX, this.crossingBaseY) <= crossing.startPromptRadius;
+  }
+
+  private _updateCrossingPrompt(): void {
+    if (this.crossingRunActive || this.crossingReturning || this.crossingBusy) {
+      this.crossingPromptText.setVisible(false);
+      return;
+    }
+
+    const nearStart = this._isNearCrossingStartChip();
+    this.crossingPromptText.setVisible(nearStart);
+    if (!nearStart) return;
+
+    const prompt = this.selectedCrossingBet > 0
+      ? `PRESS E\nBET ${this.selectedCrossingBet}`
+      : 'PICK A BET';
+    this.crossingPromptText.setText(prompt);
+  }
+
+  private _updatePlayerMovement(enabled: boolean): void {
     const speed = 120;
     const body = this.player.body as Physics.Arcade.Body;
+
+    if (!enabled) {
+      body.setVelocity(0, 0);
+      if (!this.crossingReturning && !this.crossingBusy) {
+        this.player.play('player-idle', true);
+      }
+      return;
+    }
 
     let vx = 0;
     let vy = 0;
@@ -417,9 +815,71 @@ export class DungeonScene extends Scene {
         this.lastStepAt = now;
         AudioManager.playSfx(this, 'step', { volume: 0.25, cooldownMs: 120, allowOverlap: false });
       }
-    } else {
+    } else if (!this.crossingReturning && !this.crossingBusy) {
       this.player.play('player-idle', true);
     }
+  }
+
+  update(): void {
+    if (this.crossingMode) {
+      const deltaSeconds = this.game.loop.delta / 1000;
+      const crossing = this.config.crossing;
+      const laneTop = crossing?.laneTop ?? 92;
+      const laneBottom = crossing?.laneBottom ?? (ROWS * TILE_SIZE - 16);
+      for (const column of this.crossingColumns) {
+        for (const sprite of column.sprites) {
+          const speedScale = (sprite.getData('speedScale') as number | undefined) ?? 1;
+          sprite.y += column.direction * column.speed * speedScale * deltaSeconds;
+        }
+
+        if (column.direction > 0) {
+          const topMost = Math.min(...column.sprites.map((sprite) => sprite.y));
+          column.sprites.forEach((sprite) => {
+            if (sprite.y > laneBottom + 18) {
+              sprite.setData('speedScale', Phaser.Math.FloatBetween(0.82, 1.28));
+              sprite.setData('xOffset', Phaser.Math.Between(-4, 4));
+              sprite.x = column.x + (((sprite.getData('xOffset') as number | undefined) ?? 0));
+              sprite.y = topMost - crossing!.laneSpacing * Phaser.Math.FloatBetween(1.1, 2.6);
+            }
+          });
+        } else {
+          const bottomMost = Math.max(...column.sprites.map((sprite) => sprite.y));
+          column.sprites.forEach((sprite) => {
+            if (sprite.y < laneTop - 18) {
+              sprite.setData('speedScale', Phaser.Math.FloatBetween(0.82, 1.28));
+              sprite.setData('xOffset', Phaser.Math.Between(-4, 4));
+              sprite.x = column.x + (((sprite.getData('xOffset') as number | undefined) ?? 0));
+              sprite.y = bottomMost + crossing!.laneSpacing * Phaser.Math.FloatBetween(1.1, 2.6);
+            }
+          });
+        }
+      }
+
+      const canFreeRoam = !this.crossingRunActive && !this.crossingReturning && !this.crossingBusy;
+      this._updatePlayerMovement(canFreeRoam);
+      this._updateCrossingPrompt();
+
+      if (Phaser.Input.Keyboard.JustDown(this.crossingInteractKey)) {
+        if (this.crossingRunActive) {
+          this._attemptCrossingStep();
+        } else if (this._isNearCrossingStartChip() && this.selectedCrossingBet > 0) {
+          this._startCrossingRun();
+        }
+      }
+      if (Phaser.Input.Keyboard.JustDown(this.crossingCashOutKey)) {
+        this._cashOutCrossingRun();
+      }
+
+      const coins = getCoins();
+      if (coins !== this._lastHudCoins) {
+        this._lastHudCoins = coins;
+        this.hud.setCoins(coins);
+        this.hud.setProgress(coins, this.config.target);
+        this._refreshCrossingHud();
+      }
+      return;
+    }
+    this._updatePlayerMovement(true);
 
     const coins = getCoins();
     if (coins !== this._lastHudCoins) {
@@ -441,6 +901,7 @@ export class DungeonScene extends Scene {
   }
 
   private _onDoorOverlap(): void {
+    if (this.crossingMode) return;
     if (this.doorTriggered || this.justExitedTable) return;
     this.doorTriggered = true;
     AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 40, allowOverlap: false });
@@ -471,7 +932,11 @@ export class DungeonScene extends Scene {
       // Transition to the next floor
       this.cameras.main.fadeOut(300, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.scene.start('TransitionScene', { nextFloor, name: nextConfig.name });
+        this.scene.start('TransitionScene', {
+          nextFloor,
+          name: nextConfig.name,
+          displayFloorNumber: nextConfig.displayFloorNumber ?? nextFloor,
+        });
       });
     } else {
       // End of demo — show styled panel then reset
@@ -631,6 +1096,10 @@ export class DungeonScene extends Scene {
 
     // Keep glow objects off the UI camera
     this.uiCam.ignore([glow, flash, ...sparks]);
+    if (this.crossingMode) {
+      this._refreshCrossingButtons();
+      this._refreshCrossingHud();
+    }
   }
 
   private _scheduleEnvironmentSfx(): void {
