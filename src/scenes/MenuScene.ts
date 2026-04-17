@@ -58,6 +58,29 @@ export class MenuScene extends Scene {
     this.scale.on('resize', () => {
       this.scene.restart();
     });
+
+    this.startMenuMusic();
+  }
+
+  private startMenuMusic(): void {
+    // Avoid double-starting if scene restarts (e.g. on resize)
+    const existing = this.game.registry.get('music') as Phaser.Sound.BaseSound | null;
+    if (existing?.isPlaying) return;
+    if (existing) {
+      existing.destroy();
+    }
+
+    const music = this.sound.add('menu-music', { loop: true, volume: 0.7 }) as
+      | Phaser.Sound.WebAudioSound
+      | Phaser.Sound.HTML5AudioSound;
+    this.game.registry.set('music', music);
+
+    const play = () => music.play();
+    if (this.sound.locked) {
+      this.sound.once('unlocked', play);
+    } else {
+      play();
+    }
   }
 
   private drawBackground(): void {
@@ -378,7 +401,16 @@ export class MenuScene extends Scene {
   }
 
   private applySoundLevels(): void {
-    this.sound.volume = this.soundLevels.master / 100;
+    const master = this.soundLevels.master / 100;
+    const musicVol = this.soundLevels.music / 100;
+
+    const music = this.game.registry.get('music') as
+      | Phaser.Sound.WebAudioSound
+      | Phaser.Sound.HTML5AudioSound
+      | undefined;
+    if (music) {
+      music.setVolume(master * musicVol);
+    }
   }
 
   private toggleSettings(visible: boolean): void {
@@ -436,6 +468,18 @@ export class MenuScene extends Scene {
 
   private onButtonClick(id: MenuButtonId): void {
     if (id === 'play') {
+      // Stop menu music and switch to ambient track
+      const menuMusic = this.game.registry.get('music') as
+        | Phaser.Sound.WebAudioSound
+        | Phaser.Sound.HTML5AudioSound
+        | undefined;
+      if (menuMusic) {
+        menuMusic.stop();
+      }
+      const ambientMusic = this.sound.add('casino-music', { loop: true, volume: 1.0 });
+      this.game.registry.set('music', ambientMusic);
+      ambientMusic.play();
+
       this.cameras.main.fadeOut(250, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
         this.scene.start('DungeonScene', { floor: 1 });

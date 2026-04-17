@@ -21,6 +21,9 @@ export class BootScene extends Scene {
     // Load tileset image (304x208, 16x16 tiles, 19 cols x 13 rows)
     this.load.image('dungeon-tiles', 'assets/tilemaps/dungeon_tileset.png');
 
+    this.load.audio('casino-music', 'assets/audio/casino-music.mp3');
+    this.load.audio('menu-music', 'assets/audio/menu-music.mp3');
+
     // Note: player spritesheet is generated procedurally in create()
   }
 
@@ -57,6 +60,9 @@ export class BootScene extends Scene {
 
     // Also generate legacy programmatic textures for stairs/door overlays
     this._generateFallbackTextures();
+
+    // Pre-create sounds so they're ready; MenuScene will start playback
+    this.game.registry.set('music', null);
 
     this.cameras.main.fadeOut(400, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
