@@ -5,6 +5,7 @@ import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 import { getDiscountedBetAmount, hasDiscountForFloor } from '../state/coinState';
+import { HouseController } from '../ui/HouseController';
 
 const WIN_TARGET = 300;
 const BET_OPTIONS = [5, 25, 50];
@@ -520,6 +521,9 @@ export class CoinFlipScene extends Scene {
 
     this.currentCoins = result.newCoins;
     this.coinsText.setText(`Coins: ${this.currentCoins}`);
+    if (this.currentCoins < 120) {
+      this.time.delayedCall(3000, () => HouseController.say(this, 'playerActions', 'lowChips'));
+    }
 
     this.resultText.setText(
       result.won

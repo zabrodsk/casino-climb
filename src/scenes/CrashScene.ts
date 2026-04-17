@@ -5,6 +5,7 @@ import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 import { getDiscountedBetAmount, hasDiscountForFloor } from '../state/coinState';
+import { HouseController } from '../ui/HouseController';
 
 const WIN_TARGET = 350;
 const BET_OPTIONS = [10, 25, 50];
@@ -472,6 +473,11 @@ export class CrashScene extends Scene {
 
     this.resultText.setText(`CRASHED @ ${this.crashPoint.toFixed(2)}x — lost ${betCost}`);
     this.resultText.setColor(COLOR.loseRed);
+
+    HouseController.say(this, 'gameSpecific', 'crashLost');
+    if (this.currentCoins < 120) {
+      this.time.delayedCall(4500, () => HouseController.say(this, 'playerActions', 'lowChips'));
+    }
 
     this.successfulCashOuts = 0;
 

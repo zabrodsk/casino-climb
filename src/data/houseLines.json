@@ -1,0 +1,66 @@
+{
+  "floorEntry": {
+    "1": [
+      "Welcome back. We missed watching you lose.",
+      "The lobby always smells like hope. It won't last.",
+      "Floor one. The easiest floor. You'll still find a way to struggle."
+    ],
+    "2": [
+      "You made it past the first door. The House is impressed. Barely.",
+      "Second floor. The crash hall. Things accelerate from here — in every sense.",
+      "Most climb this far on luck alone. Luck has a short shelf life."
+    ],
+    "3": [
+      "The parlor. Where patience goes to die.",
+      "Third floor. The cards don't care about you. Neither does the House. We have something in common.",
+      "You sit across from us now. Twenty-one is a number. The House is a feeling."
+    ],
+    "4": [
+      "The Fate Chamber. Even we don't control what happens here.",
+      "The wheel remembers every spin before yours. It is not your friend."
+    ],
+    "5": [
+      "Floor five. You've come further than most dare.",
+      "The vault is close enough to smell. Don't let that comfort you."
+    ]
+  },
+  "playerActions": {
+    "winStreak": [
+      "Three in a row. The House is taking notes.",
+      "You keep winning. That's... inconvenient. Enjoy it while we recalibrate.",
+      "A streak like this means the correction is coming. We always correct."
+    ],
+    "lowChips": [
+      "Running low. That sound you hear is the floor getting closer.",
+      "Your stack is shrinking. The House has seen this before. Many times.",
+      "Fewer chips, fewer choices. The walls close in so quietly here."
+    ],
+    "busted": [
+      "Nothing left. The House kept its promise.",
+      "That's all of it. Gone. The math was never in your favor.",
+      "Empty pockets at the end. It was always going to be this way."
+    ],
+    "highBet": [
+      "Bold. We like bold. It's easier to collect.",
+      "Large bets are a form of honesty. You're admitting you're desperate.",
+      "The bigger the bet, the faster this ends."
+    ]
+  },
+  "gameSpecific": {
+    "crashLost": [
+      "You held too long. Greed has a very specific weight.",
+      "The crash was always coming. You just chose not to believe it.",
+      "They all think they'll cash out in time. They rarely do."
+    ],
+    "blackjackBusted": [
+      "One card too many. Patience is a wager, and you lost it.",
+      "Twenty-two. You were so close to nothing at all.",
+      "The bust is never surprising. Only the player is surprised."
+    ],
+    "wheelLoseAll": [
+      "The wheel gave and the wheel took. It owes you nothing.",
+      "Fate is indifferent. The House is not — we're quite pleased.",
+      "That spin cost you more than coins. It always does."
+    ]
+  }
+}

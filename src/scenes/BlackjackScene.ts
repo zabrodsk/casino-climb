@@ -13,6 +13,7 @@ import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 import { getDiscountedBetAmount, hasDiscountForFloor } from '../state/coinState';
+import { HouseController } from '../ui/HouseController';
 
 const WIN_TARGET = 400;
 const HANDS_TO_WIN = 3;
@@ -466,6 +467,9 @@ export class BlackjackScene extends Scene {
     }
 
     this.coinsText.setText(`Coins: ${this.currentCoins}`);
+    if (this.currentCoins < 120) {
+      this.time.delayedCall(3000, () => HouseController.say(this, 'playerActions', 'lowChips'));
+    }
     this.handsWonText.setText(`Hands Won: ${this.handsWon}/${HANDS_TO_WIN}`);
     this.resultText
       .setText(result.displayText)
@@ -483,6 +487,7 @@ export class BlackjackScene extends Scene {
     );
     if (playerEval.busted) {
       AudioManager.playSfx(this, 'blackjack-bust', { volume: 1.4, cooldownMs: 120, allowOverlap: false });
+      HouseController.say(this, 'gameSpecific', 'blackjackBusted');
     } else if (result.outcome === 'win' && playerEval.total === 21) {
       AudioManager.playSfx(this, 'blackjack-hit21', { volume: 1.45, cooldownMs: 120, allowOverlap: false });
     }
