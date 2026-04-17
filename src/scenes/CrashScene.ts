@@ -4,12 +4,14 @@ import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle 
 import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
+import { getDiscountedBetAmount, hasDiscountForFloor } from '../state/coinState';
 
 const WIN_TARGET = 350;
 const BET_OPTIONS = [10, 25, 50];
 
 export class CrashScene extends Scene {
   private currentCoins: number = 200;
+  private floorNumber: number = 1;
   private selectedBet: number = 0;
 
   // Round state
@@ -50,6 +52,7 @@ export class CrashScene extends Scene {
 
   init(data: { coins: number; floor?: number }) {
     this.currentCoins = data.coins ?? 200;
+    this.floorNumber = data.floor ?? 1;
     this.selectedBet = 0;
     this.playing = false;
     this.currentMult = 1.0;
@@ -92,6 +95,14 @@ export class CrashScene extends Scene {
       fontSize: '20px',
       color: COLOR.goldText,
     }).setOrigin(0.5);
+
+    if (hasDiscountForFloor(this.floorNumber)) {
+      this.add.text(40, 78, 'SUPPORT DISCOUNT ACTIVE — bets cost 20% less here', {
+        fontFamily: FONT.mono,
+        fontSize: '14px',
+        color: COLOR.goldText,
+      }).setOrigin(0, 0.5);
+    }
 
     // Coins display (top right)
     this.coinsText = this.add.text(W - 40, 48, `Coins: ${this.currentCoins}`, {
@@ -278,7 +289,7 @@ export class CrashScene extends Scene {
 
     this.betButtons.forEach(({ bg, label, bet }, i) => {
       const x = betStartX + i * betSpacing;
-      const disabled = bet > this.currentCoins;
+      const disabled = this.getBetCost(bet) > this.currentCoins;
       const active = this.selectedBet === bet;
 
       if (active) {
@@ -295,7 +306,11 @@ export class CrashScene extends Scene {
   }
 
   private canPlay(): boolean {
-    return isValidBet(this.currentCoins, this.selectedBet) && !this.playing;
+    return isValidBet(this.currentCoins, this.getBetCost()) && !this.playing;
+  }
+
+  private getBetCost(bet = this.selectedBet): number {
+    return getDiscountedBetAmount(bet, this.floorNumber);
   }
 
   private updatePlayButton() {
@@ -451,10 +466,11 @@ export class CrashScene extends Scene {
     this.multDisplay.setColor(COLOR.loseRed);
     this.multDisplay.setFontSize(42);
 
-    this.currentCoins -= this.selectedBet;
+    const betCost = this.getBetCost();
+    this.currentCoins -= betCost;
     this.coinsText.setText(`Coins: ${this.currentCoins}`);
 
-    this.resultText.setText(`CRASHED @ ${this.crashPoint.toFixed(2)}x — lost ${this.selectedBet}`);
+    this.resultText.setText(`CRASHED @ ${this.crashPoint.toFixed(2)}x — lost ${betCost}`);
     this.resultText.setColor(COLOR.loseRed);
 
     this.successfulCashOuts = 0;
@@ -466,7 +482,7 @@ export class CrashScene extends Scene {
     this.playBtnText.setVisible(true);
     this._playZone.setVisible(true);
 
-    if (!isValidBet(this.currentCoins, this.selectedBet)) {
+    if (!isValidBet(this.currentCoins, this.getBetCost())) {
       this.selectedBet = 0;
     }
     this.refreshBetButtons();
@@ -489,9 +505,10 @@ export class CrashScene extends Scene {
     }
     this.playing = false;
 
+    const betCost = this.getBetCost();
     const result = resolve({
       coins: this.currentCoins,
-      bet: this.selectedBet,
+      bet: betCost,
       cashOutAt: mult,
       crashPoint: this.crashPoint,
     });
@@ -499,7 +516,7 @@ export class CrashScene extends Scene {
     this.currentCoins = result.newCoins;
     this.coinsText.setText(`Coins: ${this.currentCoins}`);
 
-    const winnings = result.payout - this.selectedBet;
+    const winnings = result.payout - betCost;
     this.resultText.setText(`+${winnings} coins at ${mult.toFixed(2)}x`);
     this.resultText.setColor(COLOR.winGreen);
     AudioManager.playSfx(this, 'cashout', { volume: 1.45, cooldownMs: 120, allowOverlap: false });
@@ -521,7 +538,7 @@ export class CrashScene extends Scene {
     this.playBtnText.setVisible(true);
     this._playZone.setVisible(true);
 
-    if (!isValidBet(this.currentCoins, this.selectedBet)) {
+    if (!isValidBet(this.currentCoins, this.getBetCost())) {
       this.selectedBet = 0;
     }
     this.refreshBetButtons();

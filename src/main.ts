@@ -8,6 +8,7 @@ import { CoinFlipScene } from './scenes/CoinFlipScene';
 import { CrashScene } from './scenes/CrashScene';
 import { BlackjackScene } from './scenes/BlackjackScene';
 import { WheelScene } from './scenes/WheelScene';
+import { EndScene } from './scenes/EndScene';
 
 const isSafari = (() => {
     if (typeof navigator === 'undefined') {
@@ -48,6 +49,7 @@ const config = {
         CrashScene,
         BlackjackScene,
         WheelScene,
+        EndScene,
     ],
 };
 
