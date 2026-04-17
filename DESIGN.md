@@ -66,7 +66,7 @@ He does not remember the recruiter, the deal, or why he came. All he knows: this
 ## Premises (Confirmed)
 
 1. Top-down character movement through dungeon rooms is core — not cosmetic.
-2. Ship 3 casino games: **Wheel of Fate** (hero), **Blackjack** (mid-floor), **Slots** (late-floor chaos).
+2. Ship 3 casino games: **Blackjack** (Floor 1 main), **Slots** (Floor 3 main), **Wheel of Fate** (optional side room — discoverable on any floor, not required to progress).
 3. The House commentary system ships — minimum 8-10 reactive voice lines that change based on player behavior and floor.
 4. 3 floors minimum: Early (hope), Mid (doubt), Late/Boss (desperation + reveal).
 5. Free pixel art packs from itch.io cover dungeon visuals. No custom art for environment.
@@ -80,7 +80,7 @@ He does not remember the recruiter, the deal, or why he came. All he knows: this
 
 ### Floor 1: Confusion (Survival)
 - Tone: Flashy, neon, almost welcoming — but wrong somehow. The House sounds smooth and reassuring.
-- Games: Wheel of Fate (tutorial version — simpler segment pool, no 💀 yet)
+- Games: Blackjack — familiar, structured, the House as dealer. Easy to understand for a disoriented man.
 - The House lines: "Welcome. Everything you see here is yours to win." Slightly too confident. Too practiced.
 - Memory fragments: None. He just woke up. Pure disorientation.
 - Visual: Bright neon dungeon tiles. Character feels small. No context for where he is or why.
@@ -108,17 +108,19 @@ He does not remember the recruiter, the deal, or why he came. All he knows: this
 
 ## The Three Games
 
-### Wheel of Fate (Hero Mechanic)
+### Wheel of Fate (Optional Side Room)
+**Access:** Hidden doorway in the dungeon corridor — discoverable on any floor, not required to progress. The House never mentions it. Finding it is a reward for exploration.
 **Core:** Bet chips on a spinning wheel divided into named segments.
 **Twist — the wheel changes every spin:**
 - Segments shuffle in count and type each spin
 - Segment types:
-  - 💀 **Lose All** — total wipe (rare, but present from Floor 1)
+  - 💀 **Lose All** — total wipe
   - 🔥 **Double Everything** — full multiplier
-  - ❓ **Random Effect** — could be: steal chips from The House, skip next floor, reverse the wheel, mini-curse
+  - ❓ **Random Effect** — steal chips from The House, screen inversion, mini-curse
   - Standard: 2x, 1.5x, 0.5x, Push (return bet)
 - Visual: Animated spinning wheel in pixel art style. Segments visibly rearrange between spins with a shuffle animation.
-- Tension: Player never knows the exact odds until the wheel shows itself for that spin.
+- Tension: Highest variance game in the casino. No guaranteed path forward — pure risk/reward.
+- The House's reaction: If the player finds and enters this room, The House goes quiet. It doesn't comment during Wheel of Fate spins. The silence is more unsettling than the commentary.
 
 ### Blackjack (Mid-Floor Standard)
 - Standard 21 rules
@@ -186,11 +188,13 @@ Lines stored as JSON. Rendered in a "speech bubble" HUD element, Minecraft font.
 - **Lose (floor reset):** Chips hit 0. runCount increments. Memory fragment threshold advances. Floor restarts.
 - **Floor advance:** On win, ExitStairs door unlocks. Player walks to stairs → TransitionScene → next floor.
 
-**Scene layout per floor (linear, no branching):**
+**Scene layout per floor:**
 ```
 [Entrance] → [Corridor] → [Game Room door] → [Game Scene overlay] → [Exit Stairs (locked until win)]
+                                ↑
+                    [Hidden side door — Wheel of Fate, optional]
 ```
-Only one game room per floor. Player cannot miss it — the corridor is a straight path.
+One required game room per floor. The Wheel of Fate side room is a hidden doorway in the corridor wall — visually subtle, not labeled. Player can miss it entirely. Finding it is the reward for looking.
 
 **Memory fragments:** `localStorage.runCount` persists across resets. Fragment text shown based on `runCount >= N` thresholds.
 
