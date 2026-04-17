@@ -42,46 +42,62 @@ const TILE_TABLE         = 142;  // r7,c9 — neon green casino table
 const TILE_STAIRS_L      = 73;   // r3,c16 — teal, locked stairs
 const TILE_STAIRS_O      = 92;   // r4,c16 — teal open stairs
 
-// ── 3/4 Perspective Map: 20 wide × 15 tall
-// 0 = floor, 1 = wall, 2 = door/casino table, 3 = stairs (locked)
-const MAP_LOGIC: number[][] = [
-  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-  [1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1],
-  [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
-  [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
-  [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
-  [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 0, 0, 1],
-  [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
-  [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
-  [1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-];
-
-const COLS = 20;
-const ROWS = 15;
+// ── Map dimensions: 40 wide × 30 tall — one big open room with 2-cell thick perimeter
+const COLS = 40;
+const ROWS = 30;
 const TILE_SIZE = 16;
 
-const PLAYER_START_X = 2 * TILE_SIZE + 8;
-const PLAYER_START_Y = 12 * TILE_SIZE + 8;
+// ── Seeded PRNG for consistent floor tile variation across reloads
+function pseudoRandom(x: number, y: number): number {
+  const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return h - Math.floor(h);
+}
 
-const DOOR_COL = 10;
-const DOOR_ROW = 7;
+// ── Build logical map programmatically (2-cell thick walls, open interior)
+// 0 = floor, 1 = wall, 2 = casino table, 3 = stairs
+function buildMapLogic(): number[][] {
+  const map: number[][] = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 
-const STAIRS_COL = 17;
-const STAIRS_ROW = 1;
+  // 2-cell thick perimeter walls
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (r < 2 || r >= ROWS - 2 || c < 2 || c >= COLS - 2) {
+        map[r][c] = 1;
+      }
+    }
+  }
+
+  // Casino table at center: col 20, row 15
+  map[15][20] = 2;
+
+  // Stairs at top-right interior: col 37, row 2
+  map[2][37] = 3;
+
+  return map;
+}
+
+const MAP_LOGIC = buildMapLogic();
+
+const PLAYER_START_X = 3 * TILE_SIZE + 8;   // col 3, bottom-left interior
+const PLAYER_START_Y = 27 * TILE_SIZE + 8;
+
+const DOOR_COL = 20;
+const DOOR_ROW = 15;
+
+const STAIRS_COL = 37;
+const STAIRS_ROW = 2;
 
 // ── Layer builders ────────────────────────────────────────────────────────────
 
-/** Floor layer: every cell gets a floor tile */
+/** Floor layer: every cell gets a floor tile, varied by seeded PRNG */
 function buildFloorData(): number[][] {
-  const floorVariants = [TILE_FLOOR_A, TILE_FLOOR_B, TILE_FLOOR_C];
   return MAP_LOGIC.map((row, r) =>
-    row.map((_v, c) => floorVariants[(r * 3 + c * 7) % 3])
+    row.map((_v, c) => {
+      const rnd = pseudoRandom(c, r);
+      if (rnd < 0.80) return TILE_FLOOR_A;       // 80% primary
+      if (rnd < 0.95) return TILE_FLOOR_B;       // 15% variant A
+      return TILE_FLOOR_C;                        // 5%  variant B
+    })
   );
 }
 
@@ -246,7 +262,7 @@ export class DungeonScene extends Scene {
     // ── Camera ────────────────────────────────────────────────────────────
     this.cameras.main.setBounds(0, 0, mapW, mapH);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.cameras.main.setZoom(2);
+    this.cameras.main.setZoom(3.5);
 
     // ── Atmosphere: vignette (reduced intensity, max alpha 0.4) ──────────
     const { width: sw, height: sh } = this.scale;
@@ -269,6 +285,19 @@ export class DungeonScene extends Scene {
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
+
+    // ── Perimeter torches ─────────────────────────────────────────────────
+    const torchCols = [5, 12, 20, 28, 35];
+    const torchRowsSide = [5, 12, 20, 25];
+
+    // Top wall torches (row 2, inner face)
+    for (const c of torchCols) this._addTorch(c * TILE_SIZE + 8, 2 * TILE_SIZE + 12);
+    // Bottom wall torches (row 27, inner face)
+    for (const c of torchCols) this._addTorch(c * TILE_SIZE + 8, 27 * TILE_SIZE + 4);
+    // Left wall torches (col 2, inner face)
+    for (const r of torchRowsSide) this._addTorch(2 * TILE_SIZE + 12, r * TILE_SIZE + 8);
+    // Right wall torches (col 37, inner face)
+    for (const r of torchRowsSide) this._addTorch(37 * TILE_SIZE + 4, r * TILE_SIZE + 8);
 
     // ── HUD ───────────────────────────────────────────────────────────────
     this.coinText = this.add
@@ -320,6 +349,43 @@ export class DungeonScene extends Scene {
     this.events.on('game-complete', this._onGameComplete, this);
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
+  }
+
+  /** Add a torch flame sprite + flickering pointlight at world position (x, y) */
+  private _addTorch(x: number, y: number): void {
+    // Flame: orange ellipse with yellow inner
+    const flame = this.add.graphics();
+    flame.setDepth(4);
+    flame.fillStyle(0xff6600, 0.9);
+    flame.fillEllipse(0, 0, 6, 8);
+    flame.fillStyle(0xffee00, 0.8);
+    flame.fillEllipse(0, 1, 3, 5);
+    flame.setPosition(x, y);
+
+    // Flickering alpha on the flame
+    const flameDuration = 160 + Math.random() * 80;
+    this.tweens.add({
+      targets: flame,
+      alpha: { from: 0.7, to: 1.0 },
+      duration: flameDuration,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // Warm orange pointlight
+    const light = this.add.pointlight(x, y, 0xff8833, 25, 0.09, 0.05);
+    light.setDepth(4);
+
+    const lightDuration = 160 + Math.random() * 80;
+    this.tweens.add({
+      targets: light,
+      intensity: { from: 0.06, to: 0.12 },
+      duration: lightDuration,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
   }
 
   private _drawVignette(g: GameObjects.Graphics, w: number, h: number): void {
