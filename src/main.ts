@@ -1,5 +1,7 @@
 import { AUTO, Game, Scale } from 'phaser';
 import { BootScene } from './scenes/BootScene';
+import { DungeonScene } from './scenes/DungeonScene';
+import { CoinFlipScene } from './scenes/CoinFlipScene';
 
 const config = {
     type: AUTO,
@@ -12,7 +14,14 @@ const config = {
         mode: Scale.FIT,
         autoCenter: Scale.CENTER_BOTH,
     },
-    scene: [BootScene],
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { x: 0, y: 0 },
+            debug: false,
+        },
+    },
+    scene: [BootScene, DungeonScene, CoinFlipScene],
 };
 
 document.addEventListener('DOMContentLoaded', () => {
