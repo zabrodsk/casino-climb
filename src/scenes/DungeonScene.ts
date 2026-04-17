@@ -1000,6 +1000,16 @@ export class DungeonScene extends Scene {
     setCoins(coins);
 
     if (won) {
+      if (this.currentFloor === 5) {
+        this.scene.resume('DungeonScene');
+        this._applyFloorAmbience();
+        this.cameras.main.fadeOut(350, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          this.scene.start('EndScene', { coins });
+        });
+        return;
+      }
+
       this.hud.showSpeech('The stairs unlock. Take them.');
       this._unlockStairs();
       if (!this.goalSoundsPlayed) {
