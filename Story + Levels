@@ -1,0 +1,340 @@
+# Casino Dungeon — Story and Level Summary
+
+## High Concept
+
+A broke, desperate man is lured into a mysterious casino that promises life-changing money. He wakes up inside with no clear memory of how he arrived. The only way out is to climb through a vertical casino dungeon, clearing one floor at a time by gambling with his coin stack. If his coins hit zero, the run restarts.
+
+The deeper he goes, the more he realizes this is not a normal casino. It is a predatory system controlled by **The House**, an unseen force that watches him, manipulates him, and feeds on human desperation and hope. At the top, he discovers the truth: he came here willingly because he needed the money. He is then given a final choice — leave with what he has, or start again to try to win more.
+
+---
+
+## Core Story Summary
+
+### Premise
+The protagonist is financially ruined, emotionally exhausted, and vulnerable. One night, he is approached by a calm, well-dressed recruiter who offers him entry into a private casino where he can supposedly win enough money to fix his life.
+
+He accepts.
+
+When the game begins, he wakes up inside the casino dungeon with no real understanding of where he is or how he got there. He only knows that:
+- he is trapped,
+- the casino is watching him,
+- he has a limited number of coins,
+- and the only path is upward.
+
+### The House
+The House is the force behind the casino. It is not just an owner or announcer — it is the will of the casino itself. It tracks the player, comments on choices, and creates the constant feeling that someone is always watching.
+
+Its goal is not just to hold players captive. The House survives on **desperation mixed with hope**. It needs players who still believe that one more game, one more win, or one more chance might save them.
+
+### Main Character Arc
+At the start, the protagonist only wants to escape. He does not remember why he came, and he treats the casino like a nightmare he has to survive.
+
+As he climbs:
+- he starts noticing that the casino feels deliberate, not random,
+- he uncovers clues about the recruiter and the deal,
+- he realizes he entered willingly,
+- and he slowly remembers that he came because he desperately needed the money.
+
+By the end, the story shifts from **“How do I escape?”** to **“Do I leave now, or risk myself again for the money I still need?”**
+
+### Ending
+At the top floor, the protagonist learns the truth:
+- he agreed to enter,
+- he came for the money,
+- and the casino has been testing and breaking him down the entire time.
+
+He is given a final choice:
+1. **Leave** with his current winnings and reclaim his freedom.
+2. **Play again** for a chance to earn more money, knowing exactly what this place is.
+
+This final decision is the core tragedy of the game. The casino’s true power is not that it traps people physically — it is that it makes them feel like they still need what it offers.
+
+---
+
+## Gameplay Structure Summary
+
+- The game is a vertical dungeon made of **6 main floors**.
+- Each floor is built around **one main casino-style game**.
+- Each floor has its own visual identity, dealer, and win condition.
+- The player carries a single coin stack throughout the run.
+- If the player’s coins hit **0**, the run ends and restarts.
+- To progress, the player must either:
+  - reach a floor-specific coin target, or
+  - complete a floor-specific success condition tied to that game.
+- There is also an **optional Wheel of Fate room** that the player can choose to interact with or skip.
+
+### NPC Structure
+Use two types of NPC presence:
+- **Floor Dealers**: one on each floor, tied directly to that floor’s game and atmosphere.
+- **Support NPCs**: only between selected floors, not everywhere. They can offer things like checkpoints, room previews, revive tokens, or risky bargains.
+
+Support NPCs should be rare enough to feel important.
+
+---
+
+## Level Summary
+
+## Floor 1 — The Lobby
+
+### General Idea
+This is the introduction floor. It should feel polished, rich, and deceptively welcoming. The goal is to teach the player the basic risk/reward loop without overwhelming them.
+
+### Main Game
+**Coin Flip / Dice Duel**
+
+A simple gambling game where the player chooses bet size and risk level. It should immediately establish the core loop:
+- bet coins,
+- win or lose,
+- grow the stack carefully,
+- survive long enough to move on.
+
+### Atmosphere
+- Golden lighting
+- Marble or polished stone
+- Clean casino entrance feel
+- Friendly but slightly uncanny dealer
+- Calm tone from The House
+
+### Progression Goal
+The player must raise their starting coin amount to a modest target to unlock the next floor.
+
+### Design Purpose
+- Teach basic betting
+- Establish tension without heavy punishment
+- Make the player think winning is possible
+
+---
+
+## Floor 2 — The Crash Hall
+
+### General Idea
+This floor introduces a more skill-based form of tension. The player is no longer just choosing bets — they are deciding when to cash out under pressure.
+
+### Main Game
+**Crash**
+
+A multiplier rises over time and can crash at any moment. The player must cash out before the crash to lock in winnings.
+
+### Atmosphere
+- Neon digital space
+- Giant multiplier displays
+- Reflective dark flooring
+- Red and purple lighting
+- Constant machine-like hum
+
+### Progression Goal
+The player must either:
+- successfully cash out several times, or
+- raise their coin stack to the next target threshold.
+
+### Design Purpose
+- Introduce timing and nerves
+- Make the player feel some control, even though luck still matters
+- Increase tension early in the run
+
+### Suggested NPC Beat
+A support NPC can appear after this floor for the first major service point, such as:
+- a checkpoint,
+- a revive token,
+- or a room preview.
+
+---
+
+## Floor 3 — The Blackjack Parlor
+
+### General Idea
+This floor slows the pace down and shifts toward strategic play. It should feel more intimate and serious than the earlier floors.
+
+### Main Game
+**Blackjack**
+
+A card-based floor centered on reading odds, making decisions, and managing risk more deliberately.
+
+### Atmosphere
+- Dark wood
+- Brass lamps
+- Green felt tables
+- Quiet luxury
+- A more human but unsettling dealer
+
+### Progression Goal
+The player must win enough hands or leave the table with a required coin amount to progress.
+
+### Design Purpose
+- Add strategic variety
+- Break up the pace after Crash
+- Make the player feel like the casino is becoming more intelligent and personal
+
+---
+
+## Floor 4 — The Roulette Gallery
+
+### General Idea
+This floor emphasizes structured risk. The player has more betting options, more ways to play safely or aggressively, and more pressure to manage their coin stack intelligently.
+
+### Main Game
+**Roulette**
+
+A classic wheel-betting floor built around choosing between safer small payouts and more dangerous large ones.
+
+### Atmosphere
+- Red velvet curtains
+- Gold trim
+- Large wheel tables
+- Surveillance-like presence in the room
+- More oppressive theatrical energy
+
+### Progression Goal
+The player must survive a set number of spins and finish above a required coin threshold, or otherwise hit a target amount.
+
+### Design Purpose
+- Test bankroll management
+- Blend luck with planning
+- Reinforce the feeling that the casino is studying the player’s habits
+
+### Suggested NPC Beat
+A second support NPC encounter can happen after this floor. This is a strong place for:
+- another checkpoint,
+- curse/penalty removal,
+- or a risky bargain.
+
+---
+
+## Optional Room — The Wheel of Fate
+
+### General Idea
+This is not a mandatory floor. It is a special temptation room the player can choose to enter or ignore. It exists to express the game’s core theme: the player does not need to risk more, but is always given the chance to.
+
+### Main Game
+**Wheel of Fate**
+
+A giant prize-and-punishment wheel with mixed outcomes.
+
+### Atmosphere
+- Dark circular chamber
+- Giant glowing wheel in the center
+- Ceremonial, almost sacred feeling
+- Less like a casino attraction, more like a ritual device
+
+### Progression Goal
+None required. The room is optional.
+
+The player may:
+- skip it and continue safely,
+- or spin for a chance at a large reward or major penalty.
+
+### Possible Outcome Types
+- bonus coins,
+- checkpoint access,
+- revive token,
+- temporary buff,
+- temporary curse,
+- large coin loss,
+- jackpot-level rare reward.
+
+### Design Purpose
+- Create a pure temptation moment
+- Add replayability and tension
+- Give the player a way to make a knowingly greedy decision
+
+---
+
+## Floor 5 — The Slot Cathedral
+
+### General Idea
+This floor should feel chaotic, loud, overstimulating, and emotionally draining. It is the casino at its most manipulative and addictive.
+
+### Main Game
+**Slots**
+
+A volatility-heavy floor built around repeated spins, unpredictable outcomes, and momentum swings.
+
+### Atmosphere
+- Towering slot machines
+- Flashing symbols
+- Distorted jackpot sounds
+- Excessive visual noise
+- A sense of sensory overload
+
+### Progression Goal
+The player must trigger enough payouts or grow their stack to a late-game threshold before going broke.
+
+### Design Purpose
+- Represent raw chaos and temptation
+- Push the player into emotionally volatile decision-making
+- Make this feel like the most dangerous non-final floor
+
+---
+
+## Floor 6 — The Vault
+
+### General Idea
+This is the top floor and the narrative climax. It should feel stripped down, cold, and final. The bright casino mask is gone. The House is no longer playful — it is direct.
+
+### Main Game
+**Final Mixed Trial**
+
+Instead of repeating one standard casino game, this floor should act as a final exam using the logic of earlier floors. It can combine:
+- one timing-based challenge,
+- one strategic challenge,
+- and one final high-stakes wager or choice.
+
+### Atmosphere
+- Minimalistic
+- Cold lighting
+- Vast empty space
+- A sense of judgment rather than entertainment
+- The House speaking more clearly and personally
+
+### Progression Goal
+The player must clear the final challenge to earn the right to leave.
+
+After that, the story reveal happens:
+- he remembers the recruiter,
+- he remembers that he entered willingly,
+- he remembers why he needed the money,
+- and he is given the choice to leave or play again.
+
+### Design Purpose
+- Deliver the story reveal
+- Make the ending a moral and emotional choice, not just a victory screen
+- Reframe the entire climb in hindsight
+
+---
+
+## Design Guidance for Codex / Finalization
+
+### Core Systems to Keep Consistent
+- One persistent coin stack per run
+- Lose all coins = restart
+- One main game identity per floor
+- Strong visual distinction between floors
+- Each floor should feel like a psychological step upward, not just a harder version of the last
+- The House should be present throughout, but become more personal and unsettling over time
+
+### Tone Goals
+- Mysterious
+- Oppressive
+- Seductive
+- Controlled rather than chaotic
+- The casino should always feel like it wants something from the player
+
+### Story Delivery
+Keep exposition light and environmental. The story should be revealed through:
+- voice lines from The House,
+- dealer dialogue,
+- environmental cues,
+- inter-floor moments,
+- and the final reveal in the Vault.
+
+### Replayability Hooks
+- Optional Wheel of Fate risk room
+- Support NPC choices
+- Different risk strategies on each floor
+- The final choice to leave or play again
+
+---
+
+## One-Sentence Game Pitch
+
+A desperate man climbs a six-floor casino dungeon to escape a mysterious supernatural House, only to discover at the top that he came willingly for the money — and must decide whether freedom is worth more than one more chance.
