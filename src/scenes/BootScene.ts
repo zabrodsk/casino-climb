@@ -8,7 +8,6 @@ export class BootScene extends Scene {
   preload(): void {
     const { width, height } = this.scale;
 
-    // Loading screen
     this.add.rectangle(0, 0, width, height, 0x000000).setOrigin(0, 0);
     this.add
       .text(width / 2, height / 2, 'Loading...', {
@@ -18,10 +17,7 @@ export class BootScene extends Scene {
       })
       .setOrigin(0.5);
 
-    // Load tileset image (304×208, 16×16 tiles, 19 cols × 13 rows)
     this.load.image('dungeon-tiles', 'assets/tilemaps/dungeon_tileset.png');
-
-    // Load character spritesheet (288×48, 9 frames of 32×48)
     this.load.spritesheet('player', 'assets/sprites/dude.png', {
       frameWidth: 32,
       frameHeight: 48,
@@ -29,7 +25,6 @@ export class BootScene extends Scene {
   }
 
   create(): void {
-    // Idle: frames 0-3 (first 4 frames, standing)
     this.anims.create({
       key: 'player-idle',
       frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
@@ -37,7 +32,6 @@ export class BootScene extends Scene {
       repeat: -1,
     });
 
-    // Walk: frames 4-8 (remaining 5 frames)
     this.anims.create({
       key: 'player-walk',
       frames: this.anims.generateFrameNumbers('player', { start: 4, end: 8 }),
@@ -45,19 +39,13 @@ export class BootScene extends Scene {
       repeat: -1,
     });
 
-    // Also generate legacy programmatic textures for stairs/door overlays
-    this._generateFallbackTextures();
-
-    this.cameras.main.fadeOut(400, 0, 0, 0);
-    this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.scene.start('DungeonScene', { floor: 1 });
-    });
+    this.generateFallbackTextures();
+    this.scene.start('MenuScene');
   }
 
-  private _generateFallbackTextures(): void {
+  private generateFallbackTextures(): void {
     const g = this.add.graphics();
 
-    // stairs-locked: grey locked stairs
     g.clear();
     g.fillStyle(0x555555);
     g.fillRect(0, 0, 16, 16);
@@ -73,7 +61,6 @@ export class BootScene extends Scene {
     g.fillRect(7, 3, 2, 4);
     g.generateTexture('stairs-locked', 16, 16);
 
-    // stairs-open: gold glowing stairs
     g.clear();
     g.fillStyle(0x443300);
     g.fillRect(0, 0, 16, 16);

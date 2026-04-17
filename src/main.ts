@@ -1,5 +1,6 @@
 import { AUTO, Game, Scale } from 'phaser';
 import { BootScene } from './scenes/BootScene';
+import { MenuScene } from './scenes/MenuScene';
 import { DungeonScene } from './scenes/DungeonScene';
 import { CoinFlipScene } from './scenes/CoinFlipScene';
 
@@ -21,7 +22,7 @@ const config = {
             debug: false,
         },
     },
-    scene: [BootScene, DungeonScene, CoinFlipScene],
+    scene: [BootScene, MenuScene, DungeonScene, CoinFlipScene],
 };
 
 document.addEventListener('DOMContentLoaded', () => {
