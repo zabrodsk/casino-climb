@@ -16,6 +16,18 @@ let _state: CoinState = {
   floor: 1,
 };
 
+export type ActiveEffect = { type: 'buff' | 'curse'; magnitude: number } | null;
+
+let _reviveToken = false;
+let _activeEffect: ActiveEffect = null;
+
+export function hasReviveToken(): boolean { return _reviveToken; }
+export function grantReviveToken(): void { _reviveToken = true; }
+export function consumeReviveToken(): void { _reviveToken = false; }
+export function getActiveEffect(): ActiveEffect { return _activeEffect; }
+export function setActiveEffect(e: ActiveEffect): void { _activeEffect = e; }
+export function clearActiveEffect(): void { _activeEffect = null; }
+
 export function getCoins(): number {
   return _state.coins;
 }
@@ -39,6 +51,8 @@ export function addCoins(delta: number): void {
 export function resetRun(): void {
   _state.coins = 200;
   _state.floor = 1;
+  _reviveToken = false;
+  _activeEffect = null;
   if (typeof localStorage !== 'undefined') {
     const current = parseInt(localStorage.getItem(RUN_COUNT_KEY) ?? '0', 10);
     localStorage.setItem(RUN_COUNT_KEY, String(current + 1));
