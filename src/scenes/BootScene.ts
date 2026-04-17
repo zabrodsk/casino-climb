@@ -615,6 +615,68 @@ export class BootScene extends Scene {
     g.fillRect(0, 30, 48, 2);
     g.generateTexture('table-blackjack', 48, 32);
 
+    // Fate floor tiles: deep void-purple with faint arcane specks
+    g.clear();
+    g.fillStyle(0x0d0018);
+    g.fillRect(0, 0, 16, 16);
+    g.fillStyle(0x1a0830);
+    g.fillRect(0, 0, 16, 1);
+    g.fillRect(0, 8, 16, 1);
+    g.fillRect(8, 0, 1, 16);
+    g.fillStyle(0xcc88ff);
+    g.fillRect(3, 3, 1, 1);
+    g.fillRect(12, 11, 1, 1);
+    g.fillRect(7, 14, 1, 1);
+    g.generateTexture('fate-floor-a', 16, 16);
+
+    g.clear();
+    g.fillStyle(0x10051e);
+    g.fillRect(0, 0, 16, 16);
+    g.fillStyle(0x200840);
+    g.fillRect(0, 7, 16, 2);
+    g.fillRect(7, 0, 2, 16);
+    g.fillStyle(0x8844cc);
+    g.fillRect(1, 1, 1, 1);
+    g.fillRect(14, 1, 1, 1);
+    g.fillRect(1, 14, 1, 1);
+    g.fillRect(14, 14, 1, 1);
+    g.fillStyle(0xffd700);
+    g.fillRect(7, 7, 2, 2);
+    g.generateTexture('fate-floor-b', 16, 16);
+
+    // Wheel of Fate table: circular wheel with wedge lines and pointer
+    g.clear();
+    g.fillStyle(0xc9a66b);
+    g.fillRect(0, 0, 48, 32);
+    g.fillStyle(0x4a1a6a);
+    g.fillRect(1, 1, 46, 30);
+    g.fillStyle(0x0d0018);
+    g.fillRect(2, 2, 44, 28);
+    // Wheel circle outline
+    g.fillStyle(0xcc88ff);
+    g.fillCircle(24, 17, 12);
+    g.fillStyle(0x0d0018);
+    g.fillCircle(24, 17, 10);
+    // Wedge spokes
+    g.fillStyle(0xcc88ff);
+    g.fillRect(24, 7, 1, 20);
+    g.fillRect(14, 17, 20, 1);
+    g.fillRect(17, 10, 1, 14);
+    g.fillRect(30, 10, 1, 14);
+    g.fillRect(17, 10, 14, 1);
+    g.fillRect(17, 23, 14, 1);
+    // Center dot
+    g.fillStyle(0xffd700);
+    g.fillRect(23, 16, 3, 3);
+    // Pointer at top
+    g.fillStyle(0xffd700);
+    g.fillRect(23, 4, 3, 4);
+    g.fillRect(22, 5, 5, 2);
+    // Shadow bottom
+    g.fillStyle(0x000000);
+    g.fillRect(0, 30, 48, 2);
+    g.generateTexture('table-wheel', 48, 32);
+
     g.clear();
     g.fillStyle(0x1a1a1a);
     g.fillRect(0, 0, 16, 32);

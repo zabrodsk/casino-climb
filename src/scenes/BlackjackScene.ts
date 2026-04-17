@@ -9,6 +9,7 @@ import {
   startRound,
 } from '../games/blackjack';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle, drawFramedPanel } from '../ui/theme';
+import { getActiveEffect, clearActiveEffect } from '../state/coinState';
 
 const WIN_TARGET = 400;
 const HANDS_TO_WIN = 3;
@@ -426,6 +427,13 @@ export class BlackjackScene extends Scene {
     this.revealDealer = true;
     const result = settleRound(this.currentCoins, this.currentBet, this.playerHand, this.dealerHand);
     this.currentCoins = result.newCoins;
+    if (result.outcome === 'win') {
+      const effect = getActiveEffect();
+      if (effect) {
+        const adj = Math.round(this.currentBet * effect.magnitude);
+        this.currentCoins += effect.type === 'buff' ? adj : -adj;
+      }
+    }
     this.roundActive = false;
 
     if (result.outcome === 'win') {
@@ -619,6 +627,7 @@ export class BlackjackScene extends Scene {
   }
 
   private leave(): void {
+    clearActiveEffect();
     const won = this.currentCoins >= WIN_TARGET || this.handsWon >= HANDS_TO_WIN;
 
     try {

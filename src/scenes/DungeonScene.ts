@@ -1,5 +1,5 @@
 import { Scene, Tilemaps, Physics, GameObjects } from 'phaser';
-import { getCoins, getFloor, setCoins, setFloor, resetRun } from '../state/coinState';
+import { getCoins, getFloor, setCoins, setFloor, resetRun, hasReviveToken, consumeReviveToken } from '../state/coinState';
 import { HUD } from '../ui/HUD';
 import { FLOOR_CONFIG, FloorConfig } from '../data/floorConfig';
 import { drawFramedPanel, neonTitleStyle, bodyTextStyle } from '../ui/theme';
@@ -472,6 +472,15 @@ export class DungeonScene extends Scene {
       this.hud.showSpeech('The stairs unlock. Take them.');
       this._unlockStairs();
     } else if (coins <= 0) {
+      if (hasReviveToken()) {
+        consumeReviveToken();
+        setCoins(50);
+        this.hud.showSpeech('Your revive token shatters. You survive with 50 coins.');
+        this.scene.resume('DungeonScene');
+        this.cameras.main.fadeIn(300, 0, 0, 0);
+        this.doorTriggered = false;
+        return;
+      }
       this.hud.showSpeech('The house always wins.');
       resetRun();
       this.scene.resume('DungeonScene');

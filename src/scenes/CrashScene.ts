@@ -1,6 +1,7 @@
 import { Scene, GameObjects } from 'phaser';
 import { resolve, nextCrashPoint, isValidBet } from '../games/crash';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle } from '../ui/theme';
+import { getActiveEffect, clearActiveEffect } from '../state/coinState';
 
 const WIN_TARGET = 350;
 const BET_OPTIONS = [10, 25, 50];
@@ -467,9 +468,14 @@ export class CrashScene extends Scene {
     });
 
     this.currentCoins = result.newCoins;
+    const winnings = result.payout - this.selectedBet;
+    const effect = getActiveEffect();
+    if (effect) {
+      const adj = Math.round(winnings * effect.magnitude);
+      this.currentCoins += effect.type === 'buff' ? adj : -adj;
+    }
     this.coinsText.setText(`Coins: ${this.currentCoins}`);
 
-    const winnings = result.payout - this.selectedBet;
     this.resultText.setText(`+${winnings} coins at ${mult.toFixed(2)}x`);
     this.resultText.setColor(COLOR.winGreen);
 
@@ -497,6 +503,7 @@ export class CrashScene extends Scene {
   }
 
   leave() {
+    clearActiveEffect();
     const won = this.currentCoins >= WIN_TARGET || this.successfulCashOuts >= 3;
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
