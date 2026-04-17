@@ -164,7 +164,8 @@ export class DungeonScene extends Scene {
           tableTexture
         )
         .setOrigin(0.5, 0.5)
-        .setDepth(3);
+        .setDepth(3)
+        .setScale(cfg.gameSceneKey === 'WheelScene' ? 2 : 1);
     } else {
       const tableTile = this.propLayer.getTileAt(tablePos.col, tablePos.row);
       if (tableTile) tableTile.tint = cfg.propTint.table;
@@ -320,6 +321,7 @@ export class DungeonScene extends Scene {
       AudioManager.playSfx(this, 'transition-exit', { volume: 0.9, cooldownMs: 350, allowOverlap: false });
       this.fromTransition = false;
     }
+    this._applyFloorAmbience();
     this._scheduleEnvironmentSfx();
     addGameplaySettingsGear(this, 'DungeonScene');
     registerDeveloperUnlockHotkey(this, () => {
@@ -442,6 +444,9 @@ export class DungeonScene extends Scene {
     if (this.doorTriggered || this.justExitedTable) return;
     this.doorTriggered = true;
     AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 40, allowOverlap: false });
+    if (this.config.gameSceneKey === 'WheelScene') {
+      AudioManager.stopMusic(this);
+    }
 
     this.player.setVelocity(0, 0);
     this.cameras.main.fadeOut(300, 0, 0, 0);
@@ -509,7 +514,9 @@ export class DungeonScene extends Scene {
       this._unlockStairs();
       if (!this.goalSoundsPlayed) {
         AudioManager.playSfx(this, 'door-open', { volume: 1.8, cooldownMs: 300, allowOverlap: true });
-        AudioManager.playSfx(this, 'goal-victory', { volume: 0.6, cooldownMs: 300, allowOverlap: false });
+        if (this.config.gameSceneKey !== 'WheelScene') {
+          AudioManager.playSfx(this, 'goal-victory', { volume: 0.6, cooldownMs: 300, allowOverlap: false });
+        }
         this.goalSoundsPlayed = true;
       }
     } else if (coins <= 0) {
@@ -534,9 +541,26 @@ export class DungeonScene extends Scene {
     this.justExitedTable = true;
 
     this.scene.resume('DungeonScene');
+    this._applyFloorAmbience();
     AudioManager.playSfx(this, 'ui-click', { volume: 0.8, cooldownMs: 40, allowOverlap: false });
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.doorTriggered = false;
+  }
+
+  private _applyFloorAmbience(): void {
+    const activeMusic = AudioManager.getMusic(this);
+    if (this.config.gameSceneKey === 'WheelScene') {
+      if (activeMusic?.key !== 'wheel-choir' || !activeMusic.isPlaying) {
+        AudioManager.playMusic(this, 'wheel-choir', { loop: true, restart: true, volume: 0.78 });
+      } else {
+        activeMusic.setVolume(AudioManager.getMusicVolume(this) * 0.78);
+      }
+      return;
+    }
+
+    if (activeMusic?.key === 'wheel-choir') {
+      AudioManager.playMusic(this, 'casino-music', { loop: true, restart: true });
+    }
   }
 
   private _unlockStairs(): void {

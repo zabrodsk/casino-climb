@@ -643,37 +643,56 @@ export class BootScene extends Scene {
     g.fillRect(7, 7, 2, 2);
     g.generateTexture('fate-floor-b', 16, 16);
 
-    // Wheel of Fate table: circular wheel with wedge lines and pointer
+    // Wheel of Fate table: wheel-only motif (no enclosing frame) for dungeon preview
     g.clear();
-    g.fillStyle(0xc9a66b);
-    g.fillRect(0, 0, 48, 32);
-    g.fillStyle(0x4a1a6a);
-    g.fillRect(1, 1, 46, 30);
-    g.fillStyle(0x0d0018);
-    g.fillRect(2, 2, 44, 28);
-    // Wheel circle outline
-    g.fillStyle(0xcc88ff);
-    g.fillCircle(24, 17, 12);
-    g.fillStyle(0x0d0018);
-    g.fillCircle(24, 17, 10);
-    // Wedge spokes
-    g.fillStyle(0xcc88ff);
-    g.fillRect(24, 7, 1, 20);
-    g.fillRect(14, 17, 20, 1);
-    g.fillRect(17, 10, 1, 14);
-    g.fillRect(30, 10, 1, 14);
-    g.fillRect(17, 10, 14, 1);
-    g.fillRect(17, 23, 14, 1);
-    // Center dot
-    g.fillStyle(0xffd700);
-    g.fillRect(23, 16, 3, 3);
-    // Pointer at top
-    g.fillStyle(0xffd700);
-    g.fillRect(23, 4, 3, 4);
-    g.fillRect(22, 5, 5, 2);
-    // Shadow bottom
-    g.fillStyle(0x000000);
-    g.fillRect(0, 30, 48, 2);
+    g.fillStyle(0xffdf8a);
+    g.fillCircle(24, 16, 12);
+    g.fillStyle(0xa85a1e);
+    g.fillCircle(24, 16, 11);
+
+    // Outer ring wedges (purple/red)
+    g.fillStyle(0x9f4ec6);
+    g.fillRect(17, 6, 6, 4);
+    g.fillRect(12, 11, 4, 5);
+    g.fillRect(20, 22, 6, 3);
+    g.fillRect(29, 20, 5, 4);
+    g.fillStyle(0xc22657);
+    g.fillRect(24, 6, 6, 4);
+    g.fillRect(9, 16, 4, 4);
+    g.fillRect(15, 21, 4, 3);
+    g.fillRect(31, 11, 4, 4);
+
+    // Inner green wheel and spokes
+    g.fillStyle(0x30c975);
+    g.fillCircle(24, 16, 6);
+    g.fillStyle(0xffc74f);
+    g.fillRect(24, 10, 1, 12);
+    g.fillRect(18, 16, 12, 1);
+    g.fillRect(20, 12, 1, 8);
+    g.fillRect(28, 12, 1, 8);
+
+    g.fillStyle(0xeef6ff);
+    g.fillCircle(24, 16, 3);
+    g.fillStyle(0xf5b133);
+    g.fillRect(23, 15, 2, 2);
+
+    // Top pointer
+    g.fillStyle(0xffd35b);
+    g.fillRect(23, 3, 3, 4);
+    g.fillRect(22, 4, 5, 2);
+
+    // Jewel dots on rim
+    g.fillStyle(0x29d087);
+    g.fillRect(10, 9, 2, 2);
+    g.fillRect(36, 10, 2, 2);
+    g.fillRect(12, 22, 2, 2);
+    g.fillRect(35, 21, 2, 2);
+
+    // Base
+    g.fillStyle(0x6f2a14);
+    g.fillRect(10, 26, 28, 3);
+    g.fillStyle(0xe0a242);
+    g.fillRect(16, 27, 16, 2);
     g.generateTexture('table-wheel', 48, 32);
 
     g.clear();

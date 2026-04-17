@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 
-export type MusicKey = 'menu-music' | 'casino-music' | 'crash-game';
+export type MusicKey = 'menu-music' | 'casino-music' | 'crash-game' | 'wheel-choir';
 
 export type SfxKey =
   | 'ui-click'
@@ -9,6 +9,7 @@ export type SfxKey =
   | 'deal-card'
   | 'coin-flip'
   | 'dice-roll'
+  | 'wheel-spin'
   | 'coin-settle'
   | 'dice-land'
   | 'cashout'
@@ -64,6 +65,7 @@ const MUSIC_ASSETS: Record<MusicKey, string> = {
   'menu-music': 'assets/audio/menu-music.mp3',
   'casino-music': 'assets/audio/casino-music.mp3',
   'crash-game': 'assets/audio/crash-game.mp3',
+  'wheel-choir': 'assets/audio/wheel-choir.mp3',
 };
 
 const SFX_ASSETS: Record<SfxKey, string> = {
@@ -73,6 +75,7 @@ const SFX_ASSETS: Record<SfxKey, string> = {
   'deal-card': 'assets/audio/sfx/card-sound.mp3',
   'coin-flip': 'assets/audio/sfx/coin-flip.wav',
   'dice-roll': 'assets/audio/sfx/dice-roll.mp3',
+  'wheel-spin': 'assets/audio/sfx/spinning-wheel.mp3',
   'coin-settle': 'assets/audio/sfx/coin-settle.wav',
   'dice-land': 'assets/audio/sfx/dice-land.wav',
   'cashout': 'assets/audio/sfx/cashout.wav',
