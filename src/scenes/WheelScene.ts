@@ -67,12 +67,12 @@ export class WheelScene extends Scene {
 
     addGameplaySettingsGear(this, 'WheelScene');
     registerDeveloperUnlockHotkey(this, () => this.unlockForDevelopers());
+    this.input.keyboard?.on('keydown-ESC', () => this.leave());
 
     this.events.once('shutdown', () => {
       this.stopSpinSound();
     });
 
-    this.input.keyboard?.on('keydown-ESC', () => this.leave());
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
 

@@ -6,9 +6,6 @@ const DEV_MODE_STORAGE_KEY = 'casino.devMode.enabled';
 const DEV_MODE_PREVIOUS_COINS_KEY = 'casino.devMode.previousCoins';
 
 export function isDeveloperModeEnabled(): boolean {
-  if (!import.meta.env.DEV) {
-    return false;
-  }
   if (typeof window === 'undefined' || !window.localStorage) {
     return false;
   }
@@ -16,9 +13,6 @@ export function isDeveloperModeEnabled(): boolean {
 }
 
 export function enableDeveloperMode(): void {
-  if (!import.meta.env.DEV) {
-    return;
-  }
   if (typeof window === 'undefined' || !window.localStorage) {
     return;
   }
@@ -33,9 +27,6 @@ export function enableDeveloperMode(): void {
 }
 
 export function disableDeveloperMode(): void {
-  if (!import.meta.env.DEV) {
-    return;
-  }
   if (typeof window === 'undefined' || !window.localStorage) {
     return;
   }
@@ -72,10 +63,6 @@ export function registerDeveloperUnlockHotkey(
   onEnable?: () => void,
   onDisable?: () => void,
 ): void {
-  if (!import.meta.env.DEV) {
-    return;
-  }
-
   const keyboard = scene.input.keyboard;
   if (!keyboard) {
     return;
