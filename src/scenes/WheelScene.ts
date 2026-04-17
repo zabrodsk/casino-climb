@@ -8,6 +8,7 @@ import { AudioManager } from '../audio/AudioManager';
 import { COLOR, FONT, buttonLabelStyle, drawFramedPanel, drawNestedButton, neonTitleStyle } from '../ui/theme';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
+import { HouseController } from '../ui/HouseController';
 
 const WHEEL_CX = 512;
 const WHEEL_CY = 334;
@@ -46,6 +47,9 @@ export class WheelScene extends Scene {
   }
 
   create(): void {
+    HouseController.disable();
+    this.events.once('shutdown', () => HouseController.enable());
+
     const W = 1024;
     const H = 768;
 
@@ -354,6 +358,10 @@ export class WheelScene extends Scene {
     this.continueZone.setInteractive({ cursor: 'pointer' });
 
     this.showSpeech(seg.flavor);
+
+    if (seg.coinDelta <= -150) {
+      HouseController.say(this, 'gameSpecific', 'wheelLoseAll');
+    }
 
     const isGood = seg.coinDelta > 0 || seg.effectType === 'revive' || seg.effectType === 'buff';
     const isBad = seg.coinDelta < 0 || seg.effectType === 'curse';

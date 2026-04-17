@@ -6,6 +6,8 @@ import { drawFramedPanel, drawNestedButton, buttonLabelStyle, neonTitleStyle, bo
 import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { isDeveloperModeEnabled, registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
+import { resetMemoryRunState } from '../state/memoryState';
+import { HouseController } from '../ui/HouseController';
 
 // Prop tile indices into dungeon_tileset.png. Floor + walls render as procedural
 // stone sprites (see BootScene); only the table + stairs still come from the tileset.
@@ -347,6 +349,9 @@ export class DungeonScene extends Scene {
     this.hud.setCoins(getCoins());
     this.hud.setFloor(this.displayFloorNumber, cfg.name);
     this.hud.setProgress(getCoins(), cfg.target);
+    this.time.delayedCall(1800, () => {
+      HouseController.say(this, 'floorEntry', String(this.displayFloorNumber));
+    });
     this._lastHudCoins = getCoins();
     this.cameras.main.ignore(this.hud.getObjects());
     this.ensureDevModeLabel();
@@ -671,6 +676,7 @@ export class DungeonScene extends Scene {
     AudioManager.playSfx(this, 'game-over', { volume: 0.6, cooldownMs: 250, allowOverlap: false });
 
     if (getCoins() <= 0) {
+      resetMemoryRunState();
       resetRun();
       this.cameras.main.fadeOut(500, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
@@ -991,6 +997,7 @@ export class DungeonScene extends Scene {
     this.cameras.main.ignore([panel, title, subtitle]);
 
     this.time.delayedCall(3000, () => {
+      resetMemoryRunState();
       resetRun();
       this.scene.start('DungeonScene', { floor: 1 });
     });
@@ -998,6 +1005,18 @@ export class DungeonScene extends Scene {
 
   private _onGameComplete({ coins, won }: { coins: number; won: boolean }): void {
     setCoins(coins);
+
+    if (won) {
+      const streak = HouseController.incrementWinStreak();
+      if (streak >= 3) {
+        HouseController.say(this, 'playerActions', 'winStreak');
+      }
+    } else if (coins <= 0) {
+      HouseController.say(this, 'playerActions', 'busted');
+      HouseController.resetWinStreak();
+    } else {
+      HouseController.resetWinStreak();
+    }
 
     if (won) {
       if (this.currentFloor === 5) {
@@ -1022,6 +1041,7 @@ export class DungeonScene extends Scene {
     } else if (coins <= 0) {
       this.hud.showSpeech('The house always wins.');
       AudioManager.playSfx(this, 'game-over', { volume: 1.0, cooldownMs: 300, allowOverlap: false });
+      resetMemoryRunState();
       resetRun();
       this.scene.resume('DungeonScene');
       this.cameras.main.fadeOut(500, 0, 0, 0);
