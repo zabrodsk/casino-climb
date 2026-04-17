@@ -1,0 +1,3 @@
+{"t":0,"agent":"ad9725a","agent_type":"executor","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"ad9725a","agent_type":"executor","event":"agent_stop","success":true,"duration_ms":148276}
+{"t":0,"agent":"a3f1272","agent_type":"executor","event":"agent_start","parent_mode":"none"}
