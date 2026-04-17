@@ -2,6 +2,8 @@ import { Scene, GameObjects } from 'phaser';
 import { play, isValidBet, RiskType } from '../games/coinFlip';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle } from '../ui/theme';
 import { AudioManager } from '../audio/AudioManager';
+import { addGameplaySettingsGear } from '../ui/gameplaySettings';
+import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 
 const WIN_TARGET = 300;
 const BET_OPTIONS = [5, 25, 50];
@@ -247,6 +249,12 @@ export class CoinFlipScene extends Scene {
     this.updatePlayButton();
     this.refreshBetButtons();
 
+    addGameplaySettingsGear(this, 'CoinFlipScene');
+    registerDeveloperUnlockHotkey(this, () => {
+      this.currentCoins = 999;
+      this.coinsText.setText(`Coins: ${this.currentCoins}`);
+      this.leaveTable();
+    });
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
 

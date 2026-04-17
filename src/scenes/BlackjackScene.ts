@@ -10,6 +10,8 @@ import {
 } from '../games/blackjack';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle, drawFramedPanel } from '../ui/theme';
 import { AudioManager } from '../audio/AudioManager';
+import { addGameplaySettingsGear } from '../ui/gameplaySettings';
+import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 
 const WIN_TARGET = 400;
 const HANDS_TO_WIN = 3;
@@ -171,6 +173,12 @@ export class BlackjackScene extends Scene {
       this._showSpeech('Select a bet, then hit DEAL. Get closer to 21 than the dealer without going over. HIT draws a card. STAND lets the dealer play.');
     });
 
+    addGameplaySettingsGear(this, 'BlackjackScene');
+    registerDeveloperUnlockHotkey(this, () => {
+      this.currentCoins = 999;
+      this.coinsText.setText(`Coins: ${this.currentCoins}`);
+      this.leave();
+    });
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
 

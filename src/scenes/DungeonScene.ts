@@ -4,6 +4,8 @@ import { HUD } from '../ui/HUD';
 import { FLOOR_CONFIG, FloorConfig } from '../data/floorConfig';
 import { drawFramedPanel, neonTitleStyle, bodyTextStyle } from '../ui/theme';
 import { AudioManager } from '../audio/AudioManager';
+import { addGameplaySettingsGear } from '../ui/gameplaySettings';
+import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 
 // Prop tile indices into dungeon_tileset.png. Floor + walls render as procedural
 // stone sprites (see BootScene); only the table + stairs still come from the tileset.
@@ -319,6 +321,11 @@ export class DungeonScene extends Scene {
       this.fromTransition = false;
     }
     this._scheduleEnvironmentSfx();
+    addGameplaySettingsGear(this, 'DungeonScene');
+    registerDeveloperUnlockHotkey(this, () => {
+      setCoins(999);
+      this._unlockStairs();
+    });
   }
 
   /** Add a torch flame sprite + flickering pointlight at world position (x, y) */

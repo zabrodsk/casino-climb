@@ -2,6 +2,8 @@ import { Scene, GameObjects } from 'phaser';
 import { resolve, nextCrashPoint, isValidBet } from '../games/crash';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle } from '../ui/theme';
 import { AudioManager } from '../audio/AudioManager';
+import { addGameplaySettingsGear } from '../ui/gameplaySettings';
+import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 
 const WIN_TARGET = 350;
 const BET_OPTIONS = [10, 25, 50];
@@ -227,6 +229,12 @@ export class CrashScene extends Scene {
       AudioManager.playMusic(this, 'casino-music', { loop: true, restart: true });
     });
 
+    addGameplaySettingsGear(this, 'CrashScene');
+    registerDeveloperUnlockHotkey(this, () => {
+      this.currentCoins = 999;
+      this.coinsText.setText(`Coins: ${this.currentCoins}`);
+      this.leave();
+    });
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
 
