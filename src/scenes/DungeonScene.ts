@@ -3,6 +3,8 @@ import { getCoins, getFloor, setCoins, setFloor, resetRun, hasReviveToken, consu
 import { HUD } from '../ui/HUD';
 import { FLOOR_CONFIG, FloorConfig } from '../data/floorConfig';
 import { drawFramedPanel, neonTitleStyle, bodyTextStyle } from '../ui/theme';
+import { addGameplaySettingsGear } from '../ui/gameplaySettings';
+import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 
 // Prop tile indices into dungeon_tileset.png. Floor + walls render as procedural
 // stone sprites (see BootScene); only the table + stairs still come from the tileset.
@@ -291,6 +293,9 @@ export class DungeonScene extends Scene {
     this.hud.setProgress(getCoins(), cfg.target);
     this._lastHudCoins = getCoins();
     this.cameras.main.ignore(this.hud.getObjects());
+    const settingsGearObjects = addGameplaySettingsGear(this, 'DungeonScene');
+    this.cameras.main.ignore(settingsGearObjects);
+    registerDeveloperUnlockHotkey(this, () => this._onDeveloperUnlock());
 
     // ── game-complete listener ─────────────────────────────────────────────
     this.events.on('game-complete', this._onGameComplete, this);
@@ -499,6 +504,16 @@ export class DungeonScene extends Scene {
     this.scene.resume('DungeonScene');
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.doorTriggered = false;
+  }
+
+  private _onDeveloperUnlock(): void {
+    const boostedCoins = Math.max(getCoins(), this.config.target);
+    setCoins(boostedCoins);
+    this._lastHudCoins = boostedCoins;
+    this.hud.setCoins(boostedCoins);
+    this.hud.setProgress(boostedCoins, this.config.target);
+    this.hud.showSpeech('DEV: floor unlocked.');
+    this._unlockStairs();
   }
 
   private _unlockStairs(): void {

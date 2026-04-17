@@ -1,7 +1,14 @@
 import { Scene, GameObjects, Input, Math as PhaserMath } from 'phaser';
+import {
+  SoundLevels,
+  SoundSliderKey,
+  applySoundLevels,
+  getMusicVolume,
+  getSoundLevels,
+  updateSoundLevel,
+} from '../state/audioSettings';
 
 type MenuButtonId = 'play' | 'settings';
-type SoundSliderKey = 'master' | 'music' | 'sfx';
 
 type SliderUi = {
   key: SoundSliderKey;
@@ -25,17 +32,14 @@ export class MenuScene extends Scene {
   private settingsObjects: GameObjects.GameObject[] = [];
   private sliderUis: SliderUi[] = [];
   private draggingSlider?: SoundSliderKey;
-  private soundLevels: Record<SoundSliderKey, number> = {
-    master: 80,
-    music: 70,
-    sfx: 85,
-  };
+  private soundLevels!: SoundLevels;
 
   constructor() {
     super('MenuScene');
   }
 
   create(): void {
+    this.soundLevels = getSoundLevels(this.game);
     this.cameras.main.setRoundPixels(true);
     this.drawBackground();
     this.drawDecor();
@@ -70,7 +74,7 @@ export class MenuScene extends Scene {
       existing.destroy();
     }
 
-    const music = this.sound.add('menu-music', { loop: true, volume: 0.7 }) as
+    const music = this.sound.add('menu-music', { loop: true, volume: getMusicVolume(this.soundLevels) }) as
       | Phaser.Sound.WebAudioSound
       | Phaser.Sound.HTML5AudioSound;
     this.game.registry.set('music', music);
@@ -81,6 +85,7 @@ export class MenuScene extends Scene {
     } else {
       play();
     }
+    applySoundLevels(this);
   }
 
   private drawBackground(): void {
@@ -385,9 +390,9 @@ export class MenuScene extends Scene {
     const ratio = PhaserMath.Clamp((pointerX - bounds.left) / bounds.width, 0, 1);
     const value = Math.round(ratio * 100);
 
-    this.soundLevels[key] = value;
+    this.soundLevels = updateSoundLevel(this.game, key, value);
     this.updateSliderVisual(slider, value);
-    this.applySoundLevels();
+    applySoundLevels(this);
   }
 
   private updateSliderVisual(slider: SliderUi, value: number): void {
@@ -398,19 +403,6 @@ export class MenuScene extends Scene {
     slider.fill.setSize(fillWidth, slider.fill.height);
     slider.knob.x = bounds.left + (bounds.width * ratio);
     slider.valueText.setText(`${value}%`);
-  }
-
-  private applySoundLevels(): void {
-    const master = this.soundLevels.master / 100;
-    const musicVol = this.soundLevels.music / 100;
-
-    const music = this.game.registry.get('music') as
-      | Phaser.Sound.WebAudioSound
-      | Phaser.Sound.HTML5AudioSound
-      | undefined;
-    if (music) {
-      music.setVolume(master * musicVol);
-    }
   }
 
   private toggleSettings(visible: boolean): void {
@@ -476,9 +468,13 @@ export class MenuScene extends Scene {
       if (menuMusic) {
         menuMusic.stop();
       }
-      const ambientMusic = this.sound.add('casino-music', { loop: true, volume: 1.0 });
+      const ambientMusic = this.sound.add('casino-music', {
+        loop: true,
+        volume: getMusicVolume(getSoundLevels(this.game)),
+      });
       this.game.registry.set('music', ambientMusic);
       ambientMusic.play();
+      applySoundLevels(this);
 
       this.cameras.main.fadeOut(250, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {

@@ -2,6 +2,8 @@ import { Scene, GameObjects } from 'phaser';
 import { resolve, nextCrashPoint, isValidBet } from '../games/crash';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle } from '../ui/theme';
 import { getActiveEffect, clearActiveEffect } from '../state/coinState';
+import { addGameplaySettingsGear } from '../ui/gameplaySettings';
+import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 
 const WIN_TARGET = 350;
 const BET_OPTIONS = [10, 25, 50];
@@ -220,6 +222,8 @@ export class CrashScene extends Scene {
 
     this.updatePlayButton();
     this.refreshBetButtons();
+    addGameplaySettingsGear(this, 'CrashScene');
+    registerDeveloperUnlockHotkey(this, () => this.unlockForDevelopers());
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
@@ -500,6 +504,17 @@ export class CrashScene extends Scene {
     }
     this.refreshBetButtons();
     this.updatePlayButton();
+  }
+
+  private unlockForDevelopers(): void {
+    if (this.playing) {
+      return;
+    }
+    this.currentCoins = Math.max(this.currentCoins, WIN_TARGET);
+    this.successfulCashOuts = Math.max(this.successfulCashOuts, 3);
+    this.coinsText.setText(`Coins: ${this.currentCoins}`);
+    this.targetReachedText.setText('DEV: target unlocked.').setVisible(true);
+    this.leave();
   }
 
   leave() {

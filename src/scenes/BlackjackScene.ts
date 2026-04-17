@@ -10,6 +10,8 @@ import {
 } from '../games/blackjack';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle, drawFramedPanel } from '../ui/theme';
 import { getActiveEffect, clearActiveEffect } from '../state/coinState';
+import { addGameplaySettingsGear } from '../ui/gameplaySettings';
+import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 
 const WIN_TARGET = 400;
 const HANDS_TO_WIN = 3;
@@ -170,6 +172,8 @@ export class BlackjackScene extends Scene {
     this.time.delayedCall(400, () => {
       this._showSpeech('Select a bet, then hit DEAL. Get closer to 21 than the dealer without going over. HIT draws a card. STAND lets the dealer play.');
     });
+    addGameplaySettingsGear(this, 'BlackjackScene');
+    registerDeveloperUnlockHotkey(this, () => this.unlockForDevelopers());
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
@@ -624,6 +628,18 @@ export class BlackjackScene extends Scene {
         }
       },
     });
+  }
+
+  private unlockForDevelopers(): void {
+    if (this.roundActive) {
+      return;
+    }
+    this.currentCoins = Math.max(this.currentCoins, WIN_TARGET);
+    this.handsWon = HANDS_TO_WIN;
+    this.coinsText.setText(`Coins: ${this.currentCoins}`);
+    this.handsWonText.setText(`Hands Won: ${this.handsWon}/${HANDS_TO_WIN}`);
+    this.targetReachedText.setText('DEV: target unlocked.').setVisible(true);
+    this.leave();
   }
 
   private leave(): void {
