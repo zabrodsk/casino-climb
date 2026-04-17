@@ -2,7 +2,6 @@ import { Scene, GameObjects } from 'phaser';
 import { AudioManager } from '../audio/AudioManager';
 import { buttonLabelStyle, drawFramedPanel, drawNestedButton, neonTitleStyle } from '../ui/theme';
 import { getRunStats, resetRun, setFloor } from '../state/coinState';
-import { resetNarrativeRunState } from '../state/narrativeState';
 
 const ENDING_LINES = [
   'You remember all of it.',
@@ -74,7 +73,7 @@ export class EndScene extends Scene {
     this.leaveZone.on('pointerdown', () => this.leaveEnding());
 
     const replayBg = this.add.graphics();
-    const replayText = this.add.text(width / 2 + 140, 654, 'PLAY AGAIN', buttonLabelStyle(20)).setOrigin(0.5);
+    const replayText = this.add.text(width / 2 + 140, 654, 'START OVER', buttonLabelStyle(20)).setOrigin(0.5);
     drawNestedButton(replayBg, width / 2 + 140, 654, 220, 52, false);
     this.replayZone = this.add.zone(width / 2 + 140, 654, 220, 52).setInteractive({ cursor: 'pointer' });
     this.replayZone.on('pointerover', () => drawNestedButton(replayBg, width / 2 + 140, 654, 220, 52, true));
@@ -87,21 +86,9 @@ export class EndScene extends Scene {
     this.replayZone.disableInteractive();
     AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 50, allowOverlap: false });
 
-    const { width, height } = this.scale;
-    const finalQuote = this.add.text(width / 2, height - 94, 'You can leave. The hunger follows you anyway.', {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#d8b26a',
-    }).setOrigin(0.5).setAlpha(0);
-
-    this.tweens.add({ targets: finalQuote, alpha: 1, duration: 280 });
-    this.time.delayedCall(1300, () => {
-      resetNarrativeRunState();
-      resetRun();
-      this.cameras.main.fadeOut(420, 0, 0, 0);
-      this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.scene.start('MenuScene');
-      });
+    this.cameras.main.fadeOut(420, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.start('OutdoorScene');
     });
   }
 

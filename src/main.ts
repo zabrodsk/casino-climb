@@ -10,6 +10,7 @@ import { BlackjackScene } from './scenes/BlackjackScene';
 import { WheelScene } from './scenes/WheelScene';
 import { VaultScene } from './scenes/VaultScene';
 import { EndScene } from './scenes/EndScene';
+import { OutdoorScene } from './scenes/OutdoorScene';
 import { resetDeveloperModeOnLaunch } from './dev/developerHotkeys';
 
 const isSafari = (() => {
@@ -53,6 +54,7 @@ const config = {
         WheelScene,
         VaultScene,
         EndScene,
+        OutdoorScene,
     ],
 };
 

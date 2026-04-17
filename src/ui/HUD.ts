@@ -41,7 +41,11 @@ export class HUD {
   private static readonly BAR_W = 320;
   private static readonly BAR_H = 14;
   private static readonly BAR_Y = 58;
+  private static readonly BAR_Y_BELOW_RUN_PANEL = 142; // below run panel with extra breathing room
   static readonly DEPTH = 100;
+
+  private _currentBarY = HUD.BAR_Y;
+  private _lastFillRatio = 0;
 
   constructor(scene: Phaser.Scene, opts?: { target?: number }) {
     this.scene = scene;
@@ -175,12 +179,18 @@ export class HUD {
       const line = lines[idx] ?? '';
       lineText.setVisible(line.length > 0).setText(line);
     });
+
+    // Push progress bar below the run panel so they don't overlap
+    this._repositionProgressBar(HUD.BAR_Y_BELOW_RUN_PANEL);
   }
 
   hideRunPanel(): void {
     this.runPanelBg.setVisible(false);
     this.runPanelTitle.setVisible(false);
     this.runPanelLines.forEach((line) => line.setVisible(false));
+
+    // Restore progress bar to its default position
+    this._repositionProgressBar(HUD.BAR_Y);
   }
 
   destroy(): void {
@@ -279,7 +289,7 @@ export class HUD {
   private _buildProgressBar(): void {
     const { width: sw } = this.scene.scale;
     const barX = (sw - HUD.BAR_W) / 2;
-    const barY = HUD.BAR_Y;
+    const barY = this._currentBarY;
 
     // Label above bar
     this.progressLabel = this.scene.add.text(sw / 2, barY - 2, `— ADVANCE AT ${this._target} COINS —`, {
@@ -291,10 +301,7 @@ export class HUD {
     // Background flat rect with gold border
     this.progressBg = this.scene.add.graphics();
     this.progressBg.setScrollFactor(0).setDepth(HUD.DEPTH);
-    this.progressBg.fillStyle(THEME.bgPanelDark, 0.9);
-    this.progressBg.fillRect(barX, barY, HUD.BAR_W, HUD.BAR_H);
-    this.progressBg.lineStyle(2, THEME.goldDim, 1);
-    this.progressBg.strokeRect(barX, barY, HUD.BAR_W, HUD.BAR_H);
+    this._redrawProgressBg(barX, barY);
 
     // Fill (drawn separately so we can redraw)
     this.progressFill = this.scene.add.graphics();
@@ -311,10 +318,34 @@ export class HUD {
     });
   }
 
-  private _drawProgressFill(ratio: number): void {
+  private _redrawProgressBg(barX: number, barY: number): void {
+    this.progressBg.clear();
+    this.progressBg.fillStyle(THEME.bgPanelDark, 0.9);
+    this.progressBg.fillRect(barX, barY, HUD.BAR_W, HUD.BAR_H);
+    this.progressBg.lineStyle(2, THEME.goldDim, 1);
+    this.progressBg.strokeRect(barX, barY, HUD.BAR_W, HUD.BAR_H);
+  }
+
+  private _repositionProgressBar(newBarY: number): void {
+    if (this._currentBarY === newBarY) return;
+    this._currentBarY = newBarY;
     const { width: sw } = this.scene.scale;
     const barX = (sw - HUD.BAR_W) / 2;
-    const barY = HUD.BAR_Y;
+
+    this.progressLabel.setY(newBarY - 2);
+    this._redrawProgressBg(barX, newBarY);
+    this._drawProgressFill(this._lastFillRatio);
+
+    const dotY = newBarY + HUD.BAR_H + 6;
+    const dotPositions = [barX + 20, barX + 80, barX + 160, barX + 240, barX + 300];
+    this._marqueDots.forEach((dot, i) => dot.setPosition(dotPositions[i], dotY));
+  }
+
+  private _drawProgressFill(ratio: number): void {
+    this._lastFillRatio = ratio;
+    const { width: sw } = this.scene.scale;
+    const barX = (sw - HUD.BAR_W) / 2;
+    const barY = this._currentBarY;
     const innerW = HUD.BAR_W - 4;
     const fillW = Math.max(0, Math.min(ratio * innerW, innerW));
 
@@ -382,24 +413,25 @@ export class HUD {
 
   private _buildRunPanel(): void {
     const { width: sw } = this.scene.scale;
-    const panelW = 372;
-    const panelH = 78;
+    const panelW = 520;
+    const panelH = 110;
     const x = (sw - panelW) / 2;
     const y = 8;
 
     this.runPanelBg = this.scene.add.graphics();
     this.runPanelBg.setScrollFactor(0).setDepth(HUD.DEPTH).setVisible(false);
-    drawFramedPanel(this.runPanelBg, x, y, panelW, panelH, { borderWidth: 2, alpha: 0.92 });
+    drawFramedPanel(this.runPanelBg, x, y, panelW, panelH, { borderWidth: 2, alpha: 0.95 });
 
-    this.runPanelTitle = this.scene.add.text(sw / 2, y + 16, '', {
-      fontSize: '12px',
+    this.runPanelTitle = this.scene.add.text(sw / 2, y + 14, '', {
+      fontSize: '18px',
       fontFamily: FONT.mono,
+      fontStyle: 'bold',
       color: COLOR.goldText,
     }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(HUD.DEPTH + 1).setVisible(false);
 
     this.runPanelLines = [0, 1, 2].map((idx) =>
-      this.scene.add.text(sw / 2, y + 34 + idx * 14, '', {
-        fontSize: '11px',
+      this.scene.add.text(sw / 2, y + 44 + idx * 22, '', {
+        fontSize: '15px',
         fontFamily: FONT.mono,
         color: COLOR.ivorySoft,
         align: 'center',
