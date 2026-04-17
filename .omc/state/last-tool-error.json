@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"/Users/dusanzabrodsky/Library/Mobile Documents/com~apple~CloudDocs/coding/hackathon\\\" && npm run build 2>&1\",\"timeout\":120000}",
-  "error": "Exit code 1\n\n> template-vite-ts@1.4.0 build\n> vite build --config vite/config.prod.mjs\n\nBuilding for production...\n---------------------------------------------------------\n❤️❤️❤️ Tell us about your game! - games@phaser.io ❤️❤️❤️\n---------------------------------------------------------\n✨ Done ✨\nerror during build:\nsrc/scenes/BootScene.ts (1:7): \"default\" is not exported by \"node_modules/phaser/dist/phaser.esm.js\", imported by \"src/scenes/BootScene.ts\".\nfile: /Users/dusanzabrodsky/Library/Mobile...",
-  "timestamp": "2026-04-17T09:18:31.441Z",
-  "retry_count": 4
+  "tool_input_preview": "{\"command\":\"cd \\\"/Users/dusanzabrodsky/Library/Mobile Documents/com~apple~CloudDocs/coding/hackathon\\\" && npx tsc --noEmit 2>&1\",\"timeout\":60000}",
+  "error": "Exit code 2\nsrc/scenes/CoinFlipScene.ts(3,82): error TS6133: 'bodyTextStyle' is declared but its value is never read.\nsrc/scenes/CoinFlipScene.ts(3,97): error TS6133: 'drawFramedPanel' is declared but its value is never read.\nsrc/scenes/CoinFlipScene.ts(234,11): error TS6133: 'leaveBtnText' is declared but its value is never read.\nsrc/scenes/CrashScene.ts(3,82): error TS6133: 'drawFramedPanel' is declared but its value is never read.\nsrc/ui/HUD.ts(281,31): error TS6133: 'idx' is declared but its...",
+  "timestamp": "2026-04-17T11:29:05.087Z",
+  "retry_count": 1
 }

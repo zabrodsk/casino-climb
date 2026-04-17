@@ -1,4 +1,4 @@
-import { AUTO, Game, Scale } from 'phaser';
+import { AUTO, CANVAS, Game, Scale } from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { MenuScene } from './scenes/MenuScene';
 import { TransitionScene } from './scenes/TransitionScene';
@@ -6,8 +6,19 @@ import { DungeonScene } from './scenes/DungeonScene';
 import { CoinFlipScene } from './scenes/CoinFlipScene';
 import { CrashScene } from './scenes/CrashScene';
 
+const isSafari = (() => {
+    if (typeof navigator === 'undefined') {
+        return false;
+    }
+
+    const ua = navigator.userAgent;
+    return /Safari/i.test(ua) && !/Chrome|Chromium|Android/i.test(ua);
+})();
+
 const config = {
-    type: AUTO,
+    // Safari can present a blank canvas with this scene stack under WebGL.
+    // Falling back to Canvas there keeps localhost usable while other browsers stay on AUTO.
+    type: isSafari ? CANVAS : AUTO,
     width: 1024,
     height: 768,
     parent: 'game-container',

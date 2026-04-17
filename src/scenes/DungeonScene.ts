@@ -11,9 +11,9 @@ const TILE_TABLE        = 142;
 const TILE_STAIRS_L     = 73;
 const TILE_STAIRS_O     = 92;
 
-// ── Map dimensions: 14×11 — snug dungeon room, camera zoom 5× makes it feel right
-const COLS = 14;
-const ROWS = 11;
+// ── Map dimensions: 18x13 — enough room to circle the table comfortably
+const COLS = 18;
+const ROWS = 13;
 const TILE_SIZE = 16;
 
 // ── Seeded PRNG for consistent floor tile variation
@@ -235,11 +235,15 @@ export class DungeonScene extends Scene {
       ease: 'Sine.easeInOut',
     });
 
-    // ── Perimeter torches — 4 torches at interior corners (rows 2/8, cols 2/11) ──
-    this._addTorch(2  * TILE_SIZE + 8, 2 * TILE_SIZE + 14, cfg.torchColor, cfg.torchGlow);
-    this._addTorch(11 * TILE_SIZE + 8, 2 * TILE_SIZE + 14, cfg.torchColor, cfg.torchGlow);
-    this._addTorch(2  * TILE_SIZE + 8, 8 * TILE_SIZE + 4,  cfg.torchColor, cfg.torchGlow);
-    this._addTorch(11 * TILE_SIZE + 8, 8 * TILE_SIZE + 4,  cfg.torchColor, cfg.torchGlow);
+    // ── Perimeter torches — 4 torches at interior corners of the walkable room ──
+    const westTorchCol = 2;
+    const eastTorchCol = COLS - 3;
+    const northTorchRow = 2;
+    const southTorchRow = ROWS - 3;
+    this._addTorch(westTorchCol * TILE_SIZE + 8, northTorchRow * TILE_SIZE + 14, cfg.torchColor, cfg.torchGlow);
+    this._addTorch(eastTorchCol * TILE_SIZE + 8, northTorchRow * TILE_SIZE + 14, cfg.torchColor, cfg.torchGlow);
+    this._addTorch(westTorchCol * TILE_SIZE + 8, southTorchRow * TILE_SIZE + 4, cfg.torchColor, cfg.torchGlow);
+    this._addTorch(eastTorchCol * TILE_SIZE + 8, southTorchRow * TILE_SIZE + 4, cfg.torchColor, cfg.torchGlow);
 
     // ── Table label ───────────────────────────────────────────────────────
     const tableLabelY = tablePos.row * TILE_SIZE - (cfg.useCompositeTable ? 20 : 4);
