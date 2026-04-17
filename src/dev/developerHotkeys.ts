@@ -1,10 +1,72 @@
 import Phaser from 'phaser';
+import { getCoins, setCoins } from '../state/coinState';
 
 const DEV_UNLOCK_KEY = Phaser.Input.Keyboard.KeyCodes.F10;
+const DEV_MODE_STORAGE_KEY = 'casino.devMode.enabled';
+const DEV_MODE_PREVIOUS_COINS_KEY = 'casino.devMode.previousCoins';
+
+export function isDeveloperModeEnabled(): boolean {
+  if (!import.meta.env.DEV) {
+    return false;
+  }
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return false;
+  }
+  return window.localStorage.getItem(DEV_MODE_STORAGE_KEY) === '1';
+}
+
+export function enableDeveloperMode(): void {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  try {
+    if (!isDeveloperModeEnabled()) {
+      window.localStorage.setItem(DEV_MODE_PREVIOUS_COINS_KEY, String(getCoins()));
+    }
+    window.localStorage.setItem(DEV_MODE_STORAGE_KEY, '1');
+  } catch {
+    // Ignore storage errors in dev helper.
+  }
+}
+
+export function disableDeveloperMode(): void {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  try {
+    const previousCoinsRaw = window.localStorage.getItem(DEV_MODE_PREVIOUS_COINS_KEY);
+    if (previousCoinsRaw !== null) {
+      const parsed = Number(previousCoinsRaw);
+      if (Number.isFinite(parsed)) {
+        setCoins(Math.max(0, Math.round(parsed)));
+      }
+    }
+    window.localStorage.removeItem(DEV_MODE_PREVIOUS_COINS_KEY);
+    window.localStorage.removeItem(DEV_MODE_STORAGE_KEY);
+  } catch {
+    // Ignore storage errors in dev helper.
+  }
+}
+
+export function toggleDeveloperMode(): boolean {
+  if (isDeveloperModeEnabled()) {
+    disableDeveloperMode();
+    return false;
+  }
+  enableDeveloperMode();
+  return true;
+}
 
 export function registerDeveloperUnlockHotkey(
   scene: Phaser.Scene,
-  onUnlock: () => void,
+  onEnable?: () => void,
+  onDisable?: () => void,
 ): void {
   if (!import.meta.env.DEV) {
     return;
@@ -16,7 +78,14 @@ export function registerDeveloperUnlockHotkey(
   }
 
   const key = keyboard.addKey(DEV_UNLOCK_KEY);
-  const handler = () => onUnlock();
+  const handler = () => {
+    const enabled = toggleDeveloperMode();
+    if (enabled) {
+      onEnable?.();
+      return;
+    }
+    onDisable?.();
+  };
   key.on('down', handler);
 
   scene.events.once('shutdown', () => {

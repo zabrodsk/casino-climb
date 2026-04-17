@@ -1,21 +1,11 @@
 import { Scene, Tilemaps, Physics, GameObjects } from 'phaser';
-import {
-  addToTotalCoins,
-  consumeReviveToken,
-  getCoins,
-  getFloor,
-  hasReviveToken,
-  resetRun,
-  setCoins,
-  setFloor,
-} from '../state/coinState';
+import { getCoins, getFloor, setCoins, setFloor, resetRun } from '../state/coinState';
 import { HUD } from '../ui/HUD';
 import { FLOOR_CONFIG, FloorConfig } from '../data/floorConfig';
 import { drawFramedPanel, drawNestedButton, buttonLabelStyle, neonTitleStyle, bodyTextStyle } from '../ui/theme';
 import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
-import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
-import { resetNarrativeRunState } from '../state/narrativeState';
+import { isDeveloperModeEnabled, registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 
 // Prop tile indices into dungeon_tileset.png. Floor + walls render as procedural
 // stone sprites (see BootScene); only the table + stairs still come from the tileset.
@@ -103,6 +93,11 @@ export class DungeonScene extends Scene {
   private goalSoundsPlayed = false;
   private fromTransition = false;
   private envTimer: Phaser.Time.TimerEvent | null = null;
+  private devLevelButtonBg?: Phaser.GameObjects.Graphics;
+  private devLevelButtonLabel?: Phaser.GameObjects.Text;
+  private devLevelButtonZone?: Phaser.GameObjects.Zone;
+  private devLevelPanel?: Phaser.GameObjects.Container;
+  private devModeLabel?: Phaser.GameObjects.Text;
 
   private stairsSprite!: Phaser.GameObjects.Image;
   private uiCam!: Phaser.Cameras.Scene2D.Camera;
@@ -354,6 +349,7 @@ export class DungeonScene extends Scene {
     this.hud.setProgress(getCoins(), cfg.target);
     this._lastHudCoins = getCoins();
     this.cameras.main.ignore(this.hud.getObjects());
+    this.ensureDevModeLabel();
 
     // ── game-complete listener ─────────────────────────────────────────────
     this.events.on('game-complete', this._onGameComplete, this);
@@ -362,6 +358,9 @@ export class DungeonScene extends Scene {
         this.envTimer.remove(false);
         this.envTimer = null;
       }
+      this.destroyDevLevelSelector();
+      this.devModeLabel?.destroy();
+      this.devModeLabel = undefined;
     });
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
@@ -373,10 +372,26 @@ export class DungeonScene extends Scene {
     this._applyFloorAmbience();
     this._scheduleEnvironmentSfx();
     addGameplaySettingsGear(this, 'DungeonScene');
-    registerDeveloperUnlockHotkey(this, () => {
-      setCoins(999);
-      this._unlockStairs();
-    });
+    this.ensureDevLevelSelector();
+    registerDeveloperUnlockHotkey(
+      this,
+      () => {
+        setCoins(999);
+        this._lastHudCoins = getCoins();
+        this.hud.setCoins(this._lastHudCoins);
+        this.hud.setProgress(this._lastHudCoins, this.config.target);
+        this.hud.showSpeech('Dev mode enabled.');
+        this.applyDevModeState();
+      },
+      () => {
+        this._lastHudCoins = getCoins();
+        this.hud.setCoins(this._lastHudCoins);
+        this.hud.setProgress(this._lastHudCoins, this.config.target);
+        this.hud.showSpeech('Dev mode disabled.');
+        this.applyDevModeState();
+      },
+    );
+    this.applyDevModeState();
 
     if (this.crossingMode) {
       this._setupCrossingMode();
@@ -639,7 +654,6 @@ export class DungeonScene extends Scene {
     const grossPayout = Math.max(this.selectedCrossingBet, Math.round(this.selectedCrossingBet * this.crossingMultiplier));
     const profit = grossPayout - this.selectedCrossingBet;
     setCoins(getCoins() + profit);
-    addToTotalCoins(Math.max(0, profit));
     this.crossingRunActive = false;
     this.hud.showSpeech(`You bank ${grossPayout}. The House lets you breathe for a second.`);
     AudioManager.playSfx(this, 'goal-victory', { volume: 0.5, cooldownMs: 250, allowOverlap: false });
@@ -657,7 +671,6 @@ export class DungeonScene extends Scene {
     AudioManager.playSfx(this, 'game-over', { volume: 0.6, cooldownMs: 250, allowOverlap: false });
 
     if (getCoins() <= 0) {
-      resetNarrativeRunState();
       resetRun();
       this.cameras.main.fadeOut(500, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
@@ -978,28 +991,15 @@ export class DungeonScene extends Scene {
     this.cameras.main.ignore([panel, title, subtitle]);
 
     this.time.delayedCall(3000, () => {
-      resetNarrativeRunState();
       resetRun();
       this.scene.start('DungeonScene', { floor: 1 });
     });
   }
 
   private _onGameComplete({ coins, won }: { coins: number; won: boolean }): void {
-    const previousCoins = getCoins();
-    addToTotalCoins(Math.max(0, coins - previousCoins));
     setCoins(coins);
 
     if (won) {
-      if (this.currentFloor === 3) {
-        this.scene.resume('DungeonScene');
-        this._applyFloorAmbience();
-        this.cameras.main.fadeOut(350, 0, 0, 0);
-        this.cameras.main.once('camerafadeoutcomplete', () => {
-          this.scene.start('EndScene', { coins });
-        });
-        return;
-      }
-
       this.hud.showSpeech('The stairs unlock. Take them.');
       this._unlockStairs();
       if (!this.goalSoundsPlayed) {
@@ -1010,29 +1010,8 @@ export class DungeonScene extends Scene {
         this.goalSoundsPlayed = true;
       }
     } else if (coins <= 0) {
-      if (hasReviveToken()) {
-        consumeReviveToken();
-        setCoins(100);
-        this.hud.showSpeech('A support token cracks open. You stagger back with 100 coins.');
-        AudioManager.playSfx(this, 'goal-victory', { volume: 0.45, cooldownMs: 200, allowOverlap: false });
-
-        const { tablePos } = this.config;
-        this.player.setPosition(tablePos.col * TILE_SIZE + 8, (tablePos.row + 2) * TILE_SIZE + 8);
-        this.justExitedTable = true;
-
-        this.scene.resume('DungeonScene');
-        this._lastHudCoins = 100;
-        this.hud.setCoins(100);
-        this.hud.setProgress(100, this.config.target);
-        this._applyFloorAmbience();
-        this.doorTriggered = false;
-        this.cameras.main.fadeIn(300, 0, 0, 0);
-        return;
-      }
-
       this.hud.showSpeech('The house always wins.');
       AudioManager.playSfx(this, 'game-over', { volume: 1.0, cooldownMs: 300, allowOverlap: false });
-      resetNarrativeRunState();
       resetRun();
       this.scene.resume('DungeonScene');
       this.cameras.main.fadeOut(500, 0, 0, 0);
@@ -1074,10 +1053,12 @@ export class DungeonScene extends Scene {
     }
   }
 
-  private _unlockStairs(): void {
+  private _unlockStairs(playFx = true): void {
     if (this.stairsUnlocked) return;
     this.stairsUnlocked = true;
-    AudioManager.playSfx(this, 'stairs-unlock', { volume: 0.95, cooldownMs: 250, allowOverlap: false });
+    if (playFx) {
+      AudioManager.playSfx(this, 'stairs-unlock', { volume: 0.95, cooldownMs: 250, allowOverlap: false });
+    }
 
     if (this.stairsBlocker.body) {
       this.stairsBlocker.destroy();
@@ -1086,66 +1067,241 @@ export class DungeonScene extends Scene {
     // Swap the composite sprite to the open variant
     this.stairsSprite.setTexture('stairs-sprite-open');
 
-    // Dramatic unlock flash: quick full-sprite scale pulse + alpha flash
-    this.tweens.add({
-      targets: this.stairsSprite,
-      scaleX: { from: 1.0, to: 1.15 },
-      scaleY: { from: 1.0, to: 1.15 },
-      yoyo: true,
-      duration: 200,
-      ease: 'Quad.easeOut',
-    });
-    const flash = this.add.image(this.stairsSprite.x, this.stairsSprite.y, 'stairs-sprite-open')
-      .setOrigin(0.5, 1)
-      .setDepth(4)
-      .setTint(0xffffff)
-      .setAlpha(0.9);
-    this.tweens.add({
-      targets: flash,
-      alpha: 0,
-      duration: 500,
-      onComplete: () => flash.destroy(),
-    });
-
-    // Strong pulsing gold pointlight above the stairs (sits on top of the archway)
-    const sx = this.stairsSprite.x;
-    const sy = this.stairsSprite.y - 24;
-    const glow = this.add.pointlight(sx, sy, 0xffdd88, 80, 0.28, 0.05);
-    glow.setDepth(4);
-    this.tweens.add({
-      targets: glow,
-      intensity: { from: 0.18, to: 0.38 },
-      duration: 700,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-
-    // Small orbiting sparkle dots (3 tiny ivory rects) for extra wow
-    const sparks: Phaser.GameObjects.Rectangle[] = [];
-    for (let i = 0; i < 3; i++) {
-      const angle0 = (i / 3) * Math.PI * 2;
-      const spark = this.add.rectangle(sx, sy, 2, 2, 0xfff4d1);
-      spark.setDepth(5);
-      sparks.push(spark);
+    if (playFx) {
+      // Dramatic unlock flash: quick full-sprite scale pulse + alpha flash
       this.tweens.add({
-        targets: spark,
-        angle: 360,
-        duration: 2000,
-        repeat: -1,
-        onUpdate: () => {
-          const t = this.time.now / 400 + angle0;
-          spark.setPosition(sx + Math.cos(t) * 16, sy + Math.sin(t) * 10);
-        },
+        targets: this.stairsSprite,
+        scaleX: { from: 1.0, to: 1.15 },
+        scaleY: { from: 1.0, to: 1.15 },
+        yoyo: true,
+        duration: 200,
+        ease: 'Quad.easeOut',
       });
-    }
+      const flash = this.add.image(this.stairsSprite.x, this.stairsSprite.y, 'stairs-sprite-open')
+        .setOrigin(0.5, 1)
+        .setDepth(4)
+        .setTint(0xffffff)
+        .setAlpha(0.9);
+      this.tweens.add({
+        targets: flash,
+        alpha: 0,
+        duration: 500,
+        onComplete: () => flash.destroy(),
+      });
 
-    // Keep glow objects off the UI camera
-    this.uiCam.ignore([glow, flash, ...sparks]);
+      // Strong pulsing gold pointlight above the stairs (sits on top of the archway)
+      const sx = this.stairsSprite.x;
+      const sy = this.stairsSprite.y - 24;
+      const glow = this.add.pointlight(sx, sy, 0xffdd88, 80, 0.28, 0.05);
+      glow.setDepth(4);
+      this.tweens.add({
+        targets: glow,
+        intensity: { from: 0.18, to: 0.38 },
+        duration: 700,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+
+      // Small orbiting sparkle dots (3 tiny ivory rects) for extra wow
+      const sparks: Phaser.GameObjects.Rectangle[] = [];
+      for (let i = 0; i < 3; i++) {
+        const angle0 = (i / 3) * Math.PI * 2;
+        const spark = this.add.rectangle(sx, sy, 2, 2, 0xfff4d1);
+        spark.setDepth(5);
+        sparks.push(spark);
+        this.tweens.add({
+          targets: spark,
+          angle: 360,
+          duration: 2000,
+          repeat: -1,
+          onUpdate: () => {
+            const t = this.time.now / 400 + angle0;
+            spark.setPosition(sx + Math.cos(t) * 16, sy + Math.sin(t) * 10);
+          },
+        });
+      }
+
+      // Keep glow objects off the UI camera
+      this.uiCam.ignore([glow, flash, ...sparks]);
+    }
     if (this.crossingMode) {
       this._refreshCrossingButtons();
       this._refreshCrossingHud();
     }
+  }
+
+  private _lockStairs(): void {
+    this.stairsUnlocked = false;
+    this.stairsSprite.setTexture('stairs-sprite-locked');
+
+    if (!this.stairsBlocker || !this.stairsBlocker.active) {
+      const { stairsPos } = this.config;
+      this.stairsBlocker = this.add
+        .zone(stairsPos.col * TILE_SIZE + 8, stairsPos.row * TILE_SIZE + 8, TILE_SIZE, TILE_SIZE)
+        .setDepth(1);
+      this.physics.add.existing(this.stairsBlocker, true);
+      this.physics.add.collider(this.player, this.stairsBlocker);
+    }
+    if (this.crossingMode) {
+      this._refreshCrossingButtons();
+      this._refreshCrossingHud();
+    }
+  }
+
+  private applyDevModeState(): void {
+    this.ensureDevModeLabel();
+    this.ensureDevLevelSelector();
+
+    if (isDeveloperModeEnabled()) {
+      this._unlockStairs(false);
+      return;
+    }
+
+    const meetsTarget = this.config.target <= 0 || getCoins() >= this.config.target;
+    if (meetsTarget) {
+      this._unlockStairs(false);
+      return;
+    }
+    this._lockStairs();
+  }
+
+  private ensureDevModeLabel(): void {
+    if (!this.devModeLabel) {
+      this.devModeLabel = this.add.text(50, 44, 'Dev Mode Active', {
+        fontFamily: 'Courier New',
+        fontSize: '11px',
+        color: '#ffcf7f',
+        stroke: '#2a1710',
+        strokeThickness: 2,
+      }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(1000);
+      this.cameras.main.ignore(this.devModeLabel);
+    }
+    this.devModeLabel.setVisible(isDeveloperModeEnabled());
+  }
+
+  private ensureDevLevelSelector(): void {
+    if (!isDeveloperModeEnabled()) {
+      this.destroyDevLevelSelector();
+      return;
+    }
+    if (this.devLevelButtonBg) {
+      return;
+    }
+
+    const x = 86;
+    const y = this.scale.height - 34;
+    const w = 68;
+    const h = 44;
+    const depth = 1000;
+
+    this.devLevelButtonBg = this.add.graphics().setScrollFactor(0).setDepth(depth);
+    this.devLevelButtonLabel = this.add.text(x, y, 'LEVELS', {
+      fontFamily: 'Courier New',
+      fontSize: '12px',
+      color: '#f5e5c7',
+      stroke: '#24130e',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(depth + 1);
+    this.devLevelButtonZone = this.add.zone(x, y, w, h).setScrollFactor(0).setDepth(depth + 2);
+
+    const redraw = (hovered: boolean): void => {
+      this.devLevelButtonBg?.clear();
+      this.devLevelButtonBg?.fillStyle(hovered ? 0xf1cc82 : 0xc8a364, 1);
+      this.devLevelButtonBg?.fillRect(x - w / 2, y - h / 2, w, h);
+      this.devLevelButtonBg?.fillStyle(0x3b2417, 1);
+      this.devLevelButtonBg?.fillRect(x - w / 2 + 4, y - h / 2 + 4, w - 8, h - 8);
+      this.devLevelButtonBg?.fillStyle(hovered ? 0x6e2937 : 0x5a2230, 0.92);
+      this.devLevelButtonBg?.fillRect(x - w / 2 + 8, y - h / 2 + 8, w - 16, h - 16);
+    };
+
+    redraw(false);
+    this.devLevelButtonZone.setInteractive({ cursor: 'pointer' });
+    this.devLevelButtonZone.on('pointerover', () => redraw(true));
+    this.devLevelButtonZone.on('pointerout', () => redraw(false));
+    this.devLevelButtonZone.on('pointerdown', () => this.toggleDevLevelPanel());
+  }
+
+  private toggleDevLevelPanel(): void {
+    if (this.devLevelPanel?.visible) {
+      this.devLevelPanel.setVisible(false);
+      return;
+    }
+    if (!this.devLevelPanel) {
+      this.devLevelPanel = this.createDevLevelPanel();
+    }
+    this.devLevelPanel.setVisible(true);
+  }
+
+  private createDevLevelPanel(): Phaser.GameObjects.Container {
+    const panel = this.add.container(0, 0).setScrollFactor(0).setDepth(1010);
+    const x = 116;
+    const y = this.scale.height - 148;
+    const panelW = 164;
+    const panelH = 126;
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0x1b0e12, 0.96);
+    bg.fillRoundedRect(x - panelW / 2, y - panelH / 2, panelW, panelH, 8);
+    bg.lineStyle(2, 0xc8a364, 1);
+    bg.strokeRoundedRect(x - panelW / 2, y - panelH / 2, panelW, panelH, 8);
+
+    const title = this.add.text(x, y - 44, 'LEVEL SELECT', {
+      fontFamily: 'Courier New',
+      fontSize: '13px',
+      color: '#f4dfb4',
+    }).setOrigin(0.5);
+
+    panel.add([bg, title]);
+
+    const floorKeys = Object.keys(FLOOR_CONFIG).map((value) => Number(value)).sort((a, b) => a - b);
+    floorKeys.forEach((floor, index) => {
+      const row = Math.floor(index / 2);
+      const col = index % 2;
+      const bx = x - 38 + col * 76;
+      const by = y - 12 + row * 36;
+      const bw = 66;
+      const bh = 28;
+
+      const buttonBg = this.add.graphics();
+      buttonBg.fillStyle(0xc8a364, 1);
+      buttonBg.fillRect(bx - bw / 2, by - bh / 2, bw, bh);
+      buttonBg.fillStyle(0x3b2417, 1);
+      buttonBg.fillRect(bx - bw / 2 + 3, by - bh / 2 + 3, bw - 6, bh - 6);
+      buttonBg.fillStyle(0x5a2230, 0.92);
+      buttonBg.fillRect(bx - bw / 2 + 6, by - bh / 2 + 6, bw - 12, bh - 12);
+
+      const label = this.add.text(bx, by, `F${floor}`, {
+        fontFamily: 'Courier New',
+        fontSize: '13px',
+        color: '#f5e5c7',
+        stroke: '#24130e',
+        strokeThickness: 2,
+      }).setOrigin(0.5);
+
+      const zone = this.add.zone(bx, by, bw, bh).setInteractive({ cursor: 'pointer' });
+      zone.on('pointerdown', () => {
+        this.devLevelPanel?.setVisible(false);
+        setFloor(floor);
+        this.scene.restart({ floor, fromTransition: false });
+      });
+
+      panel.add([buttonBg, label, zone]);
+    });
+
+    panel.setVisible(false);
+    return panel;
+  }
+
+  private destroyDevLevelSelector(): void {
+    this.devLevelButtonZone?.destroy();
+    this.devLevelButtonLabel?.destroy();
+    this.devLevelButtonBg?.destroy();
+    this.devLevelPanel?.destroy(true);
+    this.devLevelButtonZone = undefined;
+    this.devLevelButtonLabel = undefined;
+    this.devLevelButtonBg = undefined;
+    this.devLevelPanel = undefined;
   }
 
   private _scheduleEnvironmentSfx(): void {
