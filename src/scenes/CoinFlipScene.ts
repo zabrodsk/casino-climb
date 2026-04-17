@@ -1,6 +1,7 @@
 import { Scene, GameObjects } from 'phaser';
 import { play, isValidBet, RiskType } from '../games/coinFlip';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle } from '../ui/theme';
+import { SfxManager } from '../managers/SfxManager';
 
 const WIN_TARGET = 300;
 const BET_OPTIONS = [5, 25, 50];
@@ -12,6 +13,8 @@ export class CoinFlipScene extends Scene {
   private riskType: RiskType = 'flip';
   private diceGuess: 'low' | 'high' = 'low';
   private animating: boolean = false;
+  private sfx!: SfxManager;
+  private _spinSound: Phaser.Sound.BaseSound | null = null;
 
   // UI references
   private coinsText!: GameObjects.Text;
@@ -42,6 +45,7 @@ export class CoinFlipScene extends Scene {
   }
 
   create() {
+    this.sfx = new SfxManager(this);
     const W = 1024;
     const H = 768;
 
@@ -116,7 +120,7 @@ export class CoinFlipScene extends Scene {
       const zone = this.add.zone(x, betY, btnW, btnH).setInteractive({ cursor: 'pointer' });
       zone.on('pointerover', () => { if (this.selectedBet !== bet && !this.animating) drawNestedButton(bg, x, betY, btnW, btnH, true); });
       zone.on('pointerout', () => { if (this.selectedBet !== bet) drawNestedButton(bg, x, betY, btnW, btnH, false); });
-      zone.on('pointerdown', () => { if (!this.animating) this.selectBet(bet); });
+      zone.on('pointerdown', () => { if (!this.animating) { this.sfx.play('sfx-btn-click'); this.selectBet(bet); } });
 
       this.betButtons.push({ bg, label, bet });
     });
@@ -144,7 +148,7 @@ export class CoinFlipScene extends Scene {
     this.flipBtn = { bg: flipBg, label: flipLabel };
 
     const flipZone = this.add.zone(W / 2 - 110, modeY, modeBtnW, modeBtnH).setInteractive({ cursor: 'pointer' });
-    flipZone.on('pointerdown', () => { if (!this.animating) this.selectMode('flip'); });
+    flipZone.on('pointerdown', () => { if (!this.animating) { this.sfx.play('sfx-btn-click'); this.selectMode('flip'); } });
 
     // DICE DUEL button
     const diceBg = this.add.graphics();
@@ -158,7 +162,7 @@ export class CoinFlipScene extends Scene {
     this.diceBtn = { bg: diceBg, label: diceLabel };
 
     const diceZone = this.add.zone(W / 2 + 110, modeY, modeBtnW, modeBtnH).setInteractive({ cursor: 'pointer' });
-    diceZone.on('pointerdown', () => { if (!this.animating) this.selectMode('dice'); });
+    diceZone.on('pointerdown', () => { if (!this.animating) { this.sfx.play('sfx-btn-click'); this.selectMode('dice'); } });
 
     // --- Dice guess group (LOW / HIGH) ---
     this.diceGuessGroup = this.add.container(0, 0);
@@ -179,9 +183,9 @@ export class CoinFlipScene extends Scene {
     this.highBtn = { bg: highBg, label: highLabel };
 
     const lowZone = this.add.zone(W / 2 - 90, guessY, guessBtnW, guessBtnH).setInteractive({ cursor: 'pointer' });
-    lowZone.on('pointerdown', () => { if (!this.animating) this.selectGuess('low'); });
+    lowZone.on('pointerdown', () => { if (!this.animating) { this.sfx.play('sfx-btn-click'); this.selectGuess('low'); } });
     const highZone = this.add.zone(W / 2 + 90, guessY, guessBtnW, guessBtnH).setInteractive({ cursor: 'pointer' });
-    highZone.on('pointerdown', () => { if (!this.animating) this.selectGuess('high'); });
+    highZone.on('pointerdown', () => { if (!this.animating) { this.sfx.play('sfx-btn-click'); this.selectGuess('high'); } });
 
     this.diceGuessGroup.add([lowBg, lowLabel, highBg, highLabel]);
     lowZone.setVisible(false);
@@ -226,7 +230,7 @@ export class CoinFlipScene extends Scene {
     playZone.on('pointerout', () => {
       if (this.canPlay() && !this.animating) drawNestedButton(this.playBtn, W / 2, playY, 200, 60, false);
     });
-    playZone.on('pointerdown', () => { if (this.canPlay() && !this.animating) this.startPlay(); });
+    playZone.on('pointerdown', () => { if (this.canPlay() && !this.animating) { this.sfx.play('sfx-btn-click'); this.startPlay(); } });
 
     // --- EXIT TO LOBBY button ---
     const leaveY = 700;
@@ -237,7 +241,7 @@ export class CoinFlipScene extends Scene {
     const leaveZone = this.add.zone(W / 2, leaveY, 200, 46).setInteractive({ cursor: 'pointer' });
     leaveZone.on('pointerover', () => { if (!this.animating) drawNestedButton(this.leaveBtn, W / 2, leaveY, 200, 46, true); });
     leaveZone.on('pointerout', () => { if (!this.animating) drawNestedButton(this.leaveBtn, W / 2, leaveY, 200, 46, false); });
-    leaveZone.on('pointerdown', () => { if (!this.animating) this.leaveTable(); });
+    leaveZone.on('pointerdown', () => { if (!this.animating) { this.sfx.play('sfx-btn-click'); this.leaveTable(); } });
 
     (this as any)._playZone = playZone;
     (this as any)._playY = playY;
@@ -381,6 +385,10 @@ export class CoinFlipScene extends Scene {
   }
 
   private runCoinAnimation(cx: number, cy: number) {
+    if (this.cache.audio.has('sfx-coin-spin')) {
+      this._spinSound = this.sound.add('sfx-coin-spin', { loop: true, volume: this.sfx.getVolume() });
+      this._spinSound.play();
+    }
     const frames = Math.floor(ANIM_DURATION / 80);
     let frame = 0;
     const sides = ['H', 'T'];
@@ -411,6 +419,10 @@ export class CoinFlipScene extends Scene {
   }
 
   private runDiceAnimation(cx: number, cy: number) {
+    if (this.cache.audio.has('sfx-coin-spin')) {
+      this._spinSound = this.sound.add('sfx-coin-spin', { loop: true, volume: this.sfx.getVolume() });
+      this._spinSound.play();
+    }
     const frames = Math.floor(ANIM_DURATION / 80);
     let frame = 0;
 
@@ -458,6 +470,9 @@ export class CoinFlipScene extends Scene {
   }
 
   private resolvePlay() {
+    this._spinSound?.stop();
+    this._spinSound = null;
+
     const result = play({
       coins: this.currentCoins,
       bet: this.selectedBet,
@@ -493,6 +508,7 @@ export class CoinFlipScene extends Scene {
         : `${result.displayResult} — Lost ${this.selectedBet} coins`
     );
     this.resultText.setColor(result.won ? COLOR.winGreen : COLOR.loseRed);
+    this.sfx.play(result.won ? 'sfx-coin-land-win' : 'sfx-coin-land-lose');
 
     if (this.currentCoins >= WIN_TARGET) {
       this.targetReachedText.setText('Target reached! You may advance.').setVisible(true);

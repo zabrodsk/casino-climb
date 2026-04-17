@@ -3,6 +3,7 @@ import { getCoins, getFloor, setCoins, setFloor, resetRun } from '../state/coinS
 import { HUD } from '../ui/HUD';
 import { FLOOR_CONFIG, FloorConfig } from '../data/floorConfig';
 import { drawFramedPanel, neonTitleStyle, bodyTextStyle } from '../ui/theme';
+import { SfxManager } from '../managers/SfxManager';
 
 // Prop tile indices into dungeon_tileset.png. Floor + walls render as procedural
 // stone sprites (see BootScene); only the table + stairs still come from the tileset.
@@ -68,6 +69,10 @@ export class DungeonScene extends Scene {
   private stairsUnlocked = false;
   private doorTriggered = false;
   private justExitedTable = false;
+
+  private sfx!: SfxManager;
+  private _footstepSound: Phaser.Sound.BaseSound | null = null;
+  private _wasMoving = false;
 
   private stairsSprite!: Phaser.GameObjects.Image;
   private uiCam!: Phaser.Cameras.Scene2D.Camera;
@@ -295,6 +300,8 @@ export class DungeonScene extends Scene {
     // ── game-complete listener ─────────────────────────────────────────────
     this.events.on('game-complete', this._onGameComplete, this);
 
+    this.sfx = new SfxManager(this);
+
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.uiCam.fadeIn(300, 0, 0, 0);
   }
@@ -384,10 +391,22 @@ export class DungeonScene extends Scene {
       this.player.play('player-idle', true);
     }
 
+    // Footstep loop
+    if (moving && !this._wasMoving) {
+      if (this.scene.manager.getScene('DungeonScene') && this.cache.audio.has('sfx-footstep')) {
+        this._footstepSound = this.sound.add('sfx-footstep', { loop: true, volume: this.sfx.getVolume() });
+        this._footstepSound.play();
+      }
+    } else if (!moving && this._wasMoving) {
+      this._footstepSound?.stop();
+      this._footstepSound = null;
+    }
+    this._wasMoving = moving;
+
     const coins = getCoins();
     if (coins !== this._lastHudCoins) {
       this._lastHudCoins = coins;
-      this.hud.setCoins(coins);
+      this.hud.setCoins(coins, () => this.sfx.play('sfx-coin-tick'));
       this.hud.setProgress(coins, this.config.target);
     }
 
@@ -406,6 +425,11 @@ export class DungeonScene extends Scene {
   private _onDoorOverlap(): void {
     if (this.doorTriggered || this.justExitedTable) return;
     this.doorTriggered = true;
+
+    this.sfx.play('sfx-door-approach');
+    this._footstepSound?.stop();
+    this._footstepSound = null;
+    this._wasMoving = false;
 
     this.player.setVelocity(0, 0);
     this.cameras.main.fadeOut(300, 0, 0, 0);
@@ -466,7 +490,11 @@ export class DungeonScene extends Scene {
   }
 
   private _onGameComplete({ coins, won }: { coins: number; won: boolean }): void {
+    const prevCoins = getCoins();
     setCoins(coins);
+
+    if (coins > prevCoins) this.sfx.play('sfx-coin-gain');
+    else if (coins < prevCoins) this.sfx.play('sfx-coin-loss');
 
     if (won) {
       this.hud.showSpeech('The stairs unlock. Take them.');
@@ -495,6 +523,7 @@ export class DungeonScene extends Scene {
   private _unlockStairs(): void {
     if (this.stairsUnlocked) return;
     this.stairsUnlocked = true;
+    this.sfx.play('sfx-stairs-unlock');
 
     if (this.stairsBlocker.body) {
       this.stairsBlocker.destroy();

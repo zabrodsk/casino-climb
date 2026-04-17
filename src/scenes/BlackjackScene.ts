@@ -9,6 +9,7 @@ import {
   startRound,
 } from '../games/blackjack';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle } from '../ui/theme';
+import { SfxManager } from '../managers/SfxManager';
 
 const WIN_TARGET = 400;
 const HANDS_TO_WIN = 3;
@@ -34,6 +35,7 @@ export class BlackjackScene extends Scene {
   private currentBet = 0;
   private handsWon = 0;
   private roundActive = false;
+  private sfx!: SfxManager;
 
   private deck: Card[] = [];
   private playerHand: Card[] = [];
@@ -80,6 +82,7 @@ export class BlackjackScene extends Scene {
   }
 
   create() {
+    this.sfx = new SfxManager(this);
     const W = 1024;
     const H = 768;
 
@@ -220,6 +223,7 @@ export class BlackjackScene extends Scene {
       });
       zone.on('pointerdown', () => {
         if (!this.roundActive) {
+          this.sfx.play('sfx-btn-click');
           this.selectedBet = this.selectedBet === bet ? 0 : bet;
           this.updateBetButtons();
           this.updateActionButtons();
@@ -255,6 +259,7 @@ export class BlackjackScene extends Scene {
     this.dealZone = this.add.zone(292, dealY, 170, 54).setInteractive({ cursor: 'pointer' });
     this.dealZone.on('pointerdown', () => {
       if (this.canDeal()) {
+        this.sfx.play('sfx-btn-click');
         this.startHand();
       }
     });
@@ -264,6 +269,7 @@ export class BlackjackScene extends Scene {
     this.hitZone = this.add.zone(512, dealY, 170, 54).setInteractive({ cursor: 'pointer' });
     this.hitZone.on('pointerdown', () => {
       if (this.roundActive) {
+        this.sfx.play('sfx-btn-click');
         this.hit();
       }
     });
@@ -273,6 +279,7 @@ export class BlackjackScene extends Scene {
     this.standZone = this.add.zone(732, dealY, 170, 54).setInteractive({ cursor: 'pointer' });
     this.standZone.on('pointerdown', () => {
       if (this.roundActive) {
+        this.sfx.play('sfx-btn-click');
         this.stand();
       }
     });
@@ -294,6 +301,7 @@ export class BlackjackScene extends Scene {
     });
     leaveZone.on('pointerdown', () => {
       if (!this.roundActive) {
+        this.sfx.play('sfx-btn-click');
         this.leave();
       }
     });
@@ -377,6 +385,11 @@ export class BlackjackScene extends Scene {
     this.currentBet = this.selectedBet;
     this.roundActive = true;
     this.revealDealer = false;
+
+    // Staggered card deal sounds (4 cards total)
+    [0, 120, 240, 360].forEach((delay) => {
+      this.time.delayedCall(delay, () => this.sfx.play('sfx-card-deal'));
+    });
     this.resultText.setText('');
     this.targetReachedText.setVisible(false);
 
@@ -392,6 +405,7 @@ export class BlackjackScene extends Scene {
   }
 
   private hit(): void {
+    this.sfx.play('sfx-card-deal');
     const drawn = drawCard(this.deck);
     this.deck = drawn.deck;
     this.playerHand = [...this.playerHand, drawn.card];
@@ -414,9 +428,20 @@ export class BlackjackScene extends Scene {
 
   private finishRound(): void {
     this.revealDealer = true;
+    this.sfx.play('sfx-card-flip');
+
     const result = settleRound(this.currentCoins, this.currentBet, this.playerHand, this.dealerHand);
     this.currentCoins = result.newCoins;
     this.roundActive = false;
+
+    if (result.outcome === 'win') {
+      const isBlackjack = evaluateHand(this.playerHand).blackjack;
+      this.sfx.play(isBlackjack ? 'sfx-bj-blackjack' : 'sfx-bj-win');
+    } else if (result.outcome === 'lose') {
+      this.sfx.play('sfx-bj-lose');
+    } else {
+      this.sfx.play('sfx-bj-push');
+    }
 
     if (result.outcome === 'win') {
       this.handsWon += 1;

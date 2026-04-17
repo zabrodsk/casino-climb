@@ -1,5 +1,6 @@
 import { Scene } from 'phaser';
 import { THEME, COLOR, neonTitleStyle } from '../ui/theme';
+import { SfxManager } from '../managers/SfxManager';
 
 export class TransitionScene extends Scene {
   constructor() {
@@ -31,6 +32,8 @@ export class TransitionScene extends Scene {
 
     // Disable all input during transition
     this.input.enabled = false;
+
+    new SfxManager(this).play('sfx-transition-sting');
 
     // Fade in → hold → fade out → start DungeonScene
     this.cameras.main.fadeIn(400, 0, 0, 0);

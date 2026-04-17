@@ -1,4 +1,5 @@
 import { Scene, GameObjects } from 'phaser';
+import { SFX_PATHS, SfxKey } from '../managers/SfxManager';
 
 export class BootScene extends Scene {
   constructor() {
@@ -23,6 +24,11 @@ export class BootScene extends Scene {
 
     this.load.audio('casino-music', 'assets/audio/casino-music.mp3');
     this.load.audio('menu-music', 'assets/audio/menu-music.mp3');
+
+    // Load all SFX (gracefully skips missing files at runtime)
+    (Object.keys(SFX_PATHS) as SfxKey[]).forEach((key) => {
+      this.load.audio(key, SFX_PATHS[key]);
+    });
 
     // Note: player spritesheet is generated procedurally in create()
   }
@@ -63,6 +69,8 @@ export class BootScene extends Scene {
 
     // Pre-create sounds so they're ready; MenuScene will start playback
     this.game.registry.set('music', null);
+    // Default sound levels — overwritten by MenuScene sliders once opened
+    this.game.registry.set('soundLevels', { master: 80, music: 70, sfx: 85 });
 
     this.cameras.main.fadeOut(400, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {

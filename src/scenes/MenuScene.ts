@@ -1,4 +1,5 @@
 import { Scene, GameObjects, Input, Math as PhaserMath } from 'phaser';
+import { SfxManager } from '../managers/SfxManager';
 
 type MenuButtonId = 'play' | 'settings';
 type SoundSliderKey = 'master' | 'music' | 'sfx';
@@ -30,12 +31,17 @@ export class MenuScene extends Scene {
     music: 70,
     sfx: 85,
   };
+  private sfx!: SfxManager;
+  private _lastSliderSfx = 0;
 
   constructor() {
     super('MenuScene');
   }
 
   create(): void {
+    this.sfx = new SfxManager(this);
+    this.game.registry.set('soundLevels', this.soundLevels);
+
     this.cameras.main.setRoundPixels(true);
     this.drawBackground();
     this.drawDecor();
@@ -388,6 +394,12 @@ export class MenuScene extends Scene {
     this.soundLevels[key] = value;
     this.updateSliderVisual(slider, value);
     this.applySoundLevels();
+
+    const now = Date.now();
+    if (now - this._lastSliderSfx > 80) {
+      this._lastSliderSfx = now;
+      this.sfx.play('sfx-slider-drag');
+    }
   }
 
   private updateSliderVisual(slider: SliderUi, value: number): void {
@@ -411,13 +423,16 @@ export class MenuScene extends Scene {
     if (music) {
       music.setVolume(master * musicVol);
     }
+
+    // Keep registry in sync so SfxManager reads the latest values
+    this.game.registry.set('soundLevels', this.soundLevels);
   }
 
   private toggleSettings(visible: boolean): void {
     this.settingsVisible = visible;
     this.draggingSlider = undefined;
 
-    this.settingsObjects.forEach((obj) => obj.setVisible(visible));
+    this.settingsObjects.forEach((obj) => (obj as Phaser.GameObjects.GameObject & { setVisible: (v: boolean) => void }).setVisible(visible));
 
     if (this.settingsBackdrop) {
       this.settingsBackdrop.disableInteractive();
@@ -467,6 +482,8 @@ export class MenuScene extends Scene {
   }
 
   private onButtonClick(id: MenuButtonId): void {
+    this.sfx.play('sfx-btn-click');
+
     if (id === 'play') {
       // Stop menu music and switch to ambient track
       const menuMusic = this.game.registry.get('music') as

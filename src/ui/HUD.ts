@@ -49,7 +49,7 @@ export class HUD {
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  setCoins(coins: number): void {
+  setCoins(coins: number, onTick?: () => void): void {
     if (this._coinTween) {
       this._coinTween.stop();
       this._coinTween = null;
@@ -63,6 +63,8 @@ export class HUD {
       onUpdate: (tween) => {
         const v = Math.round(tween.getValue() ?? 0);
         this.coinLabel.setText(String(v));
+        // Fire tick every 5 coins to avoid machine-gun sound
+        if (onTick && Math.abs(v - from) % 5 === 0) onTick();
       },
       onComplete: () => {
         this._displayCoins = coins;

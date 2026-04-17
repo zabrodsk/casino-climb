@@ -1,6 +1,7 @@
 import { Scene, GameObjects } from 'phaser';
 import { resolve, nextCrashPoint, isValidBet } from '../games/crash';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle } from '../ui/theme';
+import { SfxManager } from '../managers/SfxManager';
 
 const WIN_TARGET = 350;
 const BET_OPTIONS = [10, 25, 50];
@@ -40,6 +41,9 @@ export class CrashScene extends Scene {
   private _playZone!: GameObjects.Zone;
   private _cashOutZone!: GameObjects.Zone;
 
+  private sfx!: SfxManager;
+  private _riserSound: Phaser.Sound.BaseSound | null = null;
+
   constructor() {
     super('CrashScene');
   }
@@ -56,6 +60,7 @@ export class CrashScene extends Scene {
   }
 
   create() {
+    this.sfx = new SfxManager(this);
     const W = 1024;
     const H = 768;
 
@@ -134,7 +139,7 @@ export class CrashScene extends Scene {
       zone.on('pointerout', () => {
         if (this.selectedBet !== bet) drawNestedButton(bg, x, betY, btnW, btnH, false);
       });
-      zone.on('pointerdown', () => { if (!this.playing) this.selectBet(bet); });
+      zone.on('pointerdown', () => { if (!this.playing) { this.sfx.play('sfx-btn-click'); this.selectBet(bet); } });
 
       this.betButtons.push({ bg, label, bet });
     });
@@ -187,7 +192,7 @@ export class CrashScene extends Scene {
     this._playZone.on('pointerout', () => {
       if (this.canPlay()) drawNestedButton(this.playBtn, W / 2, playY, 200, 60, false);
     });
-    this._playZone.on('pointerdown', () => { if (this.canPlay()) this.startRound(); });
+    this._playZone.on('pointerdown', () => { if (this.canPlay()) { this.sfx.play('sfx-btn-click'); this.startRound(); } });
 
     // --- CASH OUT button (hidden until round starts) ---
     const cashOutY = 590;
@@ -197,7 +202,7 @@ export class CrashScene extends Scene {
 
     this._cashOutZone = this.add.zone(W / 2, cashOutY, 220, 60).setInteractive({ cursor: 'pointer' });
     this._cashOutZone.setVisible(false);
-    this._cashOutZone.on('pointerdown', () => { if (this.playing && !this.cashedOut) this.doCashOut(); });
+    this._cashOutZone.on('pointerdown', () => { if (this.playing && !this.cashedOut) { this.sfx.play('sfx-btn-click'); this.doCashOut(); } });
 
     // --- Flash overlay (full screen red flash on crash) ---
     this.flashOverlay = this.add.graphics();
@@ -215,7 +220,7 @@ export class CrashScene extends Scene {
     const leaveZone = this.add.zone(W / 2, leaveY, 220, 46).setInteractive({ cursor: 'pointer' });
     leaveZone.on('pointerover', () => { if (!this.playing) drawNestedButton(this.leaveBtn, W / 2, leaveY, 220, 46, true); });
     leaveZone.on('pointerout', () => { if (!this.playing) drawNestedButton(this.leaveBtn, W / 2, leaveY, 220, 46, false); });
-    leaveZone.on('pointerdown', () => { if (!this.playing) this.leave(); });
+    leaveZone.on('pointerdown', () => { if (!this.playing) { this.sfx.play('sfx-btn-click'); this.leave(); } });
 
     this.updatePlayButton();
     this.refreshBetButtons();
@@ -303,6 +308,13 @@ export class CrashScene extends Scene {
   // ---- Round logic ----
 
   private startRound() {
+    this.sfx.play('sfx-crash-start');
+
+    if (this.cache.audio.has('sfx-crash-riser')) {
+      this._riserSound = this.sound.add('sfx-crash-riser', { loop: true, volume: this.sfx.getVolume() });
+      this._riserSound.play();
+    }
+
     this.playing = true;
     this.cashedOut = false;
     this.currentMult = 1.0;
@@ -407,6 +419,10 @@ export class CrashScene extends Scene {
       this.tickEvent = null;
     }
 
+    this._riserSound?.stop();
+    this._riserSound = null;
+    this.sfx.play('sfx-crash-explode');
+
     this.cameras.main.shake(250, 0.01);
 
     this.flashOverlay.setAlpha(0.3);
@@ -458,6 +474,10 @@ export class CrashScene extends Scene {
       this.tickEvent = null;
     }
     this.playing = false;
+
+    this._riserSound?.stop();
+    this._riserSound = null;
+    this.sfx.play('sfx-crash-cashout');
 
     const result = resolve({
       coins: this.currentCoins,
