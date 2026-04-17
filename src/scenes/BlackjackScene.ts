@@ -12,6 +12,7 @@ import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle,
 import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
+import { getDiscountedBetAmount, hasDiscountForFloor } from '../state/coinState';
 
 const WIN_TARGET = 400;
 const HANDS_TO_WIN = 3;
@@ -33,6 +34,7 @@ const SUIT_COLOR: Record<Card['suit'], string> = {
 
 export class BlackjackScene extends Scene {
   private currentCoins = 200;
+  private floorNumber = 1;
   private selectedBet = 0;
   private currentBet = 0;
   private handsWon = 0;
@@ -77,6 +79,7 @@ export class BlackjackScene extends Scene {
 
   init(data: { coins: number; floor?: number }) {
     this.currentCoins = data.coins ?? 200;
+    this.floorNumber = data.floor ?? 1;
     this.selectedBet = 0;
     this.currentBet = 0;
     this.handsWon = 0;
@@ -117,6 +120,14 @@ export class BlackjackScene extends Scene {
       fontSize: '20px',
       color: COLOR.goldText,
     }).setOrigin(0.5);
+
+    if (hasDiscountForFloor(this.floorNumber)) {
+      this.add.text(40, 78, 'SUPPORT DISCOUNT ACTIVE — bets cost 20% less here', {
+        fontFamily: FONT.mono,
+        fontSize: '14px',
+        color: COLOR.goldText,
+      }).setOrigin(0, 0.5);
+    }
 
     this.coinsText = this.add.text(W - 40, 48, `Coins: ${this.currentCoins}`, {
       fontSize: '22px',
@@ -228,12 +239,12 @@ export class BlackjackScene extends Scene {
 
       const zone = this.add.zone(x, betY, btnW, btnH).setInteractive({ cursor: 'pointer' });
       zone.on('pointerover', () => {
-        if (!this.roundActive && this.selectedBet !== bet && bet <= this.currentCoins) {
+        if (!this.roundActive && this.selectedBet !== bet && this.getBetCost(bet) <= this.currentCoins) {
           drawNestedButton(bg, x, betY, btnW, btnH, true);
         }
       });
       zone.on('pointerout', () => {
-        if (!this.roundActive && this.selectedBet !== bet && bet <= this.currentCoins) {
+        if (!this.roundActive && this.selectedBet !== bet && this.getBetCost(bet) <= this.currentCoins) {
           drawNestedButton(bg, x, betY, btnW, btnH, false);
         }
       });
@@ -324,7 +335,11 @@ export class BlackjackScene extends Scene {
   }
 
   private canDeal(): boolean {
-    return !this.roundActive && isValidBet(this.currentCoins, this.selectedBet);
+    return !this.roundActive && isValidBet(this.currentCoins, this.getBetCost());
+  }
+
+  private getBetCost(bet = this.selectedBet): number {
+    return getDiscountedBetAmount(bet, this.floorNumber);
   }
 
   private updateBetButtons(): void {
@@ -337,7 +352,7 @@ export class BlackjackScene extends Scene {
 
     this.betButtons.forEach(({ bg, label, bet }, index) => {
       const x = startX + index * spacing;
-      const disabled = this.roundActive || bet > this.currentCoins;
+      const disabled = this.roundActive || this.getBetCost(bet) > this.currentCoins;
       const active = this.selectedBet === bet;
 
       if (active && !disabled) {
@@ -399,7 +414,7 @@ export class BlackjackScene extends Scene {
     this.deck = round.deck;
     this.playerHand = round.player;
     this.dealerHand = round.dealer;
-    this.currentBet = this.selectedBet;
+    this.currentBet = this.getBetCost();
     this.roundActive = true;
     this.revealDealer = false;
     this.resultText.setText('');
@@ -476,7 +491,7 @@ export class BlackjackScene extends Scene {
       this.targetReachedText.setText('Target reached! You may advance.').setVisible(true);
     }
 
-    if (!isValidBet(this.currentCoins, this.selectedBet)) {
+    if (!isValidBet(this.currentCoins, this.getBetCost())) {
       this.selectedBet = 0;
     }
 

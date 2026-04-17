@@ -8,6 +8,7 @@ import {
   updateSoundLevel,
 } from '../state/audioSettings';
 import { resetRun } from '../state/coinState';
+import { resetNarrativeRunState } from '../state/narrativeState';
 
 type SliderUi = {
   key: SoundSliderKey;
@@ -239,6 +240,7 @@ export class GameplaySettingsScene extends Scene {
     ];
     gameplaySceneKeys.forEach((key) => this.scene.stop(key));
 
+    resetNarrativeRunState();
     resetRun();
     this.scene.start('MenuScene');
   }

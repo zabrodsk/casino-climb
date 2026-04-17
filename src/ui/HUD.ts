@@ -30,6 +30,11 @@ export class HUD {
   private _speechReveal: Phaser.Time.TimerEvent | null = null;
   private _speechDismiss: Phaser.Time.TimerEvent | null = null;
 
+  // Run panel
+  private runPanelBg!: Phaser.GameObjects.Graphics;
+  private runPanelTitle!: Phaser.GameObjects.Text;
+  private runPanelLines: Phaser.GameObjects.Text[] = [];
+
   private static readonly PANEL_H = 44;
   private static readonly COIN_PANEL_W = 180;
   private static readonly FLOOR_PANEL_W = 240;
@@ -45,6 +50,7 @@ export class HUD {
     this._buildFloorPanel();
     this._buildProgressBar();
     this._buildSpeechBubble();
+    this._buildRunPanel();
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
@@ -156,8 +162,25 @@ export class HUD {
       this.floorPanelBg, this.floorIcon, this.floorLabel,
       this.progressBg, this.progressFill, this.progressLabel,
       this.speechBg, this.speechText,
+      this.runPanelBg, this.runPanelTitle, ...this.runPanelLines,
       ...this._marqueDots,
     ];
+  }
+
+  showRunPanel(title: string, lines: string[]): void {
+    this.runPanelBg.setVisible(true);
+    this.runPanelTitle.setVisible(true).setText(title);
+
+    this.runPanelLines.forEach((lineText, idx) => {
+      const line = lines[idx] ?? '';
+      lineText.setVisible(line.length > 0).setText(line);
+    });
+  }
+
+  hideRunPanel(): void {
+    this.runPanelBg.setVisible(false);
+    this.runPanelTitle.setVisible(false);
+    this.runPanelLines.forEach((line) => line.setVisible(false));
   }
 
   destroy(): void {
@@ -175,6 +198,9 @@ export class HUD {
     this.progressLabel.destroy();
     this.speechBg.destroy();
     this.speechText.destroy();
+    this.runPanelBg.destroy();
+    this.runPanelTitle.destroy();
+    this.runPanelLines.forEach((line) => line.destroy());
     this._marqueDots.forEach(d => d.destroy());
     this._marqueDots = [];
   }
@@ -352,5 +378,32 @@ export class HUD {
       color: COLOR.ivorySoft,
       wordWrap: { width: bubbleW - 24 },
     }).setScrollFactor(0).setDepth(HUD.DEPTH + 3).setVisible(false);
+  }
+
+  private _buildRunPanel(): void {
+    const { width: sw } = this.scene.scale;
+    const panelW = 372;
+    const panelH = 78;
+    const x = (sw - panelW) / 2;
+    const y = 8;
+
+    this.runPanelBg = this.scene.add.graphics();
+    this.runPanelBg.setScrollFactor(0).setDepth(HUD.DEPTH).setVisible(false);
+    drawFramedPanel(this.runPanelBg, x, y, panelW, panelH, { borderWidth: 2, alpha: 0.92 });
+
+    this.runPanelTitle = this.scene.add.text(sw / 2, y + 16, '', {
+      fontSize: '12px',
+      fontFamily: FONT.mono,
+      color: COLOR.goldText,
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(HUD.DEPTH + 1).setVisible(false);
+
+    this.runPanelLines = [0, 1, 2].map((idx) =>
+      this.scene.add.text(sw / 2, y + 34 + idx * 14, '', {
+        fontSize: '11px',
+        fontFamily: FONT.mono,
+        color: COLOR.ivorySoft,
+        align: 'center',
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(HUD.DEPTH + 1).setVisible(false)
+    );
   }
 }

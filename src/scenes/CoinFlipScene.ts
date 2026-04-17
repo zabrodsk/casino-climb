@@ -4,6 +4,7 @@ import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle 
 import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
+import { getDiscountedBetAmount, hasDiscountForFloor } from '../state/coinState';
 
 const WIN_TARGET = 300;
 const BET_OPTIONS = [5, 25, 50];
@@ -11,6 +12,7 @@ const ANIM_DURATION = 1200;
 
 export class CoinFlipScene extends Scene {
   private currentCoins: number = 200;
+  private floorNumber: number = 1;
   private selectedBet: number = 0;
   private riskType: RiskType = 'flip';
   private diceGuess: 'low' | 'high' = 'low';
@@ -38,6 +40,7 @@ export class CoinFlipScene extends Scene {
 
   init(data: { coins: number; floor?: number }) {
     this.currentCoins = data.coins ?? 200;
+    this.floorNumber = data.floor ?? 1;
     this.selectedBet = 0;
     this.riskType = 'flip';
     this.diceGuess = 'low';
@@ -76,6 +79,14 @@ export class CoinFlipScene extends Scene {
       fontSize: '20px',
       color: COLOR.goldText,
     }).setOrigin(0.5);
+
+    if (hasDiscountForFloor(this.floorNumber)) {
+      this.add.text(40, 78, 'SUPPORT DISCOUNT ACTIVE — bets cost 20% less here', {
+        fontFamily: FONT.mono,
+        fontSize: '14px',
+        color: COLOR.goldText,
+      }).setOrigin(0, 0.5);
+    }
 
     // Coins display (top right)
     this.coinsText = this.add.text(W - 40, 48, `Coins: ${this.currentCoins}`, {
@@ -299,7 +310,7 @@ export class CoinFlipScene extends Scene {
 
     this.betButtons.forEach(({ bg, label, bet }, i) => {
       const x = betStartX + i * betSpacing;
-      const disabled = bet > this.currentCoins;
+      const disabled = this.getBetCost(bet) > this.currentCoins;
       const active = this.selectedBet === bet;
 
       if (active) {
@@ -359,7 +370,11 @@ export class CoinFlipScene extends Scene {
   }
 
   private canPlay(): boolean {
-    return isValidBet(this.currentCoins, this.selectedBet) && !this.animating;
+    return isValidBet(this.currentCoins, this.getBetCost()) && !this.animating;
+  }
+
+  private getBetCost(bet = this.selectedBet): number {
+    return getDiscountedBetAmount(bet, this.floorNumber);
   }
 
   private updatePlayButton() {
@@ -477,7 +492,7 @@ export class CoinFlipScene extends Scene {
   private resolvePlay() {
     const result = play({
       coins: this.currentCoins,
-      bet: this.selectedBet,
+      bet: this.getBetCost(),
       riskType: this.riskType,
       diceGuess: this.diceGuess,
     });
@@ -509,7 +524,7 @@ export class CoinFlipScene extends Scene {
     this.resultText.setText(
       result.won
         ? `${result.displayResult} — +${result.payout / 2} coins!`
-        : `${result.displayResult} — Lost ${this.selectedBet} coins`
+        : `${result.displayResult} — Lost ${this.getBetCost()} coins`
     );
     this.resultText.setColor(result.won ? COLOR.winGreen : COLOR.loseRed);
     AudioManager.playSfx(this, result.won ? 'win' : 'lose', {
@@ -530,7 +545,7 @@ export class CoinFlipScene extends Scene {
     }
 
     this.refreshBetButtons();
-    if (!isValidBet(this.currentCoins, this.selectedBet)) {
+    if (!isValidBet(this.currentCoins, this.getBetCost())) {
       this.selectedBet = 0;
     }
     this.updatePlayButton();

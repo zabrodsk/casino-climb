@@ -1,11 +1,21 @@
 import { Scene, Tilemaps, Physics, GameObjects } from 'phaser';
-import { getCoins, getFloor, setCoins, setFloor, resetRun } from '../state/coinState';
+import {
+  addToTotalCoins,
+  consumeReviveToken,
+  getCoins,
+  getFloor,
+  hasReviveToken,
+  resetRun,
+  setCoins,
+  setFloor,
+} from '../state/coinState';
 import { HUD } from '../ui/HUD';
 import { FLOOR_CONFIG, FloorConfig } from '../data/floorConfig';
 import { drawFramedPanel, drawNestedButton, buttonLabelStyle, neonTitleStyle, bodyTextStyle } from '../ui/theme';
 import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
+import { resetNarrativeRunState } from '../state/narrativeState';
 
 // Prop tile indices into dungeon_tileset.png. Floor + walls render as procedural
 // stone sprites (see BootScene); only the table + stairs still come from the tileset.
@@ -629,6 +639,7 @@ export class DungeonScene extends Scene {
     const grossPayout = Math.max(this.selectedCrossingBet, Math.round(this.selectedCrossingBet * this.crossingMultiplier));
     const profit = grossPayout - this.selectedCrossingBet;
     setCoins(getCoins() + profit);
+    addToTotalCoins(Math.max(0, profit));
     this.crossingRunActive = false;
     this.hud.showSpeech(`You bank ${grossPayout}. The House lets you breathe for a second.`);
     AudioManager.playSfx(this, 'goal-victory', { volume: 0.5, cooldownMs: 250, allowOverlap: false });
@@ -646,6 +657,7 @@ export class DungeonScene extends Scene {
     AudioManager.playSfx(this, 'game-over', { volume: 0.6, cooldownMs: 250, allowOverlap: false });
 
     if (getCoins() <= 0) {
+      resetNarrativeRunState();
       resetRun();
       this.cameras.main.fadeOut(500, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
@@ -966,15 +978,28 @@ export class DungeonScene extends Scene {
     this.cameras.main.ignore([panel, title, subtitle]);
 
     this.time.delayedCall(3000, () => {
+      resetNarrativeRunState();
       resetRun();
       this.scene.start('DungeonScene', { floor: 1 });
     });
   }
 
   private _onGameComplete({ coins, won }: { coins: number; won: boolean }): void {
+    const previousCoins = getCoins();
+    addToTotalCoins(Math.max(0, coins - previousCoins));
     setCoins(coins);
 
     if (won) {
+      if (this.currentFloor === 3) {
+        this.scene.resume('DungeonScene');
+        this._applyFloorAmbience();
+        this.cameras.main.fadeOut(350, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          this.scene.start('EndScene', { coins });
+        });
+        return;
+      }
+
       this.hud.showSpeech('The stairs unlock. Take them.');
       this._unlockStairs();
       if (!this.goalSoundsPlayed) {
@@ -985,8 +1010,29 @@ export class DungeonScene extends Scene {
         this.goalSoundsPlayed = true;
       }
     } else if (coins <= 0) {
+      if (hasReviveToken()) {
+        consumeReviveToken();
+        setCoins(100);
+        this.hud.showSpeech('A support token cracks open. You stagger back with 100 coins.');
+        AudioManager.playSfx(this, 'goal-victory', { volume: 0.45, cooldownMs: 200, allowOverlap: false });
+
+        const { tablePos } = this.config;
+        this.player.setPosition(tablePos.col * TILE_SIZE + 8, (tablePos.row + 2) * TILE_SIZE + 8);
+        this.justExitedTable = true;
+
+        this.scene.resume('DungeonScene');
+        this._lastHudCoins = 100;
+        this.hud.setCoins(100);
+        this.hud.setProgress(100, this.config.target);
+        this._applyFloorAmbience();
+        this.doorTriggered = false;
+        this.cameras.main.fadeIn(300, 0, 0, 0);
+        return;
+      }
+
       this.hud.showSpeech('The house always wins.');
       AudioManager.playSfx(this, 'game-over', { volume: 1.0, cooldownMs: 300, allowOverlap: false });
+      resetNarrativeRunState();
       resetRun();
       this.scene.resume('DungeonScene');
       this.cameras.main.fadeOut(500, 0, 0, 0);
