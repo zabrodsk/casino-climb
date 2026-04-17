@@ -155,6 +155,14 @@ export class DungeonScene extends Scene {
     this.doorTriggered = false;
     this.justExitedTable = false;
     this.goalSoundsPlayed = false;
+    this.crossingColumns = [];
+    this.crossingBoardObjects = [];
+    this.crossingButtons = [];
+    this.crossingRunActive = false;
+    this.crossingBusy = false;
+    this.crossingReturning = false;
+    this.crossingMultiplier = this.config.crossing?.startMultiplier ?? 1;
+    this.crossingCurrentColumnIndex = 0;
     if (this.envTimer) {
       this.envTimer.remove(false);
       this.envTimer = null;
@@ -396,13 +404,14 @@ export class DungeonScene extends Scene {
         this.applyDevModeState();
       },
     );
-    this.applyDevModeState();
 
     if (this.crossingMode) {
       this._setupCrossingMode();
     } else {
       this.hud.hideRunPanel();
     }
+
+    this.applyDevModeState();
   }
 
   private _setupCrossingMode(): void {
@@ -936,7 +945,7 @@ export class DungeonScene extends Scene {
     if (this.doorTriggered || this.justExitedTable) return;
     this.doorTriggered = true;
     AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 40, allowOverlap: false });
-    if (this.config.gameSceneKey === 'WheelScene') {
+    if (this.config.gameSceneKey === 'WheelScene' || this.config.gameSceneKey === 'VaultScene') {
       AudioManager.stopMusic(this);
     }
 
@@ -1019,7 +1028,7 @@ export class DungeonScene extends Scene {
     }
 
     if (won) {
-      if (this.currentFloor === 5) {
+      if (this.currentFloor === 6) {
         this.scene.resume('DungeonScene');
         this._applyFloorAmbience();
         this.cameras.main.fadeOut(350, 0, 0, 0);
@@ -1069,6 +1078,13 @@ export class DungeonScene extends Scene {
 
   private _applyFloorAmbience(): void {
     const activeMusic = AudioManager.getMusic(this);
+    if (this.config.gameSceneKey === 'VaultScene') {
+      if (activeMusic) {
+        AudioManager.stopMusic(this);
+      }
+      return;
+    }
+
     if (this.config.gameSceneKey === 'WheelScene') {
       if (activeMusic?.key !== 'wheel-choir' || !activeMusic.isPlaying) {
         AudioManager.playMusic(this, 'wheel-choir', { loop: true, restart: true, volume: 0.78 });

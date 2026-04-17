@@ -5,10 +5,10 @@ import { getRunStats, resetRun, setFloor } from '../state/coinState';
 import { resetNarrativeRunState } from '../state/narrativeState';
 
 const ENDING_LINES = [
-  'You remember now.',
-  'The recruiter. The promise.',
-  'You came here because you needed the money.',
-  'You still do.',
+  'You remember all of it.',
+  'The recruiter. The contract. The debt that drove you here.',
+  'The vault was never an exit. It was the truth waiting at the top.',
+  'Now you can leave knowing exactly what the House is.',
 ];
 
 export class EndScene extends Scene {
@@ -88,7 +88,7 @@ export class EndScene extends Scene {
     AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 50, allowOverlap: false });
 
     const { width, height } = this.scale;
-    const finalQuote = this.add.text(width / 2, height - 94, "Leaving doesn't solve a thing.", {
+    const finalQuote = this.add.text(width / 2, height - 94, 'You can leave. The hunger follows you anyway.', {
       fontFamily: 'monospace',
       fontSize: '18px',
       color: '#d8b26a',

@@ -236,6 +236,7 @@ export class GameplaySettingsScene extends Scene {
       'CrashScene',
       'BlackjackScene',
       'WheelScene',
+      'VaultScene',
       'TransitionScene',
     ];
     gameplaySceneKeys.forEach((key) => this.scene.stop(key));

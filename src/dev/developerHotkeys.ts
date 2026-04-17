@@ -54,6 +54,10 @@ export function disableDeveloperMode(): void {
   }
 }
 
+export function resetDeveloperModeOnLaunch(): void {
+  disableDeveloperMode();
+}
+
 export function toggleDeveloperMode(): boolean {
   if (isDeveloperModeEnabled()) {
     disableDeveloperMode();

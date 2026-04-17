@@ -369,7 +369,7 @@ export class HUD {
 
     this.speechBg = this.scene.add.graphics();
     this.speechBg.setScrollFactor(0).setDepth(HUD.DEPTH + 2);
-    drawFramedPanel(this.speechBg, bx, by, bubbleW, bubbleH, { borderWidth: 3, alpha: 0.92 });
+    drawFramedPanel(this.speechBg, bx, by, bubbleW, bubbleH, { borderWidth: 3, alpha: 0.78 });
     this.speechBg.setVisible(false);
 
     this.speechText = this.scene.add.text(bx + 12, by + 12, '', {

@@ -8,7 +8,9 @@ import { CoinFlipScene } from './scenes/CoinFlipScene';
 import { CrashScene } from './scenes/CrashScene';
 import { BlackjackScene } from './scenes/BlackjackScene';
 import { WheelScene } from './scenes/WheelScene';
+import { VaultScene } from './scenes/VaultScene';
 import { EndScene } from './scenes/EndScene';
+import { resetDeveloperModeOnLaunch } from './dev/developerHotkeys';
 
 const isSafari = (() => {
     if (typeof navigator === 'undefined') {
@@ -49,10 +51,12 @@ const config = {
         CrashScene,
         BlackjackScene,
         WheelScene,
+        VaultScene,
         EndScene,
     ],
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    resetDeveloperModeOnLaunch();
     new Game(config);
 });
