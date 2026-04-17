@@ -15,6 +15,7 @@ export interface FloorConfig {
   tableLabel: string;
   floorTextures: { primary: string; accent: string };
   useCompositeTable: boolean;
+  compositeTableTexture?: string;
   slotMachines: Array<{ col: number; row: number }>;
 }
 
@@ -32,6 +33,7 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
     tableLabel: 'TABLE',
     floorTextures: { primary: 'casino-carpet-a', accent: 'casino-carpet-b' },
     useCompositeTable: true,
+    compositeTableTexture: 'table-lobby',
     slotMachines: [
       { col: 3,  row: 2 },
       { col: 6,  row: 2 },
@@ -48,12 +50,41 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
     propTint: { table: 0xaa4466, stairsLocked: 0x4a2a3a, stairsOpen: 0xff6688 },
     torchColor: 0xaa3366,
     torchGlow: 0xff5588,
-    tablePos: { col: 9, row: 5 },
-    stairsPos: { col: 3, row: 2 },
-    playerStart: { col: 13, row: 10 },
+    tablePos: { col: 8, row: 6 },
+    stairsPos: { col: 14, row: 2 },
+    playerStart: { col: 4, row: 10 },
     tableLabel: 'CRASH',
-    floorTextures: { primary: 'stone-floor-a', accent: 'stone-floor-b' },
-    useCompositeTable: false,
-    slotMachines: [],
+    floorTextures: { primary: 'crash-floor-a', accent: 'crash-floor-b' },
+    useCompositeTable: true,
+    compositeTableTexture: 'table-crash',
+    slotMachines: [
+      { col: 3,  row: 2 },
+      { col: 6,  row: 2 },
+      { col: 10, row: 2 },
+      { col: 13, row: 2 },
+      { col: 4,  row: 9 },
+      { col: 12, row: 9 },
+    ],
+  },
+  3: {
+    name: 'THE BLACKJACK PARLOR',
+    target: 400,
+    gameSceneKey: 'BlackjackScene',
+    propTint: { table: 0x1d6b47, stairsLocked: 0x5a4630, stairsOpen: 0xf5cf7f },
+    torchColor: 0xd8a24b,
+    torchGlow: 0xffe29a,
+    tablePos: { col: 8, row: 6 },
+    stairsPos: { col: 14, row: 2 },
+    playerStart: { col: 4, row: 10 },
+    tableLabel: 'BLACKJACK',
+    floorTextures: { primary: 'parlor-floor-a', accent: 'parlor-floor-b' },
+    useCompositeTable: true,
+    compositeTableTexture: 'table-blackjack',
+    slotMachines: [
+      { col: 3,  row: 2 },
+      { col: 13, row: 2 },
+      { col: 4,  row: 9 },
+      { col: 12, row: 9 },
+    ],
   },
 };

@@ -5,6 +5,7 @@ import { TransitionScene } from './scenes/TransitionScene';
 import { DungeonScene } from './scenes/DungeonScene';
 import { CoinFlipScene } from './scenes/CoinFlipScene';
 import { CrashScene } from './scenes/CrashScene';
+import { BlackjackScene } from './scenes/BlackjackScene';
 
 const isSafari = (() => {
     if (typeof navigator === 'undefined') {
@@ -35,7 +36,7 @@ const config = {
             debug: false,
         },
     },
-    scene: [BootScene, MenuScene, TransitionScene, DungeonScene, CoinFlipScene, CrashScene],
+    scene: [BootScene, MenuScene, TransitionScene, DungeonScene, CoinFlipScene, CrashScene, BlackjackScene],
 };
 
 document.addEventListener('DOMContentLoaded', () => {
