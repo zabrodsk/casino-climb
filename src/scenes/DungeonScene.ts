@@ -2,58 +2,68 @@ import { Scene, Tilemaps, Physics, GameObjects } from 'phaser';
 import { getCoins, getFloor, setCoins, setFloor, resetRun } from '../state/coinState';
 
 // ── Tile indices into dungeon_tileset.png (304×208, 19 cols × 13 rows, 16×16 tiles)
-// Index = row * 19 + col
+// Verified via PIL pixel analysis:
 //
-// Verified via pixel analysis (PIL color extraction):
-//   idx=76  (r4,c0): blue-gray floor tile, dom=(52,74,97)
-//   idx=95  (r5,c0): blue-gray floor tile variant, dom=(52,74,97)
-//   idx=114 (r6,c0): blue-gray floor tile variant, dom=(52,74,97)
-//   idx=20  (r1,c1): pure near-black (13,7,17) — solid wall fill
-//   idx=57  (r3,c0): teal/neon-green wall top accent, dom=(79,144,149)
-//   idx=58  (r3,c1): teal wall top mid
-//   idx=59  (r3,c2): teal wall top right
-//   idx=6   (r0,c6): solid pink/mauve wall face (179,136,162)
-//   idx=7   (r0,c7): pink wall face mid
-//   idx=142 (r7,c9): highest neon-green count — casino table tile
-//   idx=73  (r3,c16): strong teal accent — stairs tile (locked)
-//   idx=92  (r4,c16): teal accent — stairs open variant
-const TILE_VOID          = -1;
+//   FLOOR:
+//   idx=154 (r8,c2): RGB=(92,89,97) — near-neutral gray stone, high texture detail (std=40.6)
+//                    R≈G≈B means no blue/warm bias. Best stone floor in the set.
+//   idx=211 (r11,c2): RGB=(84,71,84) — warm-neutral gray, R-B=+0.5 (slightly warm stone)
+//                    Very uniform (std=4.7) — good accent tile.
+//
+//   WALL-TOP (bright neon-green accent on top, dark body — seen from above in 3/4 view):
+//   idx=57 (r3,c0): top rows bright (152→171), mid dark (~99-134) — wall-top left
+//   idx=58 (r3,c1): same structure — wall-top mid
+//   idx=59 (r3,c2): same — wall-top right
+//
+//   WALL-FACE (near-black body with neon-green glow at bottom — seen from front in 3/4 view):
+//   idx=133 (r7,c0): rows 0-9 dark (12), rows 10-15 neon-green glow (49→122)
+//                    Pairs perfectly with wall-top: same color family, different orientation.
+//   idx=134 (r7,c1): identical structure — wall-face mid
+//
+//   WALL SOLID (interior wall body, pure black):
+//   idx=20  (r1,c1): RGB=(13,7,17) — near-black, uniform
+//
+//   PROPS:
+//   idx=142 (r7,c9): neon green casino table
+//   idx=73  (r3,c16): teal stairs (locked)
+//   idx=92  (r4,c16): teal stairs (open)
 
-// Floor
-const TILE_FLOOR_A       = 76;   // r4,c0 — blue-gray stone
-const TILE_FLOOR_B       = 95;   // r5,c0 — floor variant
-const TILE_FLOOR_C       = 114;  // r6,c0 — floor variant
+const TILE_VOID         = -1;
 
-// Wall — solid fill (Option A: single layer, no 3/4 split)
-const TILE_WALL_SOLID    = 20;   // r1,c1 — near-black solid wall
+// Floor — neutral stone tiles (no blue bias)
+const TILE_FLOOR_A      = 154;  // r8,c2 — textured gray stone (primary)
+const TILE_FLOOR_B      = 211;  // r11,c2 — warm-neutral stone (accent)
 
-// Wall top cap (teal accent row at top edge of a wall block, facing floor below)
-const TILE_WALL_TOP_L    = 57;   // r3,c0
-const TILE_WALL_TOP_M    = 58;   // r3,c1
-const TILE_WALL_TOP_R    = 59;   // r3,c2
+// Wall top cap: bright neon-green edge visible from above (3/4 perspective top row)
+const TILE_WALL_TOP_L   = 57;   // r3,c0
+const TILE_WALL_TOP_M   = 58;   // r3,c1
+const TILE_WALL_TOP_R   = 59;   // r3,c2
 
-// Wall face (pink mauve row drawn on the floor tile just below the wall top)
-const TILE_WALL_FACE_L   = 6;    // r0,c6
-const TILE_WALL_FACE_M   = 7;    // r0,c7
-const TILE_WALL_FACE_R   = 8;    // r0,c8
+// Wall face: dark body with neon glow at bottom (drawn on the floor row below wall-top)
+const TILE_WALL_FACE_L  = 133;  // r7,c0
+const TILE_WALL_FACE_M  = 134;  // r7,c1
+const TILE_WALL_FACE_R  = 134;  // r7,c1 (no distinct right variant, reuse mid)
+
+// Wall solid (interior wall body)
+const TILE_WALL_SOLID   = 20;   // r1,c1 — near-black
 
 // Props
-const TILE_TABLE         = 142;  // r7,c9 — neon green casino table
-const TILE_STAIRS_L      = 73;   // r3,c16 — teal, locked stairs
-const TILE_STAIRS_O      = 92;   // r4,c16 — teal open stairs
+const TILE_TABLE        = 142;  // r7,c9 — neon green casino table
+const TILE_STAIRS_L     = 73;   // r3,c16 — teal, locked stairs
+const TILE_STAIRS_O     = 92;   // r4,c16 — teal open stairs
 
-// ── Map dimensions: 40 wide × 30 tall — one big open room with 2-cell thick perimeter
-const COLS = 40;
-const ROWS = 30;
+// ── Map dimensions: 24×18 — snug dungeon room, camera zoom 4× makes it feel right
+const COLS = 24;
+const ROWS = 18;
 const TILE_SIZE = 16;
 
-// ── Seeded PRNG for consistent floor tile variation across reloads
+// ── Seeded PRNG for consistent floor tile variation
 function pseudoRandom(x: number, y: number): number {
   const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
   return h - Math.floor(h);
 }
 
-// ── Build logical map programmatically (2-cell thick walls, open interior)
+// ── Build logical map (2-cell thick perimeter walls, open interior)
 // 0 = floor, 1 = wall, 2 = casino table, 3 = stairs
 function buildMapLogic(): number[][] {
   const map: number[][] = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -67,43 +77,48 @@ function buildMapLogic(): number[][] {
     }
   }
 
-  // Casino table at center: col 20, row 15
-  map[15][20] = 2;
+  // Casino table at col 12, row 9
+  map[9][12] = 2;
 
-  // Stairs at top-right interior: col 37, row 2
-  map[2][37] = 3;
+  // Stairs at col 21, row 2
+  map[2][21] = 3;
 
   return map;
 }
 
 const MAP_LOGIC = buildMapLogic();
 
-const PLAYER_START_X = 3 * TILE_SIZE + 8;   // col 3, bottom-left interior
-const PLAYER_START_Y = 27 * TILE_SIZE + 8;
+// Player starts at col 3, row 15 (bottom-left interior)
+const PLAYER_START_X = 3 * TILE_SIZE + 8;
+const PLAYER_START_Y = 15 * TILE_SIZE + 8;
 
-const DOOR_COL = 20;
-const DOOR_ROW = 15;
+const DOOR_COL = 12;
+const DOOR_ROW = 9;
 
-const STAIRS_COL = 37;
+const STAIRS_COL = 21;
 const STAIRS_ROW = 2;
 
 // ── Layer builders ────────────────────────────────────────────────────────────
 
-/** Floor layer: every cell gets a floor tile, varied by seeded PRNG */
+/** Floor layer: every cell gets a stone tile, varied by seeded PRNG. NO TINT. */
 function buildFloorData(): number[][] {
   return MAP_LOGIC.map((row, r) =>
     row.map((_v, c) => {
       const rnd = pseudoRandom(c, r);
-      if (rnd < 0.80) return TILE_FLOOR_A;       // 80% primary
-      if (rnd < 0.95) return TILE_FLOOR_B;       // 15% variant A
-      return TILE_FLOOR_C;                        // 5%  variant B
+      return rnd < 0.85 ? TILE_FLOOR_A : TILE_FLOOR_B;  // 85% primary, 15% accent
     })
   );
 }
 
-/** Wall layer (Option A — solid single layer):
- *  Walls that have no wall above them get the WALL_TOP tile (teal cap).
- *  Walls that have wall above get WALL_SOLID (near-black fill).
+/**
+ * Wall layer — 3/4 perspective:
+ *
+ * For each wall cell:
+ *   - If the cell ABOVE it is NOT a wall (exposed top): draw wall-top tile (the bright
+ *     neon-green cap you see from above).
+ *   - If the cell above IS a wall (interior body): draw wall-solid (near-black fill).
+ *
+ * Left/mid/right variants follow the horizontal neighbor pattern.
  */
 function buildWallData(): number[][] {
   const data: number[][] = Array.from({ length: ROWS }, () =>
@@ -116,7 +131,7 @@ function buildWallData(): number[][] {
 
       const aboveIsWall = r > 0 && MAP_LOGIC[r - 1][c] === 1;
       if (!aboveIsWall) {
-        // Exposed top — use teal cap tile
+        // Exposed wall top — use neon-cap tile
         const leftIsWall  = c > 0 && MAP_LOGIC[r][c - 1] === 1;
         const rightIsWall = c < COLS - 1 && MAP_LOGIC[r][c + 1] === 1;
         if      (!leftIsWall && rightIsWall)  data[r][c] = TILE_WALL_TOP_L;
@@ -131,7 +146,16 @@ function buildWallData(): number[][] {
   return data;
 }
 
-/** Wall face layer: placed on floor cells directly below a wall row, giving 3/4 depth */
+/**
+ * Wall-face layer — 3/4 perspective depth:
+ *
+ * For each floor cell that has a wall cell directly ABOVE it, draw a wall-face tile.
+ * This is the vertical "front" of the wall block as seen from the player's eye level.
+ * The neon-green glow at the bottom of the face tile makes it read as lit from the floor,
+ * creating the illusion of a 3D block.
+ *
+ * Wall faces are placed at depth 2 (above floor, below player).
+ */
 function buildWallFaceData(): number[][] {
   const data: number[][] = Array.from({ length: ROWS }, () =>
     new Array(COLS).fill(TILE_VOID)
@@ -139,7 +163,9 @@ function buildWallFaceData(): number[][] {
 
   for (let r = 1; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      if (MAP_LOGIC[r][c] !== 0 && MAP_LOGIC[r][c] !== 2 && MAP_LOGIC[r][c] !== 3) continue;
+      // Only place face on open cells (floor, table, or stairs)
+      if (MAP_LOGIC[r][c] === 1) continue;
+      // The cell above must be a wall
       if (MAP_LOGIC[r - 1][c] !== 1) continue;
 
       const leftAbove  = c > 0 && MAP_LOGIC[r - 1][c - 1] === 1;
@@ -201,12 +227,12 @@ export class DungeonScene extends Scene {
     const mapW = COLS * TILE_SIZE;
     const mapH = ROWS * TILE_SIZE;
 
-    // ── Layer 0: Floor (depth 0) ──────────────────────────────────────────
+    // ── Layer 0: Floor (depth 0) — stone tiles, NO tint ──────────────────
     const floorMap = this.make.tilemap({ data: buildFloorData(), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
     const floorTs = floorMap.addTilesetImage('dungeon-tiles', 'dungeon-tiles', TILE_SIZE, TILE_SIZE, 0, 0)!;
     const floorLayer = floorMap.createLayer(0, floorTs, 0, 0)!;
     floorLayer.setDepth(0);
-    floorLayer.setTint(0xffeecc); // warm gold tint, reduced intensity
+    // No tint — stone tiles look correct as-is
 
     // ── Layer 1: Wall solid (depth 1) ─────────────────────────────────────
     const wallMap = this.make.tilemap({ data: buildWallData(), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
@@ -214,7 +240,7 @@ export class DungeonScene extends Scene {
     const wallLayer = wallMap.createLayer(0, wallTs, 0, 0)!;
     wallLayer.setDepth(1);
 
-    // ── Layer 2: Wall face 3/4 perspective (depth 2) ─────────────────────
+    // ── Layer 2: Wall face — 3/4 depth effect (depth 2) ──────────────────
     const wallFaceMap = this.make.tilemap({ data: buildWallFaceData(), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
     const wallFaceTs = wallFaceMap.addTilesetImage('dungeon-tiles', 'dungeon-tiles', TILE_SIZE, TILE_SIZE, 0, 0)!;
     const wallFaceLayer = wallFaceMap.createLayer(0, wallFaceTs, 0, 0)!;
@@ -262,16 +288,16 @@ export class DungeonScene extends Scene {
     // ── Camera ────────────────────────────────────────────────────────────
     this.cameras.main.setBounds(0, 0, mapW, mapH);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.cameras.main.setZoom(3.5);
+    this.cameras.main.setZoom(4);
 
-    // ── Atmosphere: vignette (reduced intensity, max alpha 0.4) ──────────
+    // ── Atmosphere: vignette (softer — max alpha 0.3, clear center 0.65) ─
     const { width: sw, height: sh } = this.scale;
     const vignette = this.add.graphics();
     vignette.setScrollFactor(0);
     vignette.setDepth(50);
     this._drawVignette(vignette, sw, sh);
 
-    // ── Atmosphere: torchlight flicker near casino table ──────────────────
+    // ── Atmosphere: torchlight at casino table ────────────────────────────
     const torchX = DOOR_COL * TILE_SIZE + 8;
     const torchY = DOOR_ROW * TILE_SIZE + 8;
     const torchLight = this.add.pointlight(torchX, torchY, 0xffaa33, 60, 0.08, 0.05);
@@ -286,18 +312,16 @@ export class DungeonScene extends Scene {
       ease: 'Sine.easeInOut',
     });
 
-    // ── Perimeter torches ─────────────────────────────────────────────────
-    const torchCols = [5, 12, 20, 28, 35];
-    const torchRowsSide = [5, 12, 20, 25];
-
-    // Top wall torches (row 2, inner face)
-    for (const c of torchCols) this._addTorch(c * TILE_SIZE + 8, 2 * TILE_SIZE + 12);
-    // Bottom wall torches (row 27, inner face)
-    for (const c of torchCols) this._addTorch(c * TILE_SIZE + 8, 27 * TILE_SIZE + 4);
-    // Left wall torches (col 2, inner face)
-    for (const r of torchRowsSide) this._addTorch(2 * TILE_SIZE + 12, r * TILE_SIZE + 8);
-    // Right wall torches (col 37, inner face)
-    for (const r of torchRowsSide) this._addTorch(37 * TILE_SIZE + 4, r * TILE_SIZE + 8);
+    // ── Perimeter torches: 6 total for the smaller room ───────────────────
+    // 2 on north wall interior face (row 2)
+    this._addTorch(7 * TILE_SIZE + 8,  2 * TILE_SIZE + 14);
+    this._addTorch(17 * TILE_SIZE + 8, 2 * TILE_SIZE + 14);
+    // 2 on south wall interior face (row 15)
+    this._addTorch(7 * TILE_SIZE + 8,  15 * TILE_SIZE + 4);
+    this._addTorch(17 * TILE_SIZE + 8, 15 * TILE_SIZE + 4);
+    // 1 on each side wall
+    this._addTorch(2 * TILE_SIZE + 14, 9 * TILE_SIZE + 8);   // west wall
+    this._addTorch(21 * TILE_SIZE + 2, 9 * TILE_SIZE + 8);   // east wall
 
     // ── HUD ───────────────────────────────────────────────────────────────
     this.coinText = this.add
@@ -311,7 +335,7 @@ export class DungeonScene extends Scene {
       .setDepth(100);
 
     this.floorText = this.add
-      .text(sw - 8, 8, 'Floor 1 — The Lobby', {
+      .text(sw - 8, 8, `Floor ${getFloor()} — The Lobby`, {
         fontSize: '12px',
         color: '#ffffff',
         fontFamily: 'monospace',
@@ -353,7 +377,6 @@ export class DungeonScene extends Scene {
 
   /** Add a torch flame sprite + flickering pointlight at world position (x, y) */
   private _addTorch(x: number, y: number): void {
-    // Flame: orange ellipse with yellow inner
     const flame = this.add.graphics();
     flame.setDepth(4);
     flame.fillStyle(0xff6600, 0.9);
@@ -362,7 +385,6 @@ export class DungeonScene extends Scene {
     flame.fillEllipse(0, 1, 3, 5);
     flame.setPosition(x, y);
 
-    // Flickering alpha on the flame
     const flameDuration = 160 + Math.random() * 80;
     this.tweens.add({
       targets: flame,
@@ -373,7 +395,6 @@ export class DungeonScene extends Scene {
       ease: 'Sine.easeInOut',
     });
 
-    // Warm orange pointlight
     const light = this.add.pointlight(x, y, 0xff8833, 25, 0.09, 0.05);
     light.setDepth(4);
 
@@ -393,12 +414,13 @@ export class DungeonScene extends Scene {
     const steps = 12;
     const cx = w / 2;
     const cy = h / 2;
-    const rx = w * 0.6;  // larger clear center
-    const ry = h * 0.6;
+    // Larger clear center (0.65) and softer max alpha (0.3)
+    const rx = w * 0.65;
+    const ry = h * 0.65;
 
     for (let i = 0; i < steps; i++) {
       const t = i / steps;
-      const alpha = t * t * 0.4; // reduced max from 0.75 to 0.4
+      const alpha = t * t * 0.3;  // max alpha 0.3
       g.fillStyle(0x000000, alpha);
       const innerRx = rx * (1 - t);
       const innerRy = ry * (1 - t);
