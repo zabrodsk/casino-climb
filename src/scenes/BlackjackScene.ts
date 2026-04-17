@@ -192,6 +192,7 @@ export class BlackjackScene extends Scene {
       this.coinsText.setText(`Coins: ${this.currentCoins}`);
       this.leave();
     });
+    this.input.keyboard?.on('keydown-ESC', () => this.leave());
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
 

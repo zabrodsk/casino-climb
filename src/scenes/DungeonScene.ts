@@ -128,8 +128,10 @@ export class DungeonScene extends Scene {
   private crossingInteractKey!: Phaser.Input.Keyboard.Key;
   private crossingCashOutKey!: Phaser.Input.Keyboard.Key;
   private crossingStatusText!: GameObjects.Text;
+  private crossingGoalText!: GameObjects.Text;
   private crossingPromptText!: GameObjects.Text;
   private crossingHomeChip!: Phaser.GameObjects.Image;
+  private crossingFreeRoamBarrier?: Phaser.GameObjects.Zone;
   private crossingRunActive = false;
   private crossingBusy = false;
   private crossingReturning = false;
@@ -438,6 +440,15 @@ export class DungeonScene extends Scene {
     ).setDepth(2.5);
     this.crossingBoardObjects.push(boardGlow);
 
+    this.crossingFreeRoamBarrier = this.add.zone(
+      boardLeft + boardWidth / 2,
+      centerY,
+      boardWidth,
+      laneHeight,
+    ).setDepth(1);
+    this.physics.add.existing(this.crossingFreeRoamBarrier, true);
+    this.physics.add.collider(this.player, this.crossingFreeRoamBarrier);
+
     this.crossingHomeChip = this.add.image(crossing.chipX, this.crossingBaseY, 'poker-chip-safe')
       .setDepth(4)
       .setScale(1.15);
@@ -500,6 +511,15 @@ export class DungeonScene extends Scene {
       color: '#f7dc96',
     }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD.DEPTH + 2);
 
+    this.crossingGoalText = this.add.text(this.scale.width / 2, 94, '', {
+      fontSize: '13px',
+      fontFamily: 'monospace',
+      color: '#ffe7a8',
+      stroke: '#2c120d',
+      strokeThickness: 3,
+      align: 'center',
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD.DEPTH + 2);
+
     this.crossingPromptText = this.add.text(crossing.chipX, this.crossingBaseY - 18, '', {
       fontSize: '9px',
       fontFamily: 'monospace',
@@ -513,6 +533,7 @@ export class DungeonScene extends Scene {
     this.crossingInteractKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     this.crossingCashOutKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.C);
     const crossingUi = [
+      this.crossingGoalText,
       this.crossingStatusText,
       ...this.crossingButtons.flatMap(({ bg, label }) => [bg, label]),
     ];
@@ -523,6 +544,7 @@ export class DungeonScene extends Scene {
     this._refreshCrossingButtons();
     this._refreshCrossingHud();
     this._refreshCrossingFrontier();
+    this._refreshCrossingBarrier();
   }
 
   private _resetCrossingColumn(column: CrossingColumn, initial = false): void {
@@ -575,6 +597,7 @@ export class DungeonScene extends Scene {
   }
 
   private _refreshCrossingHud(): void {
+    const remainingToUnlock = Math.max(0, this.config.target - getCoins());
     const projectedPayout = this.selectedCrossingBet > 0
       ? Math.max(this.selectedCrossingBet, Math.round(this.selectedCrossingBet * this.crossingMultiplier))
       : 0;
@@ -585,11 +608,19 @@ export class DungeonScene extends Scene {
         ? 'Press E to jump right  |  C to bank and walk back'
         : (this.stairsUnlocked
           ? 'Stairs are live above the action. Press your luck or head north.'
-          : 'Roam freely. Press E on the first chip when you want to start.'),
+          : `Need ${remainingToUnlock} more to open the stairs. Press E on the first chip to start.`),
     ]);
 
+    this.crossingGoalText.setText(
+      this.stairsUnlocked
+        ? 'STAIRS OPEN  |  Head straight up when you are ready'
+        : `STAIRS OPEN AT ${this.config.target}  |  ${remainingToUnlock} MORE NEEDED`,
+    );
+
     if (this.crossingRunActive) {
-      this.crossingStatusText.setText(`Run live  x${this.crossingMultiplier.toFixed(2)}  |  projected ${projectedPayout}`);
+      this.crossingStatusText.setText(
+        `Run live  x${this.crossingMultiplier.toFixed(2)}  |  projected ${projectedPayout}  |  ${remainingToUnlock} to unlock`,
+      );
       return;
     }
     if (this.crossingReturning) {
@@ -600,7 +631,9 @@ export class DungeonScene extends Scene {
       this.crossingStatusText.setText('The stairs are live above the card band. Play again or just walk north and leave.');
       return;
     }
-    this.crossingStatusText.setText('Walk around freely. Head to the first chip and press E when you want to start the crossing.');
+    this.crossingStatusText.setText(
+      `Walk around freely. You still need ${remainingToUnlock} more before the stairs open.`,
+    );
   }
 
   private _startCrossingRun(): void {
@@ -613,6 +646,7 @@ export class DungeonScene extends Scene {
     this._refreshCrossingFrontier();
     this._refreshCrossingButtons();
     this._refreshCrossingHud();
+    this._refreshCrossingBarrier();
     AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 40, allowOverlap: false });
   }
 
@@ -703,6 +737,7 @@ export class DungeonScene extends Scene {
     this._refreshCrossingButtons();
     this._refreshCrossingHud();
     this._refreshCrossingFrontier();
+    this._refreshCrossingBarrier();
 
     this.player.setFlipX(true);
     this.player.play('player-walk', true);
@@ -723,6 +758,7 @@ export class DungeonScene extends Scene {
         this._refreshCrossingFrontier();
         this._refreshCrossingButtons();
         this._refreshCrossingHud();
+        this._refreshCrossingBarrier();
         if (fromBust) {
           AudioManager.playSfx(this, 'ui-click', { volume: 0.55, cooldownMs: 50, allowOverlap: false });
         }
@@ -736,6 +772,15 @@ export class DungeonScene extends Scene {
       column.blockade.setVisible(cleared);
       column.sprites.forEach((sprite) => sprite.setAlpha(cleared ? 0.45 : 1));
     });
+  }
+
+  private _refreshCrossingBarrier(): void {
+    const body = this.crossingFreeRoamBarrier?.body as Physics.Arcade.StaticBody | undefined;
+    if (!body) return;
+
+    const freeRoamActive = !this.crossingRunActive && !this.crossingReturning && !this.crossingBusy;
+    body.enable = freeRoamActive;
+    this.crossingFreeRoamBarrier?.setActive(freeRoamActive);
   }
 
   /** Add a torch flame sprite + flickering pointlight at world position (x, y) */

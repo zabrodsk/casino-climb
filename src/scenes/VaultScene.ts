@@ -142,6 +142,7 @@ export class VaultScene extends Scene {
 
     addGameplaySettingsGear(this, 'VaultScene');
     registerDeveloperUnlockHotkey(this, () => this.resolveVaultSuccess(true));
+    this.input.keyboard?.on('keydown-ESC', () => this.leaveVault());
     this.enterTimingPhase();
   }
 
@@ -440,5 +441,11 @@ export class VaultScene extends Scene {
 
   private refreshCoins(): void {
     this.coinsText.setText(`Coins: ${this.currentCoins}`);
+  }
+
+  private leaveVault(): void {
+    this.timingTween?.stop();
+    this.events.emit('game-complete', { coins: this.currentCoins, won: false });
+    this.scene.stop('VaultScene');
   }
 }
