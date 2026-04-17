@@ -11,9 +11,9 @@ const TILE_TABLE        = 142;
 const TILE_STAIRS_L     = 73;
 const TILE_STAIRS_O     = 92;
 
-// ── Map dimensions: 14×11 — snug dungeon room, camera zoom 5× makes it feel right
-const COLS = 14;
-const ROWS = 11;
+// ── Map dimensions: 18x13 — enough room to circle the table comfortably
+const COLS = 18;
+const ROWS = 13;
 const TILE_SIZE = 16;
 
 // ── Seeded PRNG for consistent floor tile variation
@@ -63,6 +63,7 @@ export class DungeonScene extends Scene {
   private wallCollisionLayer!: Tilemaps.TilemapLayer;
   private propLayer!: Tilemaps.TilemapLayer;
   private propMap!: Tilemaps.Tilemap;
+  private stairsBlocker!: Phaser.GameObjects.Zone;
 
   private stairsUnlocked = false;
   private doorTriggered = false;
@@ -142,12 +143,12 @@ export class DungeonScene extends Scene {
     if (cfg.useCompositeTable) {
       // Hide the tileset table tile; composite sprite is placed below
       this.propLayer.removeTileAt(tablePos.col, tablePos.row);
-      // Composite 48×32 casino blackjack table sprite
+      const tableTexture = cfg.compositeTableTexture ?? 'casino-table';
       this.add
         .image(
           tablePos.col * TILE_SIZE + TILE_SIZE / 2,
           tablePos.row * TILE_SIZE + TILE_SIZE / 2,
-          'casino-table'
+          tableTexture
         )
         .setOrigin(0.5, 0.5)
         .setDepth(3);
@@ -165,14 +166,14 @@ export class DungeonScene extends Scene {
 
     // ── Collision layer (invisible, logical map) ──────────────────────────
     const collisionData = this.mapLogic.map(row =>
-      row.map(v => (v === 1 ? 1 : v === 2 ? 2 : v === 3 ? 3 : 0))
+      row.map(v => (v === 1 ? 1 : v === 2 ? 2 : 0))
     );
     const collMap = this.make.tilemap({ data: collisionData, tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
     const collTs = collMap.addTilesetImage('dungeon-tiles', 'dungeon-tiles', TILE_SIZE, TILE_SIZE, 0, 0)!;
     this.wallCollisionLayer = collMap.createLayer(0, collTs, 0, 0)!;
     this.wallCollisionLayer.setVisible(false);
     this.wallCollisionLayer.setDepth(0);
-    this.wallCollisionLayer.setCollision([1, 2, 3]);
+    this.wallCollisionLayer.setCollision([1, 2]);
 
     // ── Physics world ─────────────────────────────────────────────────────
     this.physics.world.setBounds(0, 0, mapW, mapH);
@@ -235,11 +236,15 @@ export class DungeonScene extends Scene {
       ease: 'Sine.easeInOut',
     });
 
-    // ── Perimeter torches — 4 torches at interior corners (rows 2/8, cols 2/11) ──
-    this._addTorch(2  * TILE_SIZE + 8, 2 * TILE_SIZE + 14, cfg.torchColor, cfg.torchGlow);
-    this._addTorch(11 * TILE_SIZE + 8, 2 * TILE_SIZE + 14, cfg.torchColor, cfg.torchGlow);
-    this._addTorch(2  * TILE_SIZE + 8, 8 * TILE_SIZE + 4,  cfg.torchColor, cfg.torchGlow);
-    this._addTorch(11 * TILE_SIZE + 8, 8 * TILE_SIZE + 4,  cfg.torchColor, cfg.torchGlow);
+    // ── Perimeter torches — 4 torches at interior corners of the walkable room ──
+    const westTorchCol = 2;
+    const eastTorchCol = COLS - 3;
+    const northTorchRow = 2;
+    const southTorchRow = ROWS - 3;
+    this._addTorch(westTorchCol * TILE_SIZE + 8, northTorchRow * TILE_SIZE + 14, cfg.torchColor, cfg.torchGlow);
+    this._addTorch(eastTorchCol * TILE_SIZE + 8, northTorchRow * TILE_SIZE + 14, cfg.torchColor, cfg.torchGlow);
+    this._addTorch(westTorchCol * TILE_SIZE + 8, southTorchRow * TILE_SIZE + 4, cfg.torchColor, cfg.torchGlow);
+    this._addTorch(eastTorchCol * TILE_SIZE + 8, southTorchRow * TILE_SIZE + 4, cfg.torchColor, cfg.torchGlow);
 
     // ── Table label ───────────────────────────────────────────────────────
     const tableLabelY = tablePos.row * TILE_SIZE - (cfg.useCompositeTable ? 20 : 4);
@@ -266,6 +271,14 @@ export class DungeonScene extends Scene {
       .setDepth(1);
     this.physics.add.existing(stairsZone, true);
     this.physics.add.overlap(this.player, stairsZone, this._onStairsOverlap, undefined, this);
+
+    // Separate blocker in front of locked stairs. We remove this on unlock instead of
+    // mutating tile collisions at runtime, which is more reliable across scene transitions.
+    this.stairsBlocker = this.add
+      .zone(stairsPos.col * TILE_SIZE + 8, stairsPos.row * TILE_SIZE + 8, TILE_SIZE, TILE_SIZE)
+      .setDepth(1);
+    this.physics.add.existing(this.stairsBlocker, true);
+    this.physics.add.collider(this.player, this.stairsBlocker);
 
     // ── UI camera + HUD ───────────────────────────────────────────────────
     this.uiCam = this.cameras.add(0, 0, sw, sh);
@@ -483,8 +496,9 @@ export class DungeonScene extends Scene {
     if (this.stairsUnlocked) return;
     this.stairsUnlocked = true;
 
-    // Allow walking onto the stairs tile
-    this.wallCollisionLayer.setCollision([1, 2]);
+    if (this.stairsBlocker.body) {
+      this.stairsBlocker.destroy();
+    }
 
     // Swap the composite sprite to the open variant
     this.stairsSprite.setTexture('stairs-sprite-open');

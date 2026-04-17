@@ -1,0 +1,7 @@
+{
+  "nudgeCount": 0,
+  "lastNudgeAt": "",
+  "lastSignature": "",
+  "pendingSignature": "payload:019d9af3-9084-7ab2-8267-0e37690e2925|019d9b51-5191-77f2-a23b-25256bf4e565|I made the dungeon room larger and spread the layout so you can walk around the table instead of getting boxed in.\n\nThe main change is in [`src/scenes/DungeonScene.ts`](</Users/dusanzabrodsky/Library/Mobile Documents/com~apple~CloudDocs/coding/hackathon/src/scenes/DungeonScene.ts>), where the room grows from `14x11` to `18x13`, and the torch placement now adapts to the room size instead of using hardcoded positions. I also updated [`src/data/floorConfig.ts`](</Users/dusanzabrodsky/Library/Mobile Documents/com~apple~CloudDocs/coding/hackathon/src/data/floorConfig.ts>) to move the Floor 1 table, stairs, player start, and slot machines farther apart, plus nudged Floor 2 to match the bigger room.\n\n`npm run build` passes. Refresh localhost and you should have enough space to circle the table cleanly. If you want, I can also make the table trigger zone a bit tighter so you only enter the minigame when you’re really close to the front of the table.",
+  "pendingSince": "2026-04-17T12:02:36.683Z"
+}
