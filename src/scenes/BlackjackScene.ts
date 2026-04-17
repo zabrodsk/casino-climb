@@ -1,4 +1,4 @@
-import { Scene, GameObjects } from 'phaser';
+import Phaser, { Scene, GameObjects } from 'phaser';
 import {
   Card,
   dealerShouldHit,
@@ -8,24 +8,24 @@ import {
   settleRound,
   startRound,
 } from '../games/blackjack';
-import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle } from '../ui/theme';
+import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle, drawFramedPanel } from '../ui/theme';
 
 const WIN_TARGET = 400;
 const HANDS_TO_WIN = 3;
 const BET_OPTIONS = [10, 25, 50];
 
 const SUIT_TEXT: Record<Card['suit'], string> = {
-  spades: 'S',
-  hearts: 'H',
-  diamonds: 'D',
-  clubs: 'C',
+  spades: '♠',
+  hearts: '♥',
+  diamonds: '♦',
+  clubs: '♣',
 };
 
 const SUIT_COLOR: Record<Card['suit'], string> = {
-  spades: COLOR.ivory,
-  hearts: '#ff8aa1',
-  diamonds: '#ffb57b',
-  clubs: '#9ce28d',
+  spades: '#1a1a2e',
+  hearts: '#cc2244',
+  diamonds: '#c85c00',
+  clubs: '#155724',
 };
 
 export class BlackjackScene extends Scene {
@@ -62,6 +62,11 @@ export class BlackjackScene extends Scene {
   private standZone!: GameObjects.Zone;
 
   private betButtons!: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; bet: number }>;
+
+  private speechBg!: GameObjects.Graphics;
+  private speechText!: GameObjects.Text;
+  private _speechReveal: Phaser.Time.TimerEvent | null = null;
+  private _speechDismiss: Phaser.Time.TimerEvent | null = null;
 
   constructor() {
     super('BlackjackScene');
@@ -159,6 +164,11 @@ export class BlackjackScene extends Scene {
     this.updateBetButtons();
     this.updateActionButtons();
     this.renderHands();
+
+    this._buildSpeechBubble();
+    this.time.delayedCall(400, () => {
+      this._showSpeech('Select a bet, then hit DEAL. Get closer to 21 than the dealer without going over. HIT draws a card. STAND lets the dealer play.');
+    });
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
@@ -491,44 +501,121 @@ export class BlackjackScene extends Scene {
     const g = this.add.graphics();
 
     if (card) {
-      g.fillStyle(0xf7eed3, 1);
-      g.fillRoundedRect(x - 38, y - 54, 76, 108, 8);
+      // Card face: white with subtle warm tint
+      g.fillStyle(0xfaf6ed, 1);
+      g.fillRoundedRect(x - 40, y - 58, 80, 116, 8);
+      // Outer border: gold
       g.lineStyle(2, 0xb8944b, 1);
-      g.strokeRoundedRect(x - 38, y - 54, 76, 108, 8);
+      g.strokeRoundedRect(x - 40, y - 58, 80, 116, 8);
+      // Inner border: faint
+      g.lineStyle(1, 0xd4b06a, 0.35);
+      g.strokeRoundedRect(x - 34, y - 52, 68, 104, 5);
     } else {
-      g.fillStyle(0x412154, 1);
-      g.fillRoundedRect(x - 38, y - 54, 76, 108, 8);
+      g.fillStyle(0x1e1040, 1);
+      g.fillRoundedRect(x - 40, y - 58, 80, 116, 8);
       g.lineStyle(2, 0xf8cf72, 1);
-      g.strokeRoundedRect(x - 38, y - 54, 76, 108, 8);
-      g.fillStyle(0x6f2e75, 1);
-      g.fillRect(x - 24, y - 40, 48, 80);
-      g.fillStyle(0xf8cf72, 1);
-      g.fillRect(x - 6, y - 26, 12, 52);
-      g.fillRect(x - 24, y - 6, 48, 12);
+      g.strokeRoundedRect(x - 40, y - 58, 80, 116, 8);
+      // Cross pattern on card back
+      g.fillStyle(0x2e1b5c, 1);
+      g.fillRect(x - 26, y - 44, 52, 88);
+      g.fillStyle(0xf8cf72, 0.7);
+      g.fillRect(x - 5, y - 32, 10, 64);
+      g.fillRect(x - 26, y - 5, 52, 10);
     }
 
     const objects: GameObjects.GameObject[] = [g];
 
     if (card) {
-      const rank = this.add.text(x - 24, y - 36, card.rank, {
+      const col = SUIT_COLOR[card.suit];
+      // Top-left rank
+      const rank = this.add.text(x - 31, y - 48, card.rank, {
         fontFamily: FONT.mono,
-        fontSize: '18px',
-        color: SUIT_COLOR[card.suit],
+        fontSize: '22px',
+        fontStyle: 'bold',
+        color: col,
+        stroke: col === '#1a1a2e' || col === '#155724' ? '#ffffff' : '#ffffff',
+        strokeThickness: 0,
       });
-      const suit = this.add.text(x, y, SUIT_TEXT[card.suit], {
+      // Top-left suit pip below rank
+      const topSuit = this.add.text(x - 28, y - 26, SUIT_TEXT[card.suit], {
         fontFamily: FONT.mono,
-        fontSize: '32px',
-        color: SUIT_COLOR[card.suit],
-      }).setOrigin(0.5);
-      const miniSuit = this.add.text(x + 22, y + 28, SUIT_TEXT[card.suit], {
+        fontSize: '16px',
+        color: col,
+      });
+      // Large center suit
+      const suit = this.add.text(x, y + 4, SUIT_TEXT[card.suit], {
         fontFamily: FONT.mono,
-        fontSize: '14px',
-        color: SUIT_COLOR[card.suit],
+        fontSize: '38px',
+        color: col,
       }).setOrigin(0.5);
-      objects.push(rank, suit, miniSuit);
+      // Bottom-right rank + suit (flipped)
+      const brRank = this.add.text(x + 31, y + 48, card.rank, {
+        fontFamily: FONT.mono,
+        fontSize: '22px',
+        fontStyle: 'bold',
+        color: col,
+      }).setOrigin(1, 1);
+      const brSuit = this.add.text(x + 28, y + 27, SUIT_TEXT[card.suit], {
+        fontFamily: FONT.mono,
+        fontSize: '16px',
+        color: col,
+      }).setOrigin(1, 1);
+      objects.push(rank, topSuit, suit, brRank, brSuit);
     }
 
     return this.add.container(0, 0, objects);
+  }
+
+  private _buildSpeechBubble(): void {
+    const W = 1024, H = 768;
+    const bubbleW = 700;
+    const bubbleH = 80;
+    const bx = (W - bubbleW) / 2;
+    const by = H - 24 - bubbleH;
+
+    this.speechBg = this.add.graphics();
+    drawFramedPanel(this.speechBg, bx, by, bubbleW, bubbleH, { borderWidth: 3, alpha: 0.95 });
+    this.speechBg.setVisible(false).setDepth(200);
+
+    this.speechText = this.add.text(bx + 14, by + 14, '', {
+      fontSize: '16px',
+      fontFamily: FONT.mono,
+      color: COLOR.ivorySoft,
+      wordWrap: { width: bubbleW - 28 },
+    }).setVisible(false).setDepth(201);
+  }
+
+  private _showSpeech(text: string): void {
+    if (this._speechReveal) { this._speechReveal.remove(false); this._speechReveal = null; }
+    if (this._speechDismiss) { this._speechDismiss.remove(false); this._speechDismiss = null; }
+
+    this.speechBg.setVisible(true).setAlpha(1);
+    this.speechText.setVisible(true).setAlpha(1).setText('');
+
+    let i = 0;
+    this._speechReveal = this.time.addEvent({
+      delay: 28,
+      repeat: text.length - 1,
+      callback: () => {
+        i++;
+        this.speechText.setText(text.slice(0, i));
+        if (i >= text.length) {
+          this._speechReveal = null;
+          this._speechDismiss = this.time.delayedCall(3500, () => {
+            this.tweens.add({
+              targets: [this.speechBg, this.speechText],
+              alpha: 0,
+              duration: 300,
+              onComplete: () => {
+                this.speechBg.setVisible(false);
+                this.speechText.setVisible(false);
+              },
+            });
+            this._speechDismiss = null;
+          });
+        }
+      },
+    });
   }
 
   private leave(): void {

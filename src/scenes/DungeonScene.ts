@@ -27,10 +27,10 @@ function pseudoRandom(x: number, y: number): number {
 function buildMapLogic(tablePos: { col: number; row: number }, stairsPos: { col: number; row: number }): number[][] {
   const map: number[][] = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 
-  // 2-cell thick perimeter walls
+  // 1-cell thick perimeter walls
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      if (r < 2 || r >= ROWS - 2 || c < 2 || c >= COLS - 2) {
+      if (r < 1 || r >= ROWS - 1 || c < 1 || c >= COLS - 1) {
         map[r][c] = 1;
       }
     }
@@ -210,7 +210,7 @@ export class DungeonScene extends Scene {
     };
 
     // ── Camera ────────────────────────────────────────────────────────────
-    this.cameras.main.setBounds(0, 0, mapW, mapH);
+    this.cameras.main.setBounds(-TILE_SIZE, -TILE_SIZE, mapW + TILE_SIZE * 2, mapH + TILE_SIZE * 2);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.cameras.main.setZoom(5);
 
