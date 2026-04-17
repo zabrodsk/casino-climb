@@ -11,33 +11,45 @@ Supersedes: dusanzabrodsky-main-design-20260410-162932.md
 
 ## Problem Statement
 
-Build a compelling browser casino game for a hackathon in under 24 hours that stands out from generic casino prototypes. The differentiator: a pixel art dungeon crawler where a desperate man is trapped in a looping casino dungeon controlled by "The House," must win casino games floor by floor to escape, and loses his memory on each failed run.
+Build a compelling browser casino game for a hackathon in under 24 hours that stands out from generic casino prototypes. The differentiator: a pixel art dungeon crawler where a desperate man wakes inside a casino dungeon with no memory of how he got there, must climb floor by floor to escape, and slowly recovers the truth — that he chose to be here.
 
-The story is the mechanic. Most hackathon casino games have no soul. This one has a narrative arc, a psychological antagonist, and a roguelike loop with genuine stakes.
+The story is the mechanic. Most hackathon casino games have no soul. This one has a psychological arc, a predatory antagonist, and a final choice with genuine moral weight.
 
 ---
 
 ## What Makes This Cool
 
-A broke man signs a terrible deal he doesn't remember signing. He wakes in a dungeon casino, guided by a voice called The House that knows everything about him — including all his previous runs. He plays. He loses. He forgets. He plays again.
+A broke man wakes up inside a casino dungeon with no memory of how he got there. He climbs because he wants to escape. By the top, he learns he entered willingly — and that the money he truly needed is still out of reach. The final horror: he's free to leave, but leaving doesn't fix anything.
 
-The "whoa" factor: the dungeon feels *alive and predatory*. The House watches and comments. Memory fragments leak through between runs. The atmosphere shifts from hope to paranoia as you climb. No other hackathon team will have this.
+The "whoa" factor: the dungeon feels *alive and predatory*. The House watches, comments, and slowly peels back the truth. The atmosphere shifts from confusion to paranoia to tragic clarity. No other hackathon team will have this ending.
 
 ---
 
 ## Story Summary
 
-**Protagonist:** Broke, exhausted, desperate man. Not a gambler by nature — cornered by life and tempted by false hope.
+**One-sentence pitch:** A broke man wakes up inside a mysterious casino dungeon with no memory of how he arrived. Forced to climb floor by floor in search of escape, he slowly uncovers that he entered willingly after being promised life-changing money. At the top, with his memory restored, he learns he can leave — but the money he truly needed is still out of reach. The final choice: escape with his freedom, or start again for a chance at more.
 
-**Setup:** A mysterious stranger offers him a private casino invitation promising life-changing winnings. He accepts. He enters. He becomes trapped.
+---
 
-**The House:** The antagonist. Not a person — a presence. It watches, tracks behavior, remembers every run the player doesn't. Early on, it sounds reassuring. By the late floors, it's invasive and manipulative.
+**Protagonist:** Broke, exhausted, desperate man. Not a gambler by nature — cornered by life and tempted by false hope. Before the game begins, he accepted an offer from a mysterious recruiter promising life-changing winnings. Something happened at entry — drugged, disoriented, or psychologically manipulated — and the game opens with him waking inside the dungeon with no memory of how he got there.
 
-**The Loop:** Failure wipes memory. Each new run starts with amnesia but fragments of past runs leak through — familiar dealers, repeated phrases, rooms that feel strangely known.
+He does not remember the recruiter, the deal, or why he came. All he knows: this place is wrong. Something is watching him. The only way forward is up.
 
-**The Truth (final floor):** He signed a contract before entering. Memory resets were in the terms. The only exit is reaching the top. When he finally escapes: he pays his debts, stabilizes — and one year later, broke again, the stranger approaches him on the same quiet street.
+**The memory loss:** A one-time disorientation at entry — not a recurring mechanic. The casino stripped his memory on arrival, intentionally. Simple explanation is enough: he was drugged, The House disorients all newcomers, entry has a ritualistic effect. Doesn't need to be over-explained.
 
-**Themes:** Desperation makes people vulnerable. Systems of chance prey on hope. Escaping a place is not the same as escaping a pattern.
+**The House:** Not a person — a presence. It watches everything, comments on his behavior, and slowly reveals that none of this was random. It doesn't reset him repeatedly. It just needs two things: trap him long enough to break him down, and make the final offer irresistible. The casino confuses newcomers, escalates pressure, wears them down psychologically, reveals just enough truth at the top — then asks whether they want freedom or a bigger prize.
+
+**Emotional arc:**
+- **Early floors:** Survival. Confused, reactive, treating this like a nightmare he woke up inside.
+- **Mid floors:** Understanding. Piecing together that he may have chosen this. Less focused on surviving each room, more on understanding what happened.
+- **Late floors:** Tragedy. He begins remembering why he came — desperate, broke, the casino was his one chance to fix everything. The casino is not just a prison. It is also the answer to a real problem in his life.
+
+**The ending:** At the top, memory restored. He remembers the recruiter, the promise, the depth of his desperation, the fact that he willingly entered. And then: he can leave. But leaving means going back to a life that is still broken. The money he has may not be enough. The casino offers a final choice:
+
+- **Leave:** Escape with what he has. Return to his broken life. He exits physically — but not untouched. The casino damaged him during the climb. Freedom is real but marked.
+- **Play Again:** Go back in with full knowledge of what this place is. The horror is no longer "I'm trapped." It becomes: *"I'm free to leave, but I still need what this place offers."*
+
+**Themes:** Desperation makes people vulnerable. Systems of chance prey on hope. Freedom is not the same as safety. You can escape a place without escaping the condition that brought you there.
 
 ---
 
@@ -66,28 +78,31 @@ The "whoa" factor: the dungeon feels *alive and predatory*. The House watches an
 
 ## Floor Design
 
-### Floor 1: Hope
-- Tone: Flashy, neon, almost welcoming. The House sounds calm and confident.
-- Games: Wheel of Fate (tutorial/intro version)
-- The House lines: Reassuring, slightly too smooth. "Welcome. Everything you see here is yours to win."
-- Memory fragments: None yet. Pure setup.
-- Visual: Bright neon dungeon tiles. Character feels small but optimistic.
+### Floor 1: Confusion (Survival)
+- Tone: Flashy, neon, almost welcoming — but wrong somehow. The House sounds smooth and reassuring.
+- Games: Wheel of Fate (tutorial version — simpler segment pool, no 💀 yet)
+- The House lines: "Welcome. Everything you see here is yours to win." Slightly too confident. Too practiced.
+- Memory fragments: None. He just woke up. Pure disorientation.
+- Visual: Bright neon dungeon tiles. Character feels small. No context for where he is or why.
+- Narrative beat: He has no goal except to find an exit. The House acts like his host.
 
-### Floor 2: Doubt
-- Tone: Lighting dimmer. Dealers feel less human. The House becomes passive-aggressive.
-- Games: Blackjack (standard rules, but The House comments on every bad decision)
-- The House lines: "You've played cautious before. It didn't help." Implied he's done this.
-- Memory fragments: Player sees a flash — the stranger's face. A line repeats from Floor 1. Familiar.
-- Visual: Darker tiles. Occasional glitch effect on HUD text.
+### Floor 2: Doubt (Understanding)
+- Tone: Lighting dimmer. The House becomes less hospitable, more observational.
+- Games: Blackjack — The House as dealer, comments on every decision.
+- The House lines: "You're looking for something. I can tell." / "This wasn't how you imagined it would go, was it?" Implies he had expectations.
+- Memory fragments: A flash of the recruiter's face. A vague sense of a conversation he can't place. The word "winnings" surfaces in his mind unbidden.
+- Visual: Darker tiles. Occasional text glitch on The House's speech bubble.
+- Narrative beat: He starts to suspect he came here by choice. It unsettles him more than the casino does.
 
-### Floor 3: Desperation (Boss floor / Demo climax)
-- Tone: Oppressive, cold. Silence between games. The House is direct.
-- Games: Slots (high volatility — 💀 Lose All appears here)
-- The House lines: "You agreed to this. You simply don't remember." Contract fragment shown.
-- Memory fragments: Clear image of signing. The contract text fades in.
-- Visual: Glitching tiles. Static effects. Minimal color.
+### Floor 3: Clarity (Tragedy + Final Choice)
+- Tone: Oppressive, cold, stripped down. Silence between games. The House is direct.
+- Games: Slots (high volatility — 💀 Lose All is active, screen shake on bad outcomes)
+- The House lines: "You remember now, don't you?" / "You came here because you needed this place. Not because you were tricked." / "The door is at the top. It was always at the top."
+- Memory fragments: Full recall. The recruiter. The promise. The desperation. The signature.
+- Visual: Minimal color. Near-monochrome. The neon is almost gone.
+- Narrative beat: He reaches the exit. Memory fully restored. The House presents the choice: leave with what he has, or play again — now knowing everything.
 
-*Post-hackathon: add floors 4-10 per the full story arc.*
+*Post-hackathon: expand to 7-10 floors with granular memory recovery and deeper The House arc.*
 
 ---
 
@@ -109,7 +124,7 @@ The "whoa" factor: the dungeon feels *alive and predatory*. The House watches an
 - Standard 21 rules
 - Dealer is "The House" — literally labeled as such
 - The House comments on every hit, stand, and bust
-- On bust: The House says something from a "I've seen you bust here before" pool
+- On bust: The House says something from its observational pool — "You knew that was too many." / "Greed is a pattern I recognize."
 - Player starts each floor with 100 chips (fresh reset per floor — see Premises #7)
 
 ### Slots (Late-Floor Chaos)
@@ -127,13 +142,14 @@ The "whoa" factor: the dungeon feels *alive and predatory*. The House watches an
 | Trigger | Example line |
 |---------|-------------|
 | Player wins 3 in a row | "Careful. Confidence is expensive here." |
-| Player hits rock-bottom chips | "You've been here before. You always find a way to make it worse." |
+| Player hits rock-bottom chips | "That's not panic. That's recognition. You've felt this before." |
 | Player takes a long time to bet | "Take your time. The wheel doesn't care." |
 | Player loses to 💀 Lose All | "That one never gets easier to watch." |
-| Floor transition | "Another floor. Another chance you didn't earn." |
-| Player busts at blackjack | "You'd think you'd have learned by now." |
+| Floor transition (Floor 1→2) | "Still looking for the exit? It's above you. Keep climbing." |
+| Floor transition (Floor 2→3) | "You're starting to remember. I can tell. That's fine." |
+| Player busts at blackjack | "You knew that was too many. You chose it anyway." |
 | High bet placed | "Desperation looks the same every time." |
-| Game won on final floor | "You actually made it. Hm." |
+| Game won on final floor | "You remember now. And yet here you are." |
 
 Lines stored as JSON. Rendered in a "speech bubble" HUD element, Minecraft font.
 
