@@ -1,60 +1,19 @@
 import { Scene, Tilemaps, Physics, GameObjects } from 'phaser';
 import { getCoins, getFloor, setCoins, setFloor, resetRun } from '../state/coinState';
+import { HUD } from '../ui/HUD';
+import { FLOOR_CONFIG, FloorConfig } from '../data/floorConfig';
+import { drawFramedPanel, neonTitleStyle, bodyTextStyle } from '../ui/theme';
 
-// ── Tile indices into dungeon_tileset.png (304×208, 19 cols × 13 rows, 16×16 tiles)
-// Verified via PIL pixel analysis:
-//
-//   FLOOR:
-//   idx=154 (r8,c2): RGB=(92,89,97) — near-neutral gray stone, high texture detail (std=40.6)
-//                    R≈G≈B means no blue/warm bias. Best stone floor in the set.
-//   idx=211 (r11,c2): RGB=(84,71,84) — warm-neutral gray, R-B=+0.5 (slightly warm stone)
-//                    Very uniform (std=4.7) — good accent tile.
-//
-//   WALL-TOP (bright neon-green accent on top, dark body — seen from above in 3/4 view):
-//   idx=57 (r3,c0): top rows bright (152→171), mid dark (~99-134) — wall-top left
-//   idx=58 (r3,c1): same structure — wall-top mid
-//   idx=59 (r3,c2): same — wall-top right
-//
-//   WALL-FACE (near-black body with neon-green glow at bottom — seen from front in 3/4 view):
-//   idx=133 (r7,c0): rows 0-9 dark (12), rows 10-15 neon-green glow (49→122)
-//                    Pairs perfectly with wall-top: same color family, different orientation.
-//   idx=134 (r7,c1): identical structure — wall-face mid
-//
-//   WALL SOLID (interior wall body, pure black):
-//   idx=20  (r1,c1): RGB=(13,7,17) — near-black, uniform
-//
-//   PROPS:
-//   idx=142 (r7,c9): neon green casino table
-//   idx=73  (r3,c16): teal stairs (locked)
-//   idx=92  (r4,c16): teal stairs (open)
-
+// Prop tile indices into dungeon_tileset.png. Floor + walls render as procedural
+// stone sprites (see BootScene); only the table + stairs still come from the tileset.
 const TILE_VOID         = -1;
+const TILE_TABLE        = 142;
+const TILE_STAIRS_L     = 73;
+const TILE_STAIRS_O     = 92;
 
-// Floor — neutral stone tiles (no blue bias)
-const TILE_FLOOR_A      = 154;  // r8,c2 — textured gray stone (primary)
-const TILE_FLOOR_B      = 211;  // r11,c2 — warm-neutral stone (accent)
-
-// Wall top cap: bright neon-green edge visible from above (3/4 perspective top row)
-const TILE_WALL_TOP_L   = 57;   // r3,c0
-const TILE_WALL_TOP_M   = 58;   // r3,c1
-const TILE_WALL_TOP_R   = 59;   // r3,c2
-
-// Wall face: dark body with neon glow at bottom (drawn on the floor row below wall-top)
-const TILE_WALL_FACE_L  = 133;  // r7,c0
-const TILE_WALL_FACE_M  = 134;  // r7,c1
-const TILE_WALL_FACE_R  = 134;  // r7,c1 (no distinct right variant, reuse mid)
-
-// Wall solid (interior wall body)
-const TILE_WALL_SOLID   = 20;   // r1,c1 — near-black
-
-// Props
-const TILE_TABLE        = 142;  // r7,c9 — neon green casino table
-const TILE_STAIRS_L     = 73;   // r3,c16 — teal, locked stairs
-const TILE_STAIRS_O     = 92;   // r4,c16 — teal open stairs
-
-// ── Map dimensions: 24×18 — snug dungeon room, camera zoom 4× makes it feel right
-const COLS = 24;
-const ROWS = 18;
+// ── Map dimensions: 14×11 — snug dungeon room, camera zoom 5× makes it feel right
+const COLS = 14;
+const ROWS = 11;
 const TILE_SIZE = 16;
 
 // ── Seeded PRNG for consistent floor tile variation
@@ -63,9 +22,9 @@ function pseudoRandom(x: number, y: number): number {
   return h - Math.floor(h);
 }
 
-// ── Build logical map (2-cell thick perimeter walls, open interior)
+// ── Build logical map given table and stairs positions
 // 0 = floor, 1 = wall, 2 = casino table, 3 = stairs
-function buildMapLogic(): number[][] {
+function buildMapLogic(tablePos: { col: number; row: number }, stairsPos: { col: number; row: number }): number[][] {
   const map: number[][] = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 
   // 2-cell thick perimeter walls
@@ -77,119 +36,22 @@ function buildMapLogic(): number[][] {
     }
   }
 
-  // Casino table at col 12, row 9
-  map[9][12] = 2;
-
-  // Stairs at col 21, row 2
-  map[2][21] = 3;
+  map[tablePos.row][tablePos.col] = 2;
+  map[stairsPos.row][stairsPos.col] = 3;
 
   return map;
 }
 
-const MAP_LOGIC = buildMapLogic();
-
-// Player starts at col 3, row 15 (bottom-left interior)
-const PLAYER_START_X = 3 * TILE_SIZE + 8;
-const PLAYER_START_Y = 15 * TILE_SIZE + 8;
-
-const DOOR_COL = 12;
-const DOOR_ROW = 9;
-
-const STAIRS_COL = 21;
-const STAIRS_ROW = 2;
-
-// ── Layer builders ────────────────────────────────────────────────────────────
-
-/** Floor layer: every cell gets a stone tile, varied by seeded PRNG. NO TINT. */
-function buildFloorData(): number[][] {
-  return MAP_LOGIC.map((row, r) =>
-    row.map((_v, c) => {
-      const rnd = pseudoRandom(c, r);
-      return rnd < 0.85 ? TILE_FLOOR_A : TILE_FLOOR_B;  // 85% primary, 15% accent
-    })
-  );
-}
-
-/**
- * Wall layer — 3/4 perspective:
- *
- * For each wall cell:
- *   - If the cell ABOVE it is NOT a wall (exposed top): draw wall-top tile (the bright
- *     neon-green cap you see from above).
- *   - If the cell above IS a wall (interior body): draw wall-solid (near-black fill).
- *
- * Left/mid/right variants follow the horizontal neighbor pattern.
- */
-function buildWallData(): number[][] {
-  const data: number[][] = Array.from({ length: ROWS }, () =>
-    new Array(COLS).fill(TILE_VOID)
-  );
-
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      if (MAP_LOGIC[r][c] !== 1) continue;
-
-      const aboveIsWall = r > 0 && MAP_LOGIC[r - 1][c] === 1;
-      if (!aboveIsWall) {
-        // Exposed wall top — use neon-cap tile
-        const leftIsWall  = c > 0 && MAP_LOGIC[r][c - 1] === 1;
-        const rightIsWall = c < COLS - 1 && MAP_LOGIC[r][c + 1] === 1;
-        if      (!leftIsWall && rightIsWall)  data[r][c] = TILE_WALL_TOP_L;
-        else if (leftIsWall && !rightIsWall)  data[r][c] = TILE_WALL_TOP_R;
-        else                                  data[r][c] = TILE_WALL_TOP_M;
-      } else {
-        data[r][c] = TILE_WALL_SOLID;
-      }
-    }
-  }
-
-  return data;
-}
-
-/**
- * Wall-face layer — 3/4 perspective depth:
- *
- * For each floor cell that has a wall cell directly ABOVE it, draw a wall-face tile.
- * This is the vertical "front" of the wall block as seen from the player's eye level.
- * The neon-green glow at the bottom of the face tile makes it read as lit from the floor,
- * creating the illusion of a 3D block.
- *
- * Wall faces are placed at depth 2 (above floor, below player).
- */
-function buildWallFaceData(): number[][] {
-  const data: number[][] = Array.from({ length: ROWS }, () =>
-    new Array(COLS).fill(TILE_VOID)
-  );
-
-  for (let r = 1; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      // Only place face on open cells (floor, table, or stairs)
-      if (MAP_LOGIC[r][c] === 1) continue;
-      // The cell above must be a wall
-      if (MAP_LOGIC[r - 1][c] !== 1) continue;
-
-      const leftAbove  = c > 0 && MAP_LOGIC[r - 1][c - 1] === 1;
-      const rightAbove = c < COLS - 1 && MAP_LOGIC[r - 1][c + 1] === 1;
-
-      if      (!leftAbove && rightAbove)  data[r][c] = TILE_WALL_FACE_L;
-      else if (leftAbove && !rightAbove)  data[r][c] = TILE_WALL_FACE_R;
-      else                                data[r][c] = TILE_WALL_FACE_M;
-    }
-  }
-
-  return data;
-}
-
 /** Prop layer: table and stairs */
-function buildPropData(stairsOpen = false): number[][] {
+function buildPropData(mapLogic: number[][], stairsOpen = false): number[][] {
   const data: number[][] = Array.from({ length: ROWS }, () =>
     new Array(COLS).fill(TILE_VOID)
   );
 
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      if (MAP_LOGIC[r][c] === 2) data[r][c] = TILE_TABLE;
-      if (MAP_LOGIC[r][c] === 3) data[r][c] = stairsOpen ? TILE_STAIRS_O : TILE_STAIRS_L;
+      if (mapLogic[r][c] === 2) data[r][c] = TILE_TABLE;
+      if (mapLogic[r][c] === 3) data[r][c] = stairsOpen ? TILE_STAIRS_O : TILE_STAIRS_L;
     }
   }
 
@@ -204,9 +66,13 @@ export class DungeonScene extends Scene {
 
   private stairsUnlocked = false;
   private doorTriggered = false;
+  private justExitedTable = false;
 
-  private coinText!: GameObjects.Text;
-  private floorText!: GameObjects.Text;
+  private stairsSprite!: Phaser.GameObjects.Image;
+  private uiCam!: Phaser.Cameras.Scene2D.Camera;
+
+  private hud!: HUD;
+  private _lastHudCoins = -1;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: {
@@ -216,44 +82,89 @@ export class DungeonScene extends Scene {
     right: Phaser.Input.Keyboard.Key;
   };
 
+  private config!: FloorConfig;
+  private currentFloor!: number;
+  private mapLogic!: number[][];
+
   constructor() {
     super({ key: 'DungeonScene' });
   }
 
-  create(_data?: { floor?: number }): void {
+  init(data?: { floor?: number }): void {
+    this.currentFloor = data?.floor ?? getFloor() ?? 1;
+    this.config = FLOOR_CONFIG[this.currentFloor] ?? FLOOR_CONFIG[1];
+    this.mapLogic = buildMapLogic(this.config.tablePos, this.config.stairsPos);
+  }
+
+  create(): void {
     this.stairsUnlocked = false;
     this.doorTriggered = false;
+    this.justExitedTable = false;
+
+    const cfg = this.config;
+    const { tablePos, stairsPos, playerStart } = cfg;
 
     const mapW = COLS * TILE_SIZE;
     const mapH = ROWS * TILE_SIZE;
 
-    // ── Layer 0: Floor (depth 0) — stone tiles, NO tint ──────────────────
-    const floorMap = this.make.tilemap({ data: buildFloorData(), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
-    const floorTs = floorMap.addTilesetImage('dungeon-tiles', 'dungeon-tiles', TILE_SIZE, TILE_SIZE, 0, 0)!;
-    const floorLayer = floorMap.createLayer(0, floorTs, 0, 0)!;
-    floorLayer.setDepth(0);
-    // No tint — stone tiles look correct as-is
+    // ── Layers 0-2: Floor + Wall + Wall-face — programmatic gray stone sprites ──
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const cell = this.mapLogic[r][c];
+        const px = c * TILE_SIZE;
+        const py = r * TILE_SIZE;
 
-    // ── Layer 1: Wall solid (depth 1) ─────────────────────────────────────
-    const wallMap = this.make.tilemap({ data: buildWallData(), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
-    const wallTs = wallMap.addTilesetImage('dungeon-tiles', 'dungeon-tiles', TILE_SIZE, TILE_SIZE, 0, 0)!;
-    const wallLayer = wallMap.createLayer(0, wallTs, 0, 0)!;
-    wallLayer.setDepth(1);
+        if (cell !== 1) {
+          // Floor tile (0 = open, 2 = table, 3 = stairs)
+          const variant = pseudoRandom(c, r) < 0.85
+            ? cfg.floorTextures.primary
+            : cfg.floorTextures.accent;
+          this.add.image(px, py, variant).setOrigin(0).setDepth(0);
+        } else {
+          // Wall top cap
+          this.add.image(px, py, 'stone-wall-top').setOrigin(0).setDepth(1);
+        }
 
-    // ── Layer 2: Wall face — 3/4 depth effect (depth 2) ──────────────────
-    const wallFaceMap = this.make.tilemap({ data: buildWallFaceData(), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
-    const wallFaceTs = wallFaceMap.addTilesetImage('dungeon-tiles', 'dungeon-tiles', TILE_SIZE, TILE_SIZE, 0, 0)!;
-    const wallFaceLayer = wallFaceMap.createLayer(0, wallFaceTs, 0, 0)!;
-    wallFaceLayer.setDepth(2);
+        // Wall face on any floor cell that has a wall directly above it
+        if (r > 0 && cell !== 1 && this.mapLogic[r - 1][c] === 1) {
+          this.add.image(px, py, 'stone-wall-face').setOrigin(0).setDepth(2);
+        }
+      }
+    }
 
     // ── Layer 3: Props (depth 3) ──────────────────────────────────────────
-    this.propMap = this.make.tilemap({ data: buildPropData(false), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
+    this.propMap = this.make.tilemap({ data: buildPropData(this.mapLogic, false), tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
     const propTs = this.propMap.addTilesetImage('dungeon-tiles', 'dungeon-tiles', TILE_SIZE, TILE_SIZE, 0, 0)!;
     this.propLayer = this.propMap.createLayer(0, propTs, 0, 0)!;
     this.propLayer.setDepth(3);
 
+    // Retint tileset props
+    if (cfg.useCompositeTable) {
+      // Hide the tileset table tile; composite sprite is placed below
+      this.propLayer.removeTileAt(tablePos.col, tablePos.row);
+      // Composite 48×32 casino blackjack table sprite
+      this.add
+        .image(
+          tablePos.col * TILE_SIZE + TILE_SIZE / 2,
+          tablePos.row * TILE_SIZE + TILE_SIZE / 2,
+          'casino-table'
+        )
+        .setOrigin(0.5, 0.5)
+        .setDepth(3);
+    } else {
+      const tableTile = this.propLayer.getTileAt(tablePos.col, tablePos.row);
+      if (tableTile) tableTile.tint = cfg.propTint.table;
+    }
+    // Remove tileset stairs tile; composite sprite replaces it
+    this.propLayer.removeTileAt(stairsPos.col, stairsPos.row);
+    const stairsX = stairsPos.col * TILE_SIZE + TILE_SIZE / 2;
+    const stairsY = stairsPos.row * TILE_SIZE + TILE_SIZE;
+    this.stairsSprite = this.add.image(stairsX, stairsY, 'stairs-sprite-locked')
+      .setOrigin(0.5, 1)
+      .setDepth(3);
+
     // ── Collision layer (invisible, logical map) ──────────────────────────
-    const collisionData = MAP_LOGIC.map(row =>
+    const collisionData = this.mapLogic.map(row =>
       row.map(v => (v === 1 ? 1 : v === 2 ? 2 : v === 3 ? 3 : 0))
     );
     const collMap = this.make.tilemap({ data: collisionData, tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
@@ -266,7 +177,9 @@ export class DungeonScene extends Scene {
     // ── Physics world ─────────────────────────────────────────────────────
     this.physics.world.setBounds(0, 0, mapW, mapH);
 
-    this.player = this.physics.add.sprite(PLAYER_START_X, PLAYER_START_Y, 'player');
+    const startX = playerStart.col * TILE_SIZE + 8;
+    const startY = playerStart.row * TILE_SIZE + 8;
+    this.player = this.physics.add.sprite(startX, startY, 'player');
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(5);
     this.player.body!.setSize(14, 16);
@@ -275,6 +188,16 @@ export class DungeonScene extends Scene {
     this.player.play('player-idle');
 
     this.physics.add.collider(this.player, this.wallCollisionLayer);
+
+    // Slot machines (decorative, with physics colliders)
+    for (const s of cfg.slotMachines) {
+      const sx = s.col * TILE_SIZE + TILE_SIZE / 2;
+      const sy = s.row * TILE_SIZE;
+      this.add.image(sx, sy, 'slot-machine').setOrigin(0.5, 0).setDepth(3);
+      const zone = this.add.zone(sx, sy + TILE_SIZE, TILE_SIZE - 2, TILE_SIZE * 2 - 2);
+      this.physics.add.existing(zone, true);
+      this.physics.add.collider(this.player, zone);
+    }
 
     // ── Input ─────────────────────────────────────────────────────────────
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -288,9 +211,9 @@ export class DungeonScene extends Scene {
     // ── Camera ────────────────────────────────────────────────────────────
     this.cameras.main.setBounds(0, 0, mapW, mapH);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.cameras.main.setZoom(4);
+    this.cameras.main.setZoom(5);
 
-    // ── Atmosphere: vignette (softer — max alpha 0.3, clear center 0.65) ─
+    // ── Atmosphere: vignette ───────────────────────────────────────────────
     const { width: sw, height: sh } = this.scale;
     const vignette = this.add.graphics();
     vignette.setScrollFactor(0);
@@ -298,9 +221,9 @@ export class DungeonScene extends Scene {
     this._drawVignette(vignette, sw, sh);
 
     // ── Atmosphere: torchlight at casino table ────────────────────────────
-    const torchX = DOOR_COL * TILE_SIZE + 8;
-    const torchY = DOOR_ROW * TILE_SIZE + 8;
-    const torchLight = this.add.pointlight(torchX, torchY, 0xffaa33, 60, 0.08, 0.05);
+    const torchX = tablePos.col * TILE_SIZE + 8;
+    const torchY = tablePos.row * TILE_SIZE + 8;
+    const torchLight = this.add.pointlight(torchX, torchY, cfg.torchColor, 60, 0.08, 0.05);
     torchLight.setDepth(4);
     this.tweens.add({
       targets: torchLight,
@@ -312,76 +235,64 @@ export class DungeonScene extends Scene {
       ease: 'Sine.easeInOut',
     });
 
-    // ── Perimeter torches: 6 total for the smaller room ───────────────────
-    // 2 on north wall interior face (row 2)
-    this._addTorch(7 * TILE_SIZE + 8,  2 * TILE_SIZE + 14);
-    this._addTorch(17 * TILE_SIZE + 8, 2 * TILE_SIZE + 14);
-    // 2 on south wall interior face (row 15)
-    this._addTorch(7 * TILE_SIZE + 8,  15 * TILE_SIZE + 4);
-    this._addTorch(17 * TILE_SIZE + 8, 15 * TILE_SIZE + 4);
-    // 1 on each side wall
-    this._addTorch(2 * TILE_SIZE + 14, 9 * TILE_SIZE + 8);   // west wall
-    this._addTorch(21 * TILE_SIZE + 2, 9 * TILE_SIZE + 8);   // east wall
+    // ── Perimeter torches — 4 torches at interior corners (rows 2/8, cols 2/11) ──
+    this._addTorch(2  * TILE_SIZE + 8, 2 * TILE_SIZE + 14, cfg.torchColor, cfg.torchGlow);
+    this._addTorch(11 * TILE_SIZE + 8, 2 * TILE_SIZE + 14, cfg.torchColor, cfg.torchGlow);
+    this._addTorch(2  * TILE_SIZE + 8, 8 * TILE_SIZE + 4,  cfg.torchColor, cfg.torchGlow);
+    this._addTorch(11 * TILE_SIZE + 8, 8 * TILE_SIZE + 4,  cfg.torchColor, cfg.torchGlow);
 
-    // ── HUD ───────────────────────────────────────────────────────────────
-    this.coinText = this.add
-      .text(8, 8, `Coins: ${getCoins()}`, {
-        fontSize: '12px',
-        color: '#ffffff',
-        fontFamily: 'monospace',
-        shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 0, fill: true },
-      })
-      .setScrollFactor(0)
-      .setDepth(100);
-
-    this.floorText = this.add
-      .text(sw - 8, 8, `Floor ${getFloor()} — The Lobby`, {
-        fontSize: '12px',
-        color: '#ffffff',
-        fontFamily: 'monospace',
-        shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 0, fill: true },
-      })
-      .setOrigin(1, 0)
-      .setScrollFactor(0)
-      .setDepth(100);
-
-    // ── TABLE label ───────────────────────────────────────────────────────
+    // ── Table label ───────────────────────────────────────────────────────
+    const tableLabelY = tablePos.row * TILE_SIZE - (cfg.useCompositeTable ? 20 : 4);
     this.add
-      .text(DOOR_COL * TILE_SIZE + 8, DOOR_ROW * TILE_SIZE - 6, 'TABLE', {
-        fontSize: '6px',
-        color: '#00ff88',
+      .text(tablePos.col * TILE_SIZE + 8, tableLabelY, cfg.tableLabel, {
+        fontSize: '5px',
+        color: '#c9a66b',
         fontFamily: 'monospace',
+        shadow: { offsetX: 0, offsetY: 1, color: '#000000', blur: 0, fill: true },
       })
       .setOrigin(0.5, 1)
       .setDepth(6);
 
-    // ── Door overlap zone ─────────────────────────────────────────────────
+    // ── Door overlap zone ──────────────────────────────────────────────────
     const doorZone = this.add
-      .zone(DOOR_COL * TILE_SIZE + 8, DOOR_ROW * TILE_SIZE + 8, TILE_SIZE, TILE_SIZE)
+      .zone(tablePos.col * TILE_SIZE + 8, tablePos.row * TILE_SIZE + 8, 3 * TILE_SIZE, 3 * TILE_SIZE)
       .setDepth(1);
     this.physics.add.existing(doorZone, true);
     this.physics.add.overlap(this.player, doorZone, this._onDoorOverlap, undefined, this);
 
     // ── Stairs overlap zone ───────────────────────────────────────────────
     const stairsZone = this.add
-      .zone(STAIRS_COL * TILE_SIZE + 8, STAIRS_ROW * TILE_SIZE + 8, TILE_SIZE, TILE_SIZE)
+      .zone(stairsPos.col * TILE_SIZE + 8, stairsPos.row * TILE_SIZE + 8, TILE_SIZE, TILE_SIZE)
       .setDepth(1);
     this.physics.add.existing(stairsZone, true);
     this.physics.add.overlap(this.player, stairsZone, this._onStairsOverlap, undefined, this);
+
+    // ── UI camera + HUD ───────────────────────────────────────────────────
+    this.uiCam = this.cameras.add(0, 0, sw, sh);
+    this.uiCam.setScroll(0, 0);
+    this.uiCam.ignore(this.children.list);
+
+    this.hud = new HUD(this, { target: cfg.target });
+    this.hud.setCoins(getCoins());
+    this.hud.setFloor(this.currentFloor, cfg.name);
+    this.hud.setProgress(getCoins(), cfg.target);
+    this._lastHudCoins = getCoins();
+    this.cameras.main.ignore(this.hud.getObjects());
 
     // ── game-complete listener ─────────────────────────────────────────────
     this.events.on('game-complete', this._onGameComplete, this);
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
+    this.uiCam.fadeIn(300, 0, 0, 0);
   }
 
   /** Add a torch flame sprite + flickering pointlight at world position (x, y) */
-  private _addTorch(x: number, y: number): void {
+  private _addTorch(x: number, y: number, torchColor: number, glowColor: number): void {
     const flame = this.add.graphics();
     flame.setDepth(4);
-    flame.fillStyle(0xff6600, 0.9);
+    flame.fillStyle(torchColor, 0.9);
     flame.fillEllipse(0, 0, 6, 8);
-    flame.fillStyle(0xffee00, 0.8);
+    flame.fillStyle(glowColor, 0.8);
     flame.fillEllipse(0, 1, 3, 5);
     flame.setPosition(x, y);
 
@@ -395,7 +306,7 @@ export class DungeonScene extends Scene {
       ease: 'Sine.easeInOut',
     });
 
-    const light = this.add.pointlight(x, y, 0xff8833, 25, 0.09, 0.05);
+    const light = this.add.pointlight(x, y, torchColor, 25, 0.09, 0.05);
     light.setDepth(4);
 
     const lightDuration = 160 + Math.random() * 80;
@@ -414,13 +325,12 @@ export class DungeonScene extends Scene {
     const steps = 12;
     const cx = w / 2;
     const cy = h / 2;
-    // Larger clear center (0.65) and softer max alpha (0.3)
     const rx = w * 0.65;
     const ry = h * 0.65;
 
     for (let i = 0; i < steps; i++) {
       const t = i / steps;
-      const alpha = t * t * 0.3;  // max alpha 0.3
+      const alpha = t * t * 0.3;
       g.fillStyle(0x000000, alpha);
       const innerRx = rx * (1 - t);
       const innerRy = ry * (1 - t);
@@ -461,48 +371,97 @@ export class DungeonScene extends Scene {
       this.player.play('player-idle', true);
     }
 
-    this.coinText.setText(`Coins: ${getCoins()}`);
+    const coins = getCoins();
+    if (coins !== this._lastHudCoins) {
+      this._lastHudCoins = coins;
+      this.hud.setCoins(coins);
+      this.hud.setProgress(coins, this.config.target);
+    }
+
+    // Clear exit cooldown once player is far enough from the table
+    if (this.justExitedTable) {
+      const tableX = this.config.tablePos.col * TILE_SIZE + 8;
+      const tableY = this.config.tablePos.row * TILE_SIZE + 8;
+      const dx = this.player.x - tableX;
+      const dy = this.player.y - tableY;
+      if (Math.sqrt(dx * dx + dy * dy) > 32) {
+        this.justExitedTable = false;
+      }
+    }
   }
 
   private _onDoorOverlap(): void {
-    if (this.doorTriggered) return;
+    if (this.doorTriggered || this.justExitedTable) return;
     this.doorTriggered = true;
 
-    this.scene.launch('CoinFlipScene', { coins: getCoins(), floor: getFloor() });
-    this.scene.pause('DungeonScene');
+    this.player.setVelocity(0, 0);
+    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.launch(this.config.gameSceneKey, { coins: getCoins(), floor: this.currentFloor });
+      this.scene.pause('DungeonScene');
+    });
   }
 
   private _onStairsOverlap(): void {
     if (!this.stairsUnlocked) return;
 
-    setFloor(getFloor() + 1);
-    const { width, height } = this.scale;
-    this.add
-      .text(width / 2, height / 2, 'Floor 2 — Coming Soon', {
-        fontSize: '16px',
-        color: '#ffcc00',
-        fontFamily: 'monospace',
-        backgroundColor: '#000000',
-        padding: { x: 8, y: 4 },
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(200);
+    // Prevent re-entry
+    this.stairsUnlocked = false;
 
-    this.time.delayedCall(2000, () => {
-      setFloor(1);
-      this.scene.restart({ floor: 1 });
+    const nextFloor = this.currentFloor + 1;
+    setFloor(nextFloor);
+
+    const nextConfig = FLOOR_CONFIG[nextFloor];
+
+    if (nextConfig) {
+      // Transition to the next floor
+      this.cameras.main.fadeOut(300, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('TransitionScene', { nextFloor, name: nextConfig.name });
+      });
+    } else {
+      // End of demo — show styled panel then reset
+      this._showEndOfDemo();
+    }
+  }
+
+  private _showEndOfDemo(): void {
+    const { width, height } = this.scale;
+
+    const panelW = 400;
+    const panelH = 140;
+    const px = (width - panelW) / 2;
+    const py = (height - panelH) / 2;
+
+    const panel = this.add.graphics().setScrollFactor(0).setDepth(200);
+    drawFramedPanel(panel, px, py, panelW, panelH, { borderWidth: 3, alpha: 0.95 });
+
+    const title = this.add.text(width / 2, py + 44, 'END OF DEMO',
+      neonTitleStyle(28)
+    ).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    const subtitle = this.add.text(width / 2, py + 96, 'Thanks for playing.',
+      bodyTextStyle(16)
+    ).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    this.cameras.main.ignore([panel, title, subtitle]);
+
+    this.time.delayedCall(3000, () => {
+      resetRun();
+      this.scene.start('DungeonScene', { floor: 1 });
     });
   }
 
   private _onGameComplete({ coins, won }: { coins: number; won: boolean }): void {
     setCoins(coins);
-    this.coinText.setText(`Coins: ${getCoins()}`);
 
     if (won) {
+      this.hud.showSpeech('The stairs unlock. Take them.');
       this._unlockStairs();
     } else if (coins <= 0) {
+      this.hud.showSpeech('The house always wins.');
       resetRun();
+      this.scene.resume('DungeonScene');
       this.cameras.main.fadeOut(500, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
         this.scene.restart({ floor: 1 });
@@ -510,32 +469,81 @@ export class DungeonScene extends Scene {
       return;
     }
 
-    this.doorTriggered = false;
+    // Nudge player 2 tiles south so they exit the trigger zone immediately
+    const { tablePos } = this.config;
+    this.player.setPosition(tablePos.col * TILE_SIZE + 8, (tablePos.row + 2) * TILE_SIZE + 8);
+    this.justExitedTable = true;
+
     this.scene.resume('DungeonScene');
+    this.cameras.main.fadeIn(300, 0, 0, 0);
+    this.doorTriggered = false;
   }
 
   private _unlockStairs(): void {
     if (this.stairsUnlocked) return;
     this.stairsUnlocked = true;
 
+    // Allow walking onto the stairs tile
     this.wallCollisionLayer.setCollision([1, 2]);
 
-    const stairsTile = this.propLayer.getTileAt(STAIRS_COL, STAIRS_ROW);
-    if (stairsTile) {
-      stairsTile.index = TILE_STAIRS_O;
-    }
+    // Swap the composite sprite to the open variant
+    this.stairsSprite.setTexture('stairs-sprite-open');
 
-    const sx = STAIRS_COL * TILE_SIZE + 8;
-    const sy = STAIRS_ROW * TILE_SIZE + 8;
-    const glowLight = this.add.pointlight(sx, sy, 0xffdd00, 50, 0.15, 0.04);
-    glowLight.setDepth(4);
+    // Dramatic unlock flash: quick full-sprite scale pulse + alpha flash
     this.tweens.add({
-      targets: glowLight,
-      intensity: { from: 0.10, to: 0.22 },
-      duration: 600,
+      targets: this.stairsSprite,
+      scaleX: { from: 1.0, to: 1.15 },
+      scaleY: { from: 1.0, to: 1.15 },
+      yoyo: true,
+      duration: 200,
+      ease: 'Quad.easeOut',
+    });
+    const flash = this.add.image(this.stairsSprite.x, this.stairsSprite.y, 'stairs-sprite-open')
+      .setOrigin(0.5, 1)
+      .setDepth(4)
+      .setTint(0xffffff)
+      .setAlpha(0.9);
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 500,
+      onComplete: () => flash.destroy(),
+    });
+
+    // Strong pulsing gold pointlight above the stairs (sits on top of the archway)
+    const sx = this.stairsSprite.x;
+    const sy = this.stairsSprite.y - 24;
+    const glow = this.add.pointlight(sx, sy, 0xffdd88, 80, 0.28, 0.05);
+    glow.setDepth(4);
+    this.tweens.add({
+      targets: glow,
+      intensity: { from: 0.18, to: 0.38 },
+      duration: 700,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
+
+    // Small orbiting sparkle dots (3 tiny ivory rects) for extra wow
+    const sparks: Phaser.GameObjects.Rectangle[] = [];
+    for (let i = 0; i < 3; i++) {
+      const angle0 = (i / 3) * Math.PI * 2;
+      const spark = this.add.rectangle(sx, sy, 2, 2, 0xfff4d1);
+      spark.setDepth(5);
+      sparks.push(spark);
+      this.tweens.add({
+        targets: spark,
+        angle: 360,
+        duration: 2000,
+        repeat: -1,
+        onUpdate: () => {
+          const t = this.time.now / 400 + angle0;
+          spark.setPosition(sx + Math.cos(t) * 16, sy + Math.sin(t) * 10);
+        },
+      });
+    }
+
+    // Keep glow objects off the UI camera
+    this.uiCam.ignore([glow, flash, ...sparks]);
   }
 }
