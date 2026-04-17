@@ -71,7 +71,11 @@ He does not remember the recruiter, the deal, or why he came. All he knows: this
 4. 3 floors minimum: Early (hope), Mid (doubt), Late/Boss (desperation + reveal).
 5. Free pixel art packs from itch.io cover dungeon visuals. No custom art for environment.
 6. Starting from scratch. No existing codebase.
-7. **Chip economy (decided):** Each floor resets to 100 chips. Minimum bet: 5. Maximum bet: 50. At 0 chips: floor resets, run counter increments, The House taunts, memory fragments advance.
+7. **Currency system (one currency — coins):**
+   - Player starts with 200 coins. Carries them across all floors — no per-floor reset.
+   - Min bet: 5. Max bet: 50.
+   - Bonus coin drops between floors (50–100 coins) — floor completion reward, keeps runs alive after a bad game.
+   - At 0 coins: floor resets, The House comments. One bad game doesn't end the run as long as starting stack was healthy.
 8. **Floor layout:** Each floor is a linear corridor — Entrance → one Game Room (doorway triggers game) → Exit stairs (locked until game won). No branching. No multiple rooms per floor.
 
 ---
