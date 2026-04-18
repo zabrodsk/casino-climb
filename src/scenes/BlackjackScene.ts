@@ -17,7 +17,7 @@ import { DialogueBus } from '../ui/DialogueBus';
 import { getDiscountedBetAmount, hasDiscountForFloor } from '../state/coinState';
 import { HouseController } from '../ui/HouseController';
 
-const WIN_TARGET = 400;
+const WIN_TARGET = 500;
 const HANDS_TO_WIN = 3;
 const BET_OPTIONS = [10, 25, 50];
 
@@ -145,7 +145,7 @@ export class BlackjackScene extends Scene {
       fontFamily: FONT.mono,
     }).setOrigin(0, 0.5);
 
-    this.add.text(40, 78, 'Reach 400 coins or win 3 hands.', {
+    this.add.text(40, 78, 'Reach 500 coins or win 3 hands.', {
       fontSize: '16px',
       color: COLOR.goldText,
       fontFamily: FONT.mono,

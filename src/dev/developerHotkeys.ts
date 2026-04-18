@@ -77,7 +77,7 @@ export function registerDeveloperUnlockHotkey(
       onEnable?.();
       return;
     }
-    AudioManager.playSfx(scene, 'dev-mode-off', { volume: 0.95, cooldownMs: 120, allowOverlap: false });
+    AudioManager.playSfx(scene, 'dev-mode-off', { volume: 1.4, cooldownMs: 120, allowOverlap: false });
     onDisable?.();
   };
   key.on('down', handler);

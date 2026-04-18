@@ -92,7 +92,7 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
   },
   3: {
     name: 'THE BLACKJACK PARLOR',
-    target: 400,
+    target: 500,
     mode: 'table',
     gameSceneKey: 'BlackjackScene',
     propTint: { table: 0x1d6b47, stairsLocked: 0x5a4630, stairsOpen: 0xf5cf7f },
@@ -114,7 +114,7 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
   },
   4: {
     name: 'THE FATE CHAMBER',
-    target: 450,
+    target: 0,
     mode: 'table',
     gameSceneKey: 'WheelScene',
     propTint: { table: 0xd7b56a, stairsLocked: 0x4b1b20, stairsOpen: 0xffe29a },
@@ -136,7 +136,7 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
   },
   5: {
     name: 'THE CHIP CROSS',
-    target: 500,
+    target: 600,
     mode: 'crossing',
     gameSceneKey: '',
     propTint: { table: 0xb03a5b, stairsLocked: 0x4e1830, stairsOpen: 0xf6cf79 },
@@ -172,7 +172,7 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
   },
   6: {
     name: 'THE VAULT',
-    target: 650,
+    target: 0,
     mode: 'table',
     gameSceneKey: 'VaultScene',
     propTint: { table: 0xb7c7d8, stairsLocked: 0x394552, stairsOpen: 0xe6f0f8 },

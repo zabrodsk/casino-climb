@@ -80,6 +80,18 @@ export class HUD {
   }
 
   setProgress(current: number, target: number): void {
+    if (target <= 0) {
+      this.progressLabel.setVisible(false);
+      this.progressBg.setVisible(false);
+      this.progressFill.setVisible(false);
+      this._hideMarqueDots();
+      return;
+    }
+
+    this.progressLabel.setVisible(true);
+    this.progressBg.setVisible(true);
+    this.progressFill.setVisible(true);
+
     const ratio = Math.min(current / target, 1);
     this._drawProgressFill(ratio);
 
