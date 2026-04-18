@@ -675,6 +675,9 @@ export class MenuScene extends Scene {
     this.introContinueReady = false;
     this.draggingSlider = undefined;
 
+    // Swap from lobby music to dark ambient as the memory scene fades in
+    AudioManager.playMusic(this, 'casino-music', { loop: true, restart: false });
+
     if (this.settingsVisible) {
       this.toggleSettings(false);
     }
@@ -749,7 +752,6 @@ export class MenuScene extends Scene {
     this.introBackdrop?.disableInteractive();
 
     AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 50, allowOverlap: false });
-    AudioManager.playMusic(this, 'casino-music', { loop: true, restart: true });
 
     this.cameras.main.fadeOut(250, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
