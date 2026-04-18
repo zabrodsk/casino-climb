@@ -1134,7 +1134,9 @@ export class DungeonScene extends Scene {
       if (activeMusic?.key !== 'wheel-choir' || !activeMusic.isPlaying) {
         AudioManager.playMusic(this, 'wheel-choir', { loop: true, restart: true, volume: 0.78 });
       } else {
-        activeMusic.setVolume(AudioManager.getMusicVolume(this) * 0.78);
+        (activeMusic as Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound).setVolume(
+          AudioManager.getMusicVolume(this) * 0.78,
+        );
       }
       return;
     }

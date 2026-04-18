@@ -53,6 +53,8 @@ export function applySoundLevels(scene: Phaser.Scene): void {
 
   const music = scene.game.registry.get('music') as Phaser.Sound.BaseSound | undefined;
   if (music) {
-    music.setVolume(getMusicVolume(levels));
+    (music as Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound).setVolume(
+      getMusicVolume(levels),
+    );
   }
 }

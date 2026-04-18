@@ -1,6 +1,6 @@
 import Phaser, { Scene, GameObjects } from 'phaser';
 import { AudioManager } from '../audio/AudioManager';
-import { THEME, COLOR, FONT, bodyTextStyle, buttonLabelStyle, drawFramedPanel, drawNestedButton, neonTitleStyle } from '../ui/theme';
+import { COLOR, FONT, buttonLabelStyle, drawFramedPanel, drawNestedButton, neonTitleStyle } from '../ui/theme';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 
@@ -21,7 +21,6 @@ export class VaultScene extends Scene {
   private phase: TrialPhase = 'timing';
   private resolved = false;
 
-  private titleText!: GameObjects.Text;
   private coinsText!: GameObjects.Text;
   private promptText!: GameObjects.Text;
   private flavorText!: GameObjects.Text;
@@ -65,7 +64,7 @@ export class VaultScene extends Scene {
 
     this.drawBackground(W, H);
 
-    this.titleText = this.add.text(W / 2, 58, 'FLOOR 6 — THE VAULT', neonTitleStyle(28)).setOrigin(0.5);
+    this.add.text(W / 2, 58, 'FLOOR 6 — THE VAULT', neonTitleStyle(28)).setOrigin(0.5);
     this.coinsText = this.add.text(W - 40, 52, `Coins: ${this.currentCoins}`, {
       fontSize: '22px',
       color: '#dfeaf5',
@@ -379,7 +378,7 @@ export class VaultScene extends Scene {
 
     if (this.currentCoins <= 0) {
       this.time.delayedCall(1100, () => {
-        this.events.emit('game-complete', { coins: 0, won: false });
+        this.scene.get('DungeonScene').events.emit('game-complete', { coins: 0, won: false });
         this.scene.stop('VaultScene');
       });
     }
@@ -420,7 +419,7 @@ export class VaultScene extends Scene {
 
     AudioManager.playSfx(this, 'goal-victory', { volume: 0.85, cooldownMs: 120, allowOverlap: false });
     this.time.delayedCall(1500, () => {
-      this.events.emit('game-complete', { coins: this.currentCoins, won: true });
+      this.scene.get('DungeonScene').events.emit('game-complete', { coins: this.currentCoins, won: true });
       this.scene.stop('VaultScene');
     });
   }
@@ -445,7 +444,7 @@ export class VaultScene extends Scene {
 
   private leaveVault(): void {
     this.timingTween?.stop();
-    this.events.emit('game-complete', { coins: this.currentCoins, won: false });
+    this.scene.get('DungeonScene').events.emit('game-complete', { coins: this.currentCoins, won: false });
     this.scene.stop('VaultScene');
   }
 }

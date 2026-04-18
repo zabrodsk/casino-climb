@@ -150,7 +150,7 @@ export class WheelScene extends Scene {
     jewelRing.lineStyle(2, 0x2f1309, 0.85);
     jewelRing.strokeCircle(0, 0, WHEEL_R + 2);
 
-    const bolts: GameObjects.Circle[] = [];
+    const bolts: GameObjects.Arc[] = [];
     for (let i = 0; i < 12; i += 1) {
       const a = Phaser.Math.DegToRad(i * 30 - 90);
       const x = Math.cos(a) * (WHEEL_R + 8);

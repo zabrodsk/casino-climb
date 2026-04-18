@@ -1,7 +1,5 @@
 import houseLines from '../data/houseLines.json';
 
-type HouseLinesData = typeof houseLines;
-
 let _enabled = true;
 let _winStreak = 0;
 

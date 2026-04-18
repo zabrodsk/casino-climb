@@ -8,8 +8,8 @@ export function winBurst(scene: Phaser.Scene, x: number, y: number): void {
     tint: [0xf8cf72, 0xff89bf, 0xffd98d, 0xffffff],
     quantity: 1,
     emitting: false,
-    depth: 900,
   });
+  emitter.setDepth(900);
   emitter.explode(30, x, y);
   scene.time.delayedCall(800, () => emitter.destroy());
 }

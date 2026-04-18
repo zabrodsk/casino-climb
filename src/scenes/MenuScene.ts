@@ -43,7 +43,6 @@ export class MenuScene extends Scene {
   private introTimers: Phaser.Time.TimerEvent[] = [];
   private introPlaying = false;
   private introContinueReady = false;
-  private introSeen = false;
   private transitioningToRun = false;
 
   private soundLevels: AudioLevels = {
@@ -78,7 +77,6 @@ export class MenuScene extends Scene {
     this.introTimers = [];
     this.introPlaying = false;
     this.introContinueReady = false;
-    this.introSeen = false;
     this.transitioningToRun = false;
     this.soundLevels = {
       master: levels.master,
@@ -745,7 +743,9 @@ export class MenuScene extends Scene {
     this.transitioningToRun = true;
     this.introPlaying = false;
     this.introContinueReady = false;
-    this.tweens.killTweensOf(this.introPrompt);
+    if (this.introPrompt) {
+      this.tweens.killTweensOf(this.introPrompt);
+    }
     this.introBackdrop?.disableInteractive();
 
     AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 50, allowOverlap: false });
@@ -758,7 +758,9 @@ export class MenuScene extends Scene {
   }
 
   private finalizeMenuLayout(): void {
-    this.introTargets.forEach((obj) => obj.setAlpha(1));
+    this.introTargets.forEach((obj) => {
+      (obj as GameObjects.GameObject & { setAlpha(value: number): unknown }).setAlpha(1);
+    });
   }
 
   private playUiHover(): void {
