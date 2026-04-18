@@ -101,6 +101,7 @@ const SFX_ASSETS: Record<SfxKey, string> = {
 
 class AudioManagerImpl {
   private readonly sfxCooldownByKey = new Map<SfxKey, number>();
+  private readonly musicUnlockHandlerBySound = new WeakMap<Phaser.Sound.BaseSound, () => void>();
 
   preload(scene: Phaser.Scene): void {
     Object.entries(MUSIC_ASSETS).forEach(([key, path]) => {
@@ -236,6 +237,7 @@ class AudioManagerImpl {
     }
 
     if (existing) {
+      this.detachMusicUnlockHandler(scene.sound, existing);
       existing.stop();
       existing.destroy();
     }
@@ -249,15 +251,18 @@ class AudioManagerImpl {
 
     try {
       const play = () => {
+        this.musicUnlockHandlerBySound.delete(sound);
         sound.play();
       };
       if (scene.sound.locked) {
         scene.sound.once('unlocked', play);
+        this.musicUnlockHandlerBySound.set(sound, play);
       } else {
         play();
       }
       return sound;
     } catch {
+      this.detachMusicUnlockHandler(scene.sound, sound);
       sound.destroy();
       scene.game.registry.set(REGISTRY_MUSIC_KEY, null);
       return null;
@@ -270,7 +275,9 @@ class AudioManagerImpl {
     if (!music) {
       return;
     }
+    const soundManager = sceneOrGame instanceof Phaser.Scene ? sceneOrGame.sound : game.sound;
     try {
+      this.detachMusicUnlockHandler(soundManager, music);
       music.stop();
       music.destroy();
     } catch {
@@ -320,6 +327,13 @@ class AudioManagerImpl {
       return 0;
     }
     return Math.max(0, Math.min(100, Math.round(value)));
+  }
+
+  private detachMusicUnlockHandler(soundManager: Phaser.Sound.BaseSoundManager, sound: Phaser.Sound.BaseSound): void {
+    const handler = this.musicUnlockHandlerBySound.get(sound);
+    if (!handler) return;
+    soundManager.off('unlocked', handler);
+    this.musicUnlockHandlerBySound.delete(sound);
   }
 }
 

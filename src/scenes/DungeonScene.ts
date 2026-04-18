@@ -233,6 +233,9 @@ export class DungeonScene extends Scene {
     this.stairsSprite = this.add.image(stairsX, stairsY, 'stairs-sprite-locked')
       .setOrigin(0.5, 1)
       .setDepth(3);
+    if (cfg.gameSceneKey === 'VaultScene') {
+      this.stairsSprite.setVisible(false);
+    }
 
     // ── Collision layer (invisible, logical map) ──────────────────────────
     const collisionData = this.mapLogic.map(row =>
