@@ -39,7 +39,7 @@ export class TransitionScene extends Scene {
     }).setOrigin(0.5);
 
     this._addMarqueeLights(H);
-    AudioManager.playSfx(this, 'transition-enter', { volume: 0.9, cooldownMs: 300, allowOverlap: false });
+    AudioManager.playSfx(this, 'transition-enter', { volume: 0.6, cooldownMs: 300, allowOverlap: false });
 
     this.cameras.main.fadeIn(350, 0, 0, 0);
 

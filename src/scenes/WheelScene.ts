@@ -46,6 +46,7 @@ export class WheelScene extends Scene {
   create(): void {
     HouseController.disable();
     this.events.once('shutdown', () => HouseController.enable());
+    this.cameras.main.setRoundPixels(true);
 
     const W = 1024;
     const H = 768;
@@ -84,12 +85,32 @@ export class WheelScene extends Scene {
     bg.fillStyle(0x1f0f18, 1);
     bg.fillRect(0, 210, width, 340);
 
-    bg.fillStyle(0x12080d, 1);
+    // Space-themed floor area.
+    bg.fillStyle(0x070b22, 1);
     bg.fillRect(0, 550, width, 218);
+    bg.fillStyle(0x0b1334, 0.85);
+    bg.fillRect(0, 550, width, 80);
+    bg.fillStyle(0x05091a, 0.9);
+    bg.fillRect(0, 630, width, 138);
 
-    for (let y = 568; y < height; y += 16) {
-      bg.lineStyle(1, 0x5e3d2a, 0.2);
-      bg.lineBetween(0, y, width, y);
+    // Subtle nebula haze.
+    bg.fillStyle(0x3d2d7a, 0.18);
+    bg.fillEllipse(width * 0.18, 648, 320, 120);
+    bg.fillStyle(0x1f6ca8, 0.14);
+    bg.fillEllipse(width * 0.52, 610, 420, 140);
+    bg.fillStyle(0x5a2d87, 0.13);
+    bg.fillEllipse(width * 0.82, 690, 300, 120);
+
+    // Starfield (deterministic placement).
+    for (let i = 0; i < 220; i += 1) {
+      const fx = (i * 73) % width;
+      const fy = 552 + ((i * 131) % 210);
+      const twinkle = ((i * 17) % 100) / 100;
+      const size = i % 11 === 0 ? 2 : 1;
+      const alpha = 0.32 + twinkle * 0.58;
+      const color = i % 9 === 0 ? 0xb6d3ff : (i % 7 === 0 ? 0xffe7b3 : 0xeaf2ff);
+      bg.fillStyle(color, alpha);
+      bg.fillRect(fx, fy, size, size);
     }
   }
 
@@ -98,9 +119,9 @@ export class WheelScene extends Scene {
 
     this.coinsText = this.add.text(width - 40, 48, `Coins: ${this.currentCoins}`, {
       fontSize: '22px',
-      color: COLOR.ivory,
+      color: '#ffffff',
       fontFamily: FONT.mono,
-    }).setOrigin(1, 0.5);
+    }).setOrigin(1, 0.5).setResolution(2);
 
     const effect = getActiveEffect();
     if (effect) {
@@ -108,17 +129,17 @@ export class WheelScene extends Scene {
       const effectColor = effect.type === 'buff' ? COLOR.goldText : '#ff6666';
       this.add.text(40, 48, effectLabel, {
         fontSize: '14px',
-        color: effectColor,
+        color: effectColor === COLOR.goldText ? '#ffd54a' : '#ff6b6b',
         fontFamily: FONT.mono,
-      }).setOrigin(0, 0.5);
+      }).setOrigin(0, 0.5).setResolution(2);
     }
 
     if (hasReviveToken()) {
       this.add.text(40, 72, 'REVIVE TOKEN held', {
         fontSize: '14px',
-        color: '#40e0d0',
+        color: '#6ee7ff',
         fontFamily: FONT.mono,
-      }).setOrigin(0, 0.5);
+      }).setOrigin(0, 0.5).setResolution(2);
     }
   }
 
@@ -212,14 +233,16 @@ export class WheelScene extends Scene {
       const lx = Math.cos(midRad) * labelRadius;
       const ly = Math.sin(midRad) * labelRadius;
       const label = this.add.text(lx, ly, seg.label, {
-        fontSize: '11px',
+        fontSize: '12px',
         fontFamily: FONT.mono,
         fontStyle: 'bold',
-        color: '#fff7de',
-        stroke: '#4b120e',
-        strokeThickness: 3,
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 2,
+        align: 'center',
+        wordWrap: { width: 92 },
       }).setOrigin(0.5);
-      label.setRotation(midRad + Math.PI / 2);
+      label.setResolution(2);
       labelObjects.push(label);
     }
 
@@ -261,11 +284,11 @@ export class WheelScene extends Scene {
     const W = 1024;
 
     this.phaseText = this.add.text(W / 2, 590, 'The Wheel of Fate awaits.\nSpin at your own risk.', {
-      fontSize: '18px',
+      fontSize: '20px',
       fontFamily: FONT.mono,
-      color: COLOR.ivorySoft,
+      color: '#ffffff',
       align: 'center',
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setResolution(2);
 
     const passBtn = this.add.graphics();
     const passBtnText = this.add.text(W / 2 - 140, 660, 'PASS BY', buttonLabelStyle(22)).setOrigin(0.5);
@@ -381,19 +404,23 @@ export class WheelScene extends Scene {
       fontFamily: FONT.mono,
       fontStyle: 'bold',
       color: COLOR.winGreen,
-    }).setOrigin(0.5).setVisible(false);
+    }).setOrigin(0.5).setVisible(false).setResolution(2);
 
     this.resultCoins = this.add.text(W / 2, py + 64, '', {
       fontSize: '18px',
       fontFamily: FONT.mono,
-      color: COLOR.ivory,
-    }).setOrigin(0.5).setVisible(false);
+      color: '#ffffff',
+      align: 'center',
+      wordWrap: { width: 430 },
+    }).setOrigin(0.5).setVisible(false).setResolution(2);
 
     this.resultFlavor = this.add.text(W / 2, py + 92, '', {
-      fontSize: '14px',
+      fontSize: '15px',
       fontFamily: FONT.mono,
-      color: COLOR.ivorySoft,
-    }).setOrigin(0.5).setVisible(false);
+      color: '#e5e7eb',
+      align: 'center',
+      wordWrap: { width: 430 },
+    }).setOrigin(0.5).setVisible(false).setResolution(2);
 
     const contY = py + panelH + 30;
     this.continueBtn = this.add.graphics().setVisible(false);

@@ -36,13 +36,14 @@ export function resolve(input: CrashInput): CrashResult {
 }
 
 /**
- * RNG helper: returns a crash point between 1.05 and 10.0, weighted toward lower values.
- * Distribution: x = 1 / (1 - u^0.7) where u is random [0,1), clamped to [1.05, 10].
+ * RNG helper: returns a crash point between 1.05 and 6.0, strongly weighted
+ * toward early crashes so high multipliers are uncommon.
+ * Distribution: x = 1 / (1 - u^1.35) where u is random [0,1), clamped to [1.05, 6].
  */
 export function nextCrashPoint(): number {
   const u = Math.random();
-  const raw = 1 / (1 - Math.pow(u, 0.7));
-  return Math.min(10, Math.max(1.05, raw));
+  const raw = 1 / (1 - Math.pow(u, 1.35));
+  return Math.min(6, Math.max(1.05, raw));
 }
 
 export function isValidBet(coins: number, bet: number): boolean {
