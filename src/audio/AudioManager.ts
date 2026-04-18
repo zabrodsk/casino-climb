@@ -229,7 +229,9 @@ class AudioManagerImpl {
     const existing = this.getMusic(scene);
     const restart = options?.restart ?? false;
     if (existing?.key === key && existing.isPlaying && !restart) {
-      existing.setVolume(this.getMusicVolume(scene) * (options?.volume ?? 1));
+      (existing as Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound).setVolume(
+        this.getMusicVolume(scene) * (options?.volume ?? 1),
+      );
       return existing;
     }
 
@@ -280,7 +282,9 @@ class AudioManagerImpl {
   applyMusicVolume(sceneOrGame: Phaser.Scene | Phaser.Game): void {
     const music = this.getMusic(sceneOrGame);
     if (music) {
-      music.setVolume(this.getMusicVolume(sceneOrGame));
+      (music as Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound).setVolume(
+        this.getMusicVolume(sceneOrGame),
+      );
     }
   }
 

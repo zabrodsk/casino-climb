@@ -54,7 +54,6 @@ export class TransitionScene extends Scene {
 
   private showSupportNpc(): void {
     const W = 1024;
-    const H = 768;
     const reward = this.supportReward;
     if (!reward) {
       this.continueToDungeon();
@@ -91,7 +90,7 @@ export class TransitionScene extends Scene {
     }).setOrigin(0.5).setDepth(11);
 
     const buttonBg = this.add.graphics().setDepth(11);
-    const buttonText = this.add.text(W / 2, 626, 'ACCEPT AND CONTINUE', buttonLabelStyle(18)).setOrigin(0.5).setDepth(12);
+    this.add.text(W / 2, 626, 'ACCEPT AND CONTINUE', buttonLabelStyle(18)).setOrigin(0.5).setDepth(12);
     drawNestedButton(buttonBg, W / 2, 626, 260, 50, false);
     const zone = this.add.zone(W / 2, 626, 260, 50).setDepth(13).setInteractive({ cursor: 'pointer' });
     zone.on('pointerover', () => drawNestedButton(buttonBg, W / 2, 626, 260, 50, true));
