@@ -13,6 +13,7 @@ import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 import { winBurst, betFlash } from '../ui/particles';
+import { DialogueBus } from '../ui/DialogueBus';
 import { getDiscountedBetAmount, hasDiscountForFloor } from '../state/coinState';
 import { HouseController } from '../ui/HouseController';
 
@@ -69,11 +70,6 @@ export class BlackjackScene extends Scene {
   private standZone!: GameObjects.Zone;
 
   private betButtons!: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; bet: number }>;
-
-  private speechBg!: GameObjects.Graphics;
-  private speechText!: GameObjects.Text;
-  private _speechReveal: Phaser.Time.TimerEvent | null = null;
-  private _speechDismiss: Phaser.Time.TimerEvent | null = null;
 
   constructor() {
     super('BlackjackScene');
@@ -181,7 +177,7 @@ export class BlackjackScene extends Scene {
     this.updateActionButtons();
     this.renderHands();
 
-    this._buildSpeechBubble();
+
     this.time.delayedCall(400, () => {
       this._showSpeech('Select a bet, then hit DEAL. Get closer to 21 than the dealer without going over. HIT draws a card. STAND lets the dealer play.');
     });
@@ -618,56 +614,8 @@ export class BlackjackScene extends Scene {
     return this.add.container(0, 0, objects);
   }
 
-  private _buildSpeechBubble(): void {
-    const W = 1024, H = 768;
-    const bubbleW = 700;
-    const bubbleH = 80;
-    const bx = (W - bubbleW) / 2;
-    const by = H - 24 - bubbleH;
-
-    this.speechBg = this.add.graphics();
-    drawFramedPanel(this.speechBg, bx, by, bubbleW, bubbleH, { borderWidth: 3, alpha: 0.95 });
-    this.speechBg.setVisible(false).setDepth(200);
-
-    this.speechText = this.add.text(bx + 14, by + 14, '', {
-      fontSize: '16px',
-      fontFamily: FONT.mono,
-      color: COLOR.ivorySoft,
-      wordWrap: { width: bubbleW - 28 },
-    }).setVisible(false).setDepth(201);
-  }
-
   private _showSpeech(text: string): void {
-    if (this._speechReveal) { this._speechReveal.remove(false); this._speechReveal = null; }
-    if (this._speechDismiss) { this._speechDismiss.remove(false); this._speechDismiss = null; }
-
-    this.speechBg.setVisible(true).setAlpha(1);
-    this.speechText.setVisible(true).setAlpha(1).setText('');
-
-    let i = 0;
-    this._speechReveal = this.time.addEvent({
-      delay: 28,
-      repeat: text.length - 1,
-      callback: () => {
-        i++;
-        this.speechText.setText(text.slice(0, i));
-        if (i >= text.length) {
-          this._speechReveal = null;
-          this._speechDismiss = this.time.delayedCall(3500, () => {
-            this.tweens.add({
-              targets: [this.speechBg, this.speechText],
-              alpha: 0,
-              duration: 300,
-              onComplete: () => {
-                this.speechBg.setVisible(false);
-                this.speechText.setVisible(false);
-              },
-            });
-            this._speechDismiss = null;
-          });
-        }
-      },
-    });
+    DialogueBus.say(this, text);
   }
 
   private leave(): void {

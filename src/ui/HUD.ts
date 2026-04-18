@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { THEME, COLOR, FONT, drawFramedPanel } from './theme';
+import { DialogueBus } from './DialogueBus';
 
 export class HUD {
   private scene: Phaser.Scene;
@@ -24,12 +25,6 @@ export class HUD {
   private _progressPulseTween: Phaser.Tweens.Tween | null = null;
   private _marqueDots: Phaser.GameObjects.Rectangle[] = [];
 
-  // Speech bubble
-  private speechBg!: Phaser.GameObjects.Graphics;
-  private speechText!: Phaser.GameObjects.Text;
-  private _speechReveal: Phaser.Time.TimerEvent | null = null;
-  private _speechDismiss: Phaser.Time.TimerEvent | null = null;
-
   // Run panel
   private runPanelBg!: Phaser.GameObjects.Graphics;
   private runPanelTitle!: Phaser.GameObjects.Text;
@@ -53,7 +48,6 @@ export class HUD {
     this._buildCoinPanel();
     this._buildFloorPanel();
     this._buildProgressBar();
-    this._buildSpeechBubble();
     this._buildRunPanel();
   }
 
@@ -115,49 +109,11 @@ export class HUD {
   }
 
   showSpeech(text: string): void {
-    if (this._speechReveal) {
-      this._speechReveal.remove(false);
-      this._speechReveal = null;
-    }
-    if (this._speechDismiss) {
-      this._speechDismiss.remove(false);
-      this._speechDismiss = null;
-    }
-
-    this.speechBg.setVisible(true).setAlpha(1);
-    this.speechText.setVisible(true).setAlpha(1).setText('');
-
-    let i = 0;
-    this._speechReveal = this.scene.time.addEvent({
-      delay: 30,
-      repeat: text.length - 1,
-      callback: () => {
-        i++;
-        this.speechText.setText(text.slice(0, i));
-        if (i >= text.length) {
-          this._speechReveal = null;
-          this._speechDismiss = this.scene.time.delayedCall(3000, () => {
-            this.scene.tweens.add({
-              targets: [this.speechBg, this.speechText],
-              alpha: 0,
-              duration: 250,
-              onComplete: () => {
-                this.speechBg.setVisible(false);
-                this.speechText.setVisible(false);
-              },
-            });
-            this._speechDismiss = null;
-          });
-        }
-      },
-    });
+    DialogueBus.say(this.scene, text);
   }
 
   hideSpeech(): void {
-    if (this._speechReveal) { this._speechReveal.remove(false); this._speechReveal = null; }
-    if (this._speechDismiss) { this._speechDismiss.remove(false); this._speechDismiss = null; }
-    this.speechBg.setVisible(false);
-    this.speechText.setVisible(false);
+    DialogueBus.hide();
   }
 
   getObjects(): Phaser.GameObjects.GameObject[] {
@@ -165,7 +121,6 @@ export class HUD {
       this.coinPanelBg, this.coinIcon, this.coinLabel,
       this.floorPanelBg, this.floorIcon, this.floorLabel,
       this.progressBg, this.progressFill, this.progressLabel,
-      this.speechBg, this.speechText,
       this.runPanelBg, this.runPanelTitle, ...this.runPanelLines,
       ...this._marqueDots,
     ];
@@ -194,7 +149,6 @@ export class HUD {
   }
 
   destroy(): void {
-    this.hideSpeech();
     if (this._coinTween) { this._coinTween.stop(); }
     if (this._progressPulseTween) { this._progressPulseTween.stop(); }
     this.coinPanelBg.destroy();
@@ -206,8 +160,6 @@ export class HUD {
     this.progressBg.destroy();
     this.progressFill.destroy();
     this.progressLabel.destroy();
-    this.speechBg.destroy();
-    this.speechText.destroy();
     this.runPanelBg.destroy();
     this.runPanelTitle.destroy();
     this.runPanelLines.forEach((line) => line.destroy());
@@ -389,26 +341,6 @@ export class HUD {
       dot.setVisible(false).setAlpha(0);
       dot.setData('tweening', false);
     });
-  }
-
-  private _buildSpeechBubble(): void {
-    const { width: sw, height: sh } = this.scene.scale;
-    const bubbleW = Math.max(420, Math.min(sw * 0.6, 720));
-    const bubbleH = 80;
-    const bx = (sw - bubbleW) / 2;
-    const by = sh - 24 - bubbleH;
-
-    this.speechBg = this.scene.add.graphics();
-    this.speechBg.setScrollFactor(0).setDepth(HUD.DEPTH + 2);
-    drawFramedPanel(this.speechBg, bx, by, bubbleW, bubbleH, { borderWidth: 3, alpha: 0.78 });
-    this.speechBg.setVisible(false);
-
-    this.speechText = this.scene.add.text(bx + 12, by + 12, '', {
-      fontSize: '16px',
-      fontFamily: FONT.mono,
-      color: COLOR.ivorySoft,
-      wordWrap: { width: bubbleW - 24 },
-    }).setScrollFactor(0).setDepth(HUD.DEPTH + 3).setVisible(false);
   }
 
   private _buildRunPanel(): void {
