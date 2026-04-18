@@ -1,3 +1,12 @@
+export interface FloorInteractable {
+  pos: { col: number; row: number };
+  gameSceneKey: string;
+  tableLabel: string;
+  compositeTableTexture?: string;
+  /** Render scale for the composite sprite; mirrors WheelScene default (2) for the wheel. */
+  spriteScale?: number;
+}
+
 export interface FloorConfig {
   name: string;
   target: number;
@@ -18,6 +27,8 @@ export interface FloorConfig {
   floorTextures: { primary: string; accent: string };
   useCompositeTable: boolean;
   compositeTableTexture?: string;
+  /** Optional additional interactive stations on this floor (beyond the primary tablePos). */
+  interactables?: FloorInteractable[];
   slotMachines: Array<{ col: number; row: number }>;
   crossing?: {
     laneCount: number;
@@ -92,7 +103,7 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
   },
   3: {
     name: 'THE BLACKJACK PARLOR',
-    target: 500,
+    target: 450,
     mode: 'table',
     gameSceneKey: 'BlackjackScene',
     propTint: { table: 0x1d6b47, stairsLocked: 0x5a4630, stairsOpen: 0xf5cf7f },
@@ -113,7 +124,7 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
     ],
   },
   4: {
-    name: 'THE FATE CHAMBER',
+    name: 'ROOM OF FATE',
     target: 0,
     mode: 'table',
     gameSceneKey: 'WheelScene',
@@ -122,16 +133,30 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
     torchGlow: 0xffd781,
     tablePos: { col: 8, row: 6 },
     stairsPos: { col: 14, row: 2 },
-    playerStart: { col: 4, row: 10 },
+    playerStart: { col: 8, row: 10 },
     tableLabel: 'WHEEL',
     floorTextures: { primary: 'fate-floor-a', accent: 'fate-floor-b' },
     useCompositeTable: true,
     compositeTableTexture: 'table-wheel',
+    interactables: [
+      {
+        pos: { col: 13, row: 7 },
+        gameSceneKey: 'RouletteScene',
+        tableLabel: 'ROULETTE',
+        compositeTableTexture: 'table-roulette',
+        spriteScale: 2,
+      },
+      {
+        pos: { col: 3, row: 7 },
+        gameSceneKey: 'SlotMachineScene',
+        tableLabel: 'SLOTS',
+        compositeTableTexture: 'slot-machine-big',
+        spriteScale: 1,
+      },
+    ],
     slotMachines: [
       { col: 3, row: 2 },
       { col: 13, row: 2 },
-      { col: 4, row: 9 },
-      { col: 12, row: 9 },
     ],
   },
   5: {

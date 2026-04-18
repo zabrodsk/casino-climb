@@ -341,7 +341,7 @@ export class EndScene extends Scene {
       .setStyle({ ...neonTitleStyle(28), color: GOLD_TITLE, stroke: GOLD_STROKE })
       .setAlpha(0);
 
-    this.bodyText.setText('Casino Climb\n\nYou leave the House with your memory intact.')
+    this.bodyText.setText('Casino Climb\n\nYou leave the House with your memory intact.\n\nMade by Dusan & Tomas')
       .setAlpha(0);
 
     this.tweens.add({

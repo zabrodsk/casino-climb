@@ -39,11 +39,15 @@ export function resolve(input: CrashInput): CrashResult {
  * RNG helper: returns a crash point between 1.05 and 6.0, strongly weighted
  * toward early crashes so high multipliers are uncommon.
  * Distribution: x = 1 / (1 - u^1.35) where u is random [0,1), clamped to [1.05, 6].
+ * Sub-1.2 results are rerolled ~85% of the time to keep instant-bust crashes rare.
  */
 export function nextCrashPoint(): number {
-  const u = Math.random();
-  const raw = 1 / (1 - Math.pow(u, 1.35));
-  return Math.min(6, Math.max(1.05, raw));
+  while (true) {
+    const u = Math.random();
+    const raw = 1 / (1 - Math.pow(u, 1.35));
+    const point = Math.min(6, Math.max(1.05, raw));
+    if (point >= 1.2 || Math.random() < 0.15) return point;
+  }
 }
 
 export function isValidBet(coins: number, bet: number): boolean {

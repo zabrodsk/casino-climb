@@ -121,6 +121,21 @@ export function dealerShouldHit(cards: Card[]): boolean {
   return evaluateHand(cards).total < 17;
 }
 
+function rankValue(rank: Rank): number {
+  if (rank === 'A') return 11;
+  if (rank === 'K' || rank === 'Q' || rank === 'J') return 10;
+  return Number(rank);
+}
+
+export function canSplit(cards: Card[]): boolean {
+  if (cards.length !== 2) return false;
+  return rankValue(cards[0].rank) === rankValue(cards[1].rank);
+}
+
+export function canDouble(cards: Card[]): boolean {
+  return cards.length === 2 && !evaluateHand(cards).blackjack;
+}
+
 export function settleRound(coins: number, bet: number, player: Card[], dealer: Card[]): RoundResult {
   const playerValue = evaluateHand(player);
   const dealerValue = evaluateHand(dealer);
