@@ -8,6 +8,8 @@ import { CoinFlipScene } from './scenes/CoinFlipScene';
 import { CrashScene } from './scenes/CrashScene';
 import { BlackjackScene } from './scenes/BlackjackScene';
 import { WheelScene } from './scenes/WheelScene';
+import { RouletteScene } from './scenes/RouletteScene';
+import { SlotMachineScene } from './scenes/SlotMachineScene';
 import { VaultScene } from './scenes/VaultScene';
 import { EndScene } from './scenes/EndScene';
 import { OutdoorScene } from './scenes/OutdoorScene';
@@ -52,6 +54,8 @@ const config = {
         CrashScene,
         BlackjackScene,
         WheelScene,
+        RouletteScene,
+        SlotMachineScene,
         VaultScene,
         EndScene,
         OutdoorScene,

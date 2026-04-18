@@ -941,6 +941,138 @@ export class BootScene extends Scene {
     g.fillRect(12, 7, 3, 2);
     g.generateTexture('slot-machine', 16, 32);
 
+    // Roulette table: mini wheel + felt betting layout motif
+    g.clear();
+    // Green felt base
+    g.fillStyle(0x0d5a2e);
+    g.fillRect(0, 0, 48, 32);
+    g.fillStyle(0x0a4a26);
+    g.fillRect(1, 1, 46, 30);
+    // Mahogany rim
+    g.fillStyle(0x5a2510);
+    g.fillRect(0, 0, 48, 2);
+    g.fillRect(0, 30, 48, 2);
+    g.fillRect(0, 0, 2, 32);
+    g.fillRect(46, 0, 2, 32);
+    g.fillStyle(0xe0a242);
+    g.fillRect(2, 2, 44, 1);
+    g.fillRect(2, 29, 44, 1);
+    // Wheel disc on the left
+    g.fillStyle(0x6a4a28);
+    g.fillCircle(13, 16, 9);
+    g.fillStyle(0x2a2a2a);
+    g.fillCircle(13, 16, 8);
+    // Alternating red/black pocket segments
+    const pocketColors = [0xbf1d1d, 0x1a1a1a, 0xbf1d1d, 0x1a1a1a, 0xbf1d1d, 0x1a1a1a, 0xbf1d1d, 0x1a1a1a];
+    for (let i = 0; i < pocketColors.length; i += 1) {
+      const a = (i / pocketColors.length) * Math.PI * 2;
+      const cx = 13 + Math.cos(a) * 5;
+      const cy = 16 + Math.sin(a) * 5;
+      g.fillStyle(pocketColors[i]);
+      g.fillRect(Math.round(cx), Math.round(cy), 2, 2);
+    }
+    // Green zero at top
+    g.fillStyle(0x1d8a3a);
+    g.fillRect(12, 10, 2, 2);
+    // Hub
+    g.fillStyle(0xe0a242);
+    g.fillCircle(13, 16, 3);
+    g.fillStyle(0x5a2510);
+    g.fillCircle(13, 16, 1);
+    // Hub crossbar (silver)
+    g.fillStyle(0xd0d4d8);
+    g.fillRect(9, 15, 8, 1);
+    g.fillRect(12, 12, 2, 8);
+    // Ball
+    g.fillStyle(0xf7edd7);
+    g.fillRect(17, 14, 2, 2);
+    // Betting grid on the right side: 3 rows x 6 cols of numbered cells
+    const gridX = 24;
+    const gridY = 4;
+    const cellW = 3;
+    const cellH = 3;
+    for (let row = 0; row < 3; row += 1) {
+      for (let col = 0; col < 6; col += 1) {
+        const number = col * 3 + row + 1;
+        const isRed = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(number);
+        g.fillStyle(isRed ? 0x8f1818 : 0x1a1a1a);
+        g.fillRect(gridX + col * (cellW + 1), gridY + row * (cellH + 1), cellW, cellH);
+      }
+    }
+    // Outside bets row
+    g.fillStyle(0x8f1818);
+    g.fillRect(24, 20, 5, 3);
+    g.fillStyle(0x1a1a1a);
+    g.fillRect(30, 20, 5, 3);
+    g.fillStyle(0xe0a242);
+    g.fillRect(36, 20, 5, 3); // gold "ODD/EVEN" marker
+    g.fillStyle(0xf3e3b6);
+    g.fillRect(24, 25, 17, 2); // racetrack accent
+    g.generateTexture('table-roulette', 48, 32);
+
+    // Larger playable slot machine for the Room of Fate (32x32)
+    g.clear();
+    // Cabinet
+    g.fillStyle(0x1a1a1a);
+    g.fillRect(0, 0, 32, 32);
+    // Brass top
+    g.fillStyle(0xe0a242);
+    g.fillRect(2, 1, 28, 4);
+    g.fillStyle(0x8a6a38);
+    g.fillRect(2, 5, 28, 1);
+    // Marquee jewel
+    g.fillStyle(0xc94a3a);
+    g.fillRect(14, 2, 4, 2);
+    g.fillStyle(0xffdf6a);
+    g.fillRect(15, 2, 2, 1);
+    // Reel window
+    g.fillStyle(0x0a0a0a);
+    g.fillRect(4, 8, 24, 10);
+    g.fillStyle(0xefe5cf);
+    g.fillRect(5, 9, 22, 8);
+    // Three reel slots with simple symbols
+    const reelsX = [6, 13, 20];
+    for (let i = 0; i < reelsX.length; i += 1) {
+      const rx = reelsX[i];
+      g.fillStyle(0xfaf3df);
+      g.fillRect(rx, 10, 6, 6);
+      if (i === 0) {
+        g.fillStyle(0xc22657);
+        g.fillCircle(rx + 3, 13, 2);
+      } else if (i === 1) {
+        g.fillStyle(0xe0a242);
+        g.fillRect(rx + 1, 11, 4, 4);
+        g.fillStyle(0xffdf6a);
+        g.fillRect(rx + 2, 12, 2, 2);
+      } else {
+        g.fillStyle(0x1a1a1a);
+        g.fillRect(rx + 1, 11, 4, 1);
+        g.fillRect(rx + 1, 13, 4, 1);
+        g.fillRect(rx + 1, 15, 4, 0.5 + 0.5);
+      }
+    }
+    // Payline stripe
+    g.fillStyle(0xc94a3a);
+    g.fillRect(5, 13, 22, 1);
+    // Coin tray
+    g.fillStyle(0x8a6a38);
+    g.fillRect(2, 20, 28, 2);
+    g.fillStyle(0x3a2010);
+    g.fillRect(4, 22, 24, 8);
+    g.fillStyle(0xe0a242);
+    g.fillRect(6, 24, 4, 2);
+    g.fillRect(13, 26, 4, 2);
+    g.fillRect(20, 24, 4, 2);
+    // Lever on right side
+    g.fillStyle(0x6a4a28);
+    g.fillRect(29, 10, 2, 10);
+    g.fillStyle(0xc22657);
+    g.fillCircle(30, 10, 2);
+    // Base
+    g.fillStyle(0x0a0a0a);
+    g.fillRect(0, 30, 32, 2);
+    g.generateTexture('slot-machine-big', 32, 32);
+
     g.clear();
     g.fillStyle(0xffffff);
     g.fillCircle(4, 4, 4);

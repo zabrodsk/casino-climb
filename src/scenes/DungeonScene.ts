@@ -45,6 +45,7 @@ function buildMapLogic(
   tablePos: { col: number; row: number },
   stairsPos: { col: number; row: number },
   includeTable = true,
+  extraTablePositions: Array<{ col: number; row: number }> = [],
 ): number[][] {
   const map: number[][] = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 
@@ -59,6 +60,9 @@ function buildMapLogic(
 
   if (includeTable) {
     map[tablePos.row][tablePos.col] = 2;
+  }
+  for (const p of extraTablePositions) {
+    map[p.row][p.col] = 2;
   }
   map[stairsPos.row][stairsPos.col] = 3;
 
@@ -120,6 +124,7 @@ export class DungeonScene extends Scene {
   private currentFloor!: number;
   private mapLogic!: number[][];
   private displayFloorNumber!: number;
+  private lastTablePos!: { col: number; row: number };
 
   private crossingMode = false;
   private crossingColumns: CrossingColumn[] = [];
@@ -151,7 +156,14 @@ export class DungeonScene extends Scene {
     this.config = FLOOR_CONFIG[this.currentFloor] ?? FLOOR_CONFIG[1];
     this.displayFloorNumber = this.config.displayFloorNumber ?? this.currentFloor;
     this.crossingMode = this.config.mode === 'crossing';
-    this.mapLogic = buildMapLogic(this.config.tablePos, this.config.stairsPos, !this.crossingMode);
+    const extraTablePositions = (this.config.interactables ?? []).map((i) => i.pos);
+    this.mapLogic = buildMapLogic(
+      this.config.tablePos,
+      this.config.stairsPos,
+      !this.crossingMode,
+      extraTablePositions,
+    );
+    this.lastTablePos = this.config.tablePos;
   }
 
   create(): void {
@@ -227,6 +239,21 @@ export class DungeonScene extends Scene {
     } else {
       const tableTile = this.propLayer.getTileAt(tablePos.col, tablePos.row);
       if (tableTile) tableTile.tint = cfg.propTint.table;
+    }
+
+    // Extra interactables: composite sprites for secondary stations
+    for (const it of cfg.interactables ?? []) {
+      this.propLayer.removeTileAt(it.pos.col, it.pos.row);
+      const texture = it.compositeTableTexture ?? 'casino-table';
+      this.add
+        .image(
+          it.pos.col * TILE_SIZE + TILE_SIZE / 2,
+          it.pos.row * TILE_SIZE + TILE_SIZE / 2,
+          texture,
+        )
+        .setOrigin(0.5, 0.5)
+        .setDepth(3)
+        .setScale(it.spriteScale ?? 1);
     }
     // Remove tileset stairs tile; composite sprite replaces it
     this.propLayer.removeTileAt(stairsPos.col, stairsPos.row);
@@ -321,24 +348,42 @@ export class DungeonScene extends Scene {
     this._addTorch(westTorchCol * TILE_SIZE + 8, southTorchRow * TILE_SIZE + 4, cfg.torchColor, cfg.torchGlow);
     this._addTorch(eastTorchCol * TILE_SIZE + 8, southTorchRow * TILE_SIZE + 4, cfg.torchColor, cfg.torchGlow);
 
-    // ── Table label ───────────────────────────────────────────────────────
+    // ── Table labels + door zones ─────────────────────────────────────────
     if (!this.crossingMode) {
-      const tableLabelY = tablePos.row * TILE_SIZE - (cfg.useCompositeTable ? 20 : 4);
-      this.add
-        .text(tablePos.col * TILE_SIZE + 8, tableLabelY, cfg.tableLabel, {
-          fontSize: '5px',
-          color: '#c9a66b',
-          fontFamily: 'monospace',
-          shadow: { offsetX: 0, offsetY: 1, color: '#000000', blur: 0, fill: true },
-        })
-        .setOrigin(0.5, 1)
-        .setDepth(6);
+      const addStation = (
+        pos: { col: number; row: number },
+        label: string,
+        gameSceneKey: string,
+        useComposite: boolean,
+      ) => {
+        const labelY = pos.row * TILE_SIZE - (useComposite ? 20 : 4);
+        this.add
+          .text(pos.col * TILE_SIZE + 8, labelY, label, {
+            fontSize: '5px',
+            color: '#c9a66b',
+            fontFamily: 'monospace',
+            shadow: { offsetX: 0, offsetY: 1, color: '#000000', blur: 0, fill: true },
+          })
+          .setOrigin(0.5, 1)
+          .setDepth(6);
 
-      const doorZone = this.add
-        .zone(tablePos.col * TILE_SIZE + 8, tablePos.row * TILE_SIZE + 8, 3 * TILE_SIZE, 3 * TILE_SIZE)
-        .setDepth(1);
-      this.physics.add.existing(doorZone, true);
-      this.physics.add.overlap(this.player, doorZone, this._onDoorOverlap, undefined, this);
+        const zone = this.add
+          .zone(pos.col * TILE_SIZE + 8, pos.row * TILE_SIZE + 8, 3 * TILE_SIZE, 3 * TILE_SIZE)
+          .setDepth(1);
+        this.physics.add.existing(zone, true);
+        this.physics.add.overlap(
+          this.player,
+          zone,
+          () => this._onInteractableOverlap(gameSceneKey, pos),
+          undefined,
+          this,
+        );
+      };
+
+      addStation(tablePos, cfg.tableLabel, cfg.gameSceneKey, cfg.useCompositeTable);
+      for (const it of cfg.interactables ?? []) {
+        addStation(it.pos, it.tableLabel, it.gameSceneKey, true);
+      }
     }
 
     // ── Stairs overlap zone ───────────────────────────────────────────────
@@ -1012,10 +1057,10 @@ export class DungeonScene extends Scene {
       this.hud.setProgress(coins, this.config.target);
     }
 
-    // Clear exit cooldown once player is far enough from the table
+    // Clear exit cooldown once player is far enough from the last-used table
     if (this.justExitedTable) {
-      const tableX = this.config.tablePos.col * TILE_SIZE + 8;
-      const tableY = this.config.tablePos.row * TILE_SIZE + 8;
+      const tableX = this.lastTablePos.col * TILE_SIZE + 8;
+      const tableY = this.lastTablePos.row * TILE_SIZE + 8;
       const dx = this.player.x - tableX;
       const dy = this.player.y - tableY;
       if (Math.sqrt(dx * dx + dy * dy) > 32) {
@@ -1024,31 +1069,35 @@ export class DungeonScene extends Scene {
     }
   }
 
-  private _onDoorOverlap(): void {
+  private _onInteractableOverlap(
+    gameSceneKey: string,
+    pos: { col: number; row: number },
+  ): void {
     if (this.crossingMode) return;
     if (this.doorTriggered || this.justExitedTable) return;
     this.doorTriggered = true;
+    this.lastTablePos = pos;
     this.floorEntrySpeechTimer?.remove(false);
     this.floorEntrySpeechTimer = null;
     AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 40, allowOverlap: false });
-    if (this.config.gameSceneKey === 'WheelScene' || this.config.gameSceneKey === 'VaultScene') {
+    if (gameSceneKey === 'WheelScene' || gameSceneKey === 'VaultScene') {
       AudioManager.stopMusic(this);
     }
 
     const launchMinigame = () => {
       // Ensure we always enter a fresh minigame scene instance.
       if (
-        this.scene.isActive(this.config.gameSceneKey)
-        || this.scene.isPaused(this.config.gameSceneKey)
+        this.scene.isActive(gameSceneKey)
+        || this.scene.isPaused(gameSceneKey)
       ) {
-        this.scene.stop(this.config.gameSceneKey);
+        this.scene.stop(gameSceneKey);
       }
-      this.scene.launch(this.config.gameSceneKey, { coins: getCoins(), floor: this.currentFloor });
+      this.scene.launch(gameSceneKey, { coins: getCoins(), floor: this.currentFloor });
       this.scene.pause('DungeonScene');
     };
 
     this.player.setVelocity(0, 0);
-    if (this.config.gameSceneKey === 'VaultScene') {
+    if (gameSceneKey === 'VaultScene') {
       // Vault is sensitive to cross-scene fade state on re-entry; launch directly.
       this.cameras.main.resetFX();
       this.cameras.main.setAlpha(1);
@@ -1172,8 +1221,8 @@ export class DungeonScene extends Scene {
     }
 
     // Nudge player 2 tiles south so they exit the trigger zone immediately
-    const { tablePos } = this.config;
-    this.player.setPosition(tablePos.col * TILE_SIZE + 8, (tablePos.row + 2) * TILE_SIZE + 8);
+    const exitPos = this.lastTablePos;
+    this.player.setPosition(exitPos.col * TILE_SIZE + 8, (exitPos.row + 2) * TILE_SIZE + 8);
     this.justExitedTable = true;
 
     this.scene.resume('DungeonScene');
