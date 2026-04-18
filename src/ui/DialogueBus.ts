@@ -16,7 +16,8 @@ export const DialogueBus = {
     const sh = scene.scale.height;
     const bubbleW = Math.max(BUBBLE_W_MIN, Math.min(sw * 0.65, BUBBLE_W_MAX));
     const bx = (sw - bubbleW) / 2;
-    const by = sh - 24 - BUBBLE_H;
+    // Keep narrator callouts away from bottom HUD instruction/status bubbles.
+    const by = Math.max(96, Math.floor(sh * 0.24) - Math.floor(BUBBLE_H / 2));
 
     const bg = scene.add.graphics();
     drawFramedPanel(bg, bx, by, bubbleW, BUBBLE_H, { borderWidth: 3, alpha: 0.78 });

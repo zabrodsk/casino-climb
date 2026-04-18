@@ -7,14 +7,16 @@ import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 import { winBurst, betFlash } from '../ui/particles';
 import { getDiscountedBetAmount, hasDiscountForFloor } from '../state/coinState';
 import { HouseController } from '../ui/HouseController';
+import { FLOOR_CONFIG } from '../data/floorConfig';
 
-const WIN_TARGET = 300;
+const DEFAULT_TARGET = 300;
 const BET_OPTIONS = [5, 25, 50];
 const ANIM_DURATION = 1200;
 
 export class CoinFlipScene extends Scene {
   private currentCoins: number = 200;
   private floorNumber: number = 1;
+  private winTarget: number = DEFAULT_TARGET;
   private selectedBet: number = 0;
   private riskType: RiskType = 'flip';
   private diceGuess: 'low' | 'high' = 'low';
@@ -43,6 +45,7 @@ export class CoinFlipScene extends Scene {
   init(data: { coins: number; floor?: number }) {
     this.currentCoins = data.coins ?? 200;
     this.floorNumber = data.floor ?? 1;
+    this.winTarget = FLOOR_CONFIG[this.floorNumber]?.target ?? DEFAULT_TARGET;
     this.selectedBet = 0;
     this.riskType = 'flip';
     this.diceGuess = 'low';
@@ -97,7 +100,7 @@ export class CoinFlipScene extends Scene {
       fontFamily: FONT.mono,
     }).setOrigin(1, 0.5);
 
-    this.add.text(W - 40, 78, `Target: ${WIN_TARGET} to advance`, {
+    this.add.text(W - 40, 78, `Target: ${this.winTarget} to advance`, {
       fontSize: '16px',
       color: COLOR.goldText,
       fontFamily: FONT.mono,
@@ -541,7 +544,7 @@ export class CoinFlipScene extends Scene {
     });
     if (result.won) winBurst(this, 1024 / 2, 450);
 
-    if (this.currentCoins >= WIN_TARGET) {
+    if (this.currentCoins >= this.winTarget) {
       this.targetReachedText.setText('Target reached! You may advance.').setVisible(true);
     }
 
@@ -561,7 +564,7 @@ export class CoinFlipScene extends Scene {
 
   private leaveTable() {
     AudioManager.playSfx(this, 'ui-click', { volume: 0.8, cooldownMs: 50, allowOverlap: false });
-    const won = this.currentCoins >= WIN_TARGET;
+    const won = this.currentCoins >= this.winTarget;
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
       try {

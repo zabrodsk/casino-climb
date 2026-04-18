@@ -1,5 +1,5 @@
 import { Scene, Tilemaps, Physics, GameObjects } from 'phaser';
-import { getCoins, getFloor, setCoins, setFloor, resetRun } from '../state/coinState';
+import { getCoins, getFloor, getRunStats, setCoins, setFloor, resetRun } from '../state/coinState';
 import { HUD } from '../ui/HUD';
 import { FLOOR_CONFIG, FloorConfig } from '../data/floorConfig';
 import { drawFramedPanel, drawNestedButton, buttonLabelStyle, neonTitleStyle, bodyTextStyle } from '../ui/theme';
@@ -95,6 +95,7 @@ export class DungeonScene extends Scene {
   private goalSoundsPlayed = false;
   private fromTransition = false;
   private envTimer: Phaser.Time.TimerEvent | null = null;
+  private floorEntrySpeechTimer: Phaser.Time.TimerEvent | null = null;
   private devLevelButtonBg?: Phaser.GameObjects.Graphics;
   private devLevelButtonLabel?: Phaser.GameObjects.Text;
   private devLevelButtonZone?: Phaser.GameObjects.Zone;
@@ -359,8 +360,13 @@ export class DungeonScene extends Scene {
     this.hud.setCoins(getCoins());
     this.hud.setFloor(this.displayFloorNumber, cfg.name);
     this.hud.setProgress(getCoins(), cfg.target);
-    this.time.delayedCall(1800, () => {
-      HouseController.say(this, 'floorEntry', String(this.displayFloorNumber));
+    this.floorEntrySpeechTimer?.remove(false);
+    this.floorEntrySpeechTimer = this.time.delayedCall(1800, () => {
+      const isFirstEverRun = getRunStats().runCount === 0;
+      const isFirstFloor = this.displayFloorNumber === 1;
+      const trigger = isFirstFloor && isFirstEverRun ? 'floorEntryFirst' : 'floorEntry';
+      HouseController.say(this, trigger, String(this.displayFloorNumber));
+      this.floorEntrySpeechTimer = null;
     });
     this._lastHudCoins = getCoins();
     this.cameras.main.ignore(this.hud.getObjects());
@@ -369,6 +375,8 @@ export class DungeonScene extends Scene {
     // ── game-complete listener ─────────────────────────────────────────────
     this.events.on('game-complete', this._onGameComplete, this);
     this.events.once('shutdown', () => {
+      this.floorEntrySpeechTimer?.remove(false);
+      this.floorEntrySpeechTimer = null;
       if (this.envTimer) {
         this.envTimer.remove(false);
         this.envTimer = null;
@@ -989,6 +997,8 @@ export class DungeonScene extends Scene {
     if (this.crossingMode) return;
     if (this.doorTriggered || this.justExitedTable) return;
     this.doorTriggered = true;
+    this.floorEntrySpeechTimer?.remove(false);
+    this.floorEntrySpeechTimer = null;
     AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 40, allowOverlap: false });
     if (this.config.gameSceneKey === 'WheelScene' || this.config.gameSceneKey === 'VaultScene') {
       AudioManager.stopMusic(this);
@@ -1329,9 +1339,16 @@ export class DungeonScene extends Scene {
   private createDevLevelPanel(): Phaser.GameObjects.Container {
     const panel = this.add.container(0, 0).setScrollFactor(0).setDepth(1010);
     const x = 116;
-    const y = this.scale.height - 148;
     const panelW = 164;
-    const panelH = 126;
+    const floorKeys = Object.keys(FLOOR_CONFIG).map((value) => Number(value)).sort((a, b) => a - b);
+    const buttonColumns = 2;
+    const rowCount = Math.ceil(floorKeys.length / buttonColumns);
+    const panelH = 116 + Math.max(0, rowCount - 2) * 36;
+    const selectorButtonCenterY = this.scale.height - 34;
+    const selectorButtonHalfH = 22;
+    const gapAboveSelector = 12;
+    const panelBottom = selectorButtonCenterY - selectorButtonHalfH - gapAboveSelector;
+    const y = panelBottom - panelH / 2;
 
     const bg = this.add.graphics();
     bg.fillStyle(0x1b0e12, 0.96);
@@ -1347,10 +1364,9 @@ export class DungeonScene extends Scene {
 
     panel.add([bg, title]);
 
-    const floorKeys = Object.keys(FLOOR_CONFIG).map((value) => Number(value)).sort((a, b) => a - b);
     floorKeys.forEach((floor, index) => {
-      const row = Math.floor(index / 2);
-      const col = index % 2;
+      const row = Math.floor(index / buttonColumns);
+      const col = index % buttonColumns;
       const bx = x - 38 + col * 76;
       const by = y - 12 + row * 36;
       const bw = 66;

@@ -44,7 +44,7 @@ export interface FloorConfig {
 export const FLOOR_CONFIG: Record<number, FloorConfig> = {
   1: {
     name: 'THE LOBBY',
-    target: 300,
+    target: 250,
     mode: 'table',
     gameSceneKey: 'CoinFlipScene',
     propTint: { table: 0xc9a66b, stairsLocked: 0x6a4a2a, stairsOpen: 0xffdd88 },

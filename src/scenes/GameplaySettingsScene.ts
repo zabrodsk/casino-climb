@@ -1,14 +1,10 @@
 import { Scene, GameObjects, Input, Math as PhaserMath } from 'phaser';
 import { COLOR, FONT, drawNestedButton } from '../ui/theme';
-import {
-  SoundLevels,
-  SoundSliderKey,
-  applySoundLevels,
-  getSoundLevels,
-  updateSoundLevel,
-} from '../state/audioSettings';
+import { AudioLevels, AudioManager } from '../audio/AudioManager';
 import { resetRun } from '../state/coinState';
 import { resetNarrativeRunState } from '../state/narrativeState';
+
+type SoundSliderKey = keyof AudioLevels;
 
 type SliderUi = {
   key: SoundSliderKey;
@@ -22,7 +18,7 @@ export class GameplaySettingsScene extends Scene {
   private targetSceneKey = 'DungeonScene';
   private sliderUis: SliderUi[] = [];
   private draggingSlider?: SoundSliderKey;
-  private soundLevels!: SoundLevels;
+  private soundLevels!: AudioLevels;
   private navigatingHome = false;
 
   constructor() {
@@ -34,7 +30,7 @@ export class GameplaySettingsScene extends Scene {
     this.draggingSlider = undefined;
     this.sliderUis = [];
     this.navigatingHome = false;
-    this.soundLevels = getSoundLevels(this.game);
+    this.soundLevels = AudioManager.getLevels(this.game);
   }
 
   create(): void {
@@ -196,9 +192,9 @@ export class GameplaySettingsScene extends Scene {
     const ratio = PhaserMath.Clamp((pointerX - bounds.left) / bounds.width, 0, 1);
     const value = Math.round(ratio * 100);
 
-    this.soundLevels = updateSoundLevel(this.game, key, value);
+    this.soundLevels = { ...this.soundLevels, [key]: value };
+    this.soundLevels = AudioManager.setLevels(this.game, this.soundLevels);
     this.updateSliderVisual(slider, value);
-    applySoundLevels(this);
   }
 
   private updateSliderVisual(slider: SliderUi, value: number): void {

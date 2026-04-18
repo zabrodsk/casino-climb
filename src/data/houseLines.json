@@ -1,4 +1,9 @@
 {
+  "floorEntryFirst": {
+    "1": [
+      "Welcome to the lobby. First climb, first wager, same old House."
+    ]
+  },
   "floorEntry": {
     "1": [
       "Welcome back. We missed watching you lose.",
