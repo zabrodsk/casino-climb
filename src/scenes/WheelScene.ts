@@ -9,6 +9,7 @@ import { COLOR, FONT, buttonLabelStyle, drawFramedPanel, drawNestedButton, neonT
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 import { HouseController } from '../ui/HouseController';
+import { DialogueBus } from '../ui/DialogueBus';
 
 const WHEEL_CX = 512;
 const WHEEL_CY = 334;
@@ -30,10 +31,6 @@ export class WheelScene extends Scene {
   private continueBtn!: GameObjects.Graphics;
   private continueBtnText!: GameObjects.Text;
   private continueZone!: GameObjects.Zone;
-
-  private speechBg!: GameObjects.Graphics;
-  private speechText!: GameObjects.Text;
-  private speechReveal: Phaser.Time.TimerEvent | null = null;
 
   private spinDurationMs = 5200;
   private spinSound: Phaser.Sound.BaseSound | null = null;
@@ -61,7 +58,7 @@ export class WheelScene extends Scene {
     this.buildWheelGlow();
     this.buildWheel();
     this.buildPointer();
-    this.buildSpeechBubble();
+
     this.buildResultPanel();
     this.showChoicePhase();
 
@@ -434,47 +431,8 @@ export class WheelScene extends Scene {
     });
   }
 
-  private buildSpeechBubble(): void {
-    const W = 1024;
-    const H = 768;
-    const bubbleW = 640;
-    const bubbleH = 64;
-    const bx = (W - bubbleW) / 2;
-    const by = H - 20 - bubbleH;
-
-    this.speechBg = this.add.graphics();
-    drawFramedPanel(this.speechBg, bx, by, bubbleW, bubbleH, { borderWidth: 2, alpha: 0.95 });
-    this.speechBg.setVisible(false).setDepth(20);
-
-    this.speechText = this.add.text(bx + 12, by + 10, '', {
-      fontSize: '15px',
-      fontFamily: FONT.mono,
-      color: COLOR.ivorySoft,
-      wordWrap: { width: bubbleW - 24 },
-    }).setVisible(false).setDepth(21);
-  }
-
   private showSpeech(text: string): void {
-    if (this.speechReveal) {
-      this.speechReveal.remove(false);
-      this.speechReveal = null;
-    }
-
-    this.speechBg.setVisible(true).setAlpha(1);
-    this.speechText.setVisible(true).setAlpha(1).setText('');
-
-    let i = 0;
-    this.speechReveal = this.time.addEvent({
-      delay: 28,
-      repeat: text.length - 1,
-      callback: () => {
-        i += 1;
-        this.speechText.setText(text.slice(0, i));
-        if (i >= text.length) {
-          this.speechReveal = null;
-        }
-      },
-    });
+    DialogueBus.say(this, text);
   }
 
   private resolveSpinDurationMs(): number {
