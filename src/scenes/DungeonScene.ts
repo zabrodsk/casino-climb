@@ -139,6 +139,7 @@ export class DungeonScene extends Scene {
   private crossingMultiplier = 1;
   private crossingBaseY = 0;
   private crossingCurrentColumnIndex = 0;
+  private lastCardWooshAt = 0;
 
   constructor() {
     super({ key: 'DungeonScene' });
@@ -166,6 +167,7 @@ export class DungeonScene extends Scene {
     this.crossingReturning = false;
     this.crossingMultiplier = this.config.crossing?.startMultiplier ?? 1;
     this.crossingCurrentColumnIndex = 0;
+    this.lastCardWooshAt = 0;
     if (this.envTimer) {
       this.envTimer.remove(false);
       this.envTimer = null;
@@ -392,6 +394,9 @@ export class DungeonScene extends Scene {
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.uiCam.fadeIn(300, 0, 0, 0);
+    if (this.config.gameSceneKey === 'VaultScene') {
+      AudioManager.playSfx(this, 'vault-enter', { volume: 1.6, cooldownMs: 500, allowOverlap: false });
+    }
     if (this.fromTransition) {
       AudioManager.playSfx(this, 'transition-exit', { volume: 0.9, cooldownMs: 350, allowOverlap: false });
       this.fromTransition = false;
@@ -592,6 +597,7 @@ export class DungeonScene extends Scene {
       sprite.setTexture(column.cardTexture);
       sprite.setData('speedScale', Phaser.Math.FloatBetween(0.82, 1.28));
       sprite.setData('xOffset', Phaser.Math.Between(-4, 4));
+      sprite.setData('wasNearPlayer', false);
       sprite.setPosition(
         column.x + (((sprite.getData('xOffset') as number | undefined) ?? 0)),
         cursor,
@@ -923,10 +929,29 @@ export class DungeonScene extends Scene {
       const crossing = this.config.crossing;
       const laneTop = crossing?.laneTop ?? 92;
       const laneBottom = crossing?.laneBottom ?? (ROWS * TILE_SIZE - 16);
+      const cardWooshDistance = 14;
       for (const column of this.crossingColumns) {
         for (const sprite of column.sprites) {
           const speedScale = (sprite.getData('speedScale') as number | undefined) ?? 1;
           sprite.y += column.direction * column.speed * speedScale * deltaSeconds;
+
+          const distanceToPlayer = Math.abs(sprite.y - this.player.y);
+          const isNearPlayer = distanceToPlayer <= cardWooshDistance;
+          const wasNearPlayer = (sprite.getData('wasNearPlayer') as boolean | undefined) ?? false;
+          if (isNearPlayer && !wasNearPlayer) {
+            const now = this.time.now;
+            if (now - this.lastCardWooshAt >= 140) {
+              const proximity = 1 - Phaser.Math.Clamp(distanceToPlayer / cardWooshDistance, 0, 1);
+              AudioManager.playSfx(this, 'card-woosh', {
+                volume: 0.14 + proximity * 0.12,
+                rate: Phaser.Math.FloatBetween(0.94, 1.06),
+                cooldownMs: 110,
+                allowOverlap: false,
+              });
+              this.lastCardWooshAt = now;
+            }
+          }
+          sprite.setData('wasNearPlayer', isNearPlayer);
         }
 
         if (column.direction > 0) {
@@ -935,6 +960,7 @@ export class DungeonScene extends Scene {
             if (sprite.y > laneBottom + 18) {
               sprite.setData('speedScale', Phaser.Math.FloatBetween(0.82, 1.28));
               sprite.setData('xOffset', Phaser.Math.Between(-4, 4));
+              sprite.setData('wasNearPlayer', false);
               sprite.x = column.x + (((sprite.getData('xOffset') as number | undefined) ?? 0));
               sprite.y = topMost - crossing!.laneSpacing * Phaser.Math.FloatBetween(1.1, 2.6);
             }
@@ -945,6 +971,7 @@ export class DungeonScene extends Scene {
             if (sprite.y < laneTop - 18) {
               sprite.setData('speedScale', Phaser.Math.FloatBetween(0.82, 1.28));
               sprite.setData('xOffset', Phaser.Math.Between(-4, 4));
+              sprite.setData('wasNearPlayer', false);
               sprite.x = column.x + (((sprite.getData('xOffset') as number | undefined) ?? 0));
               sprite.y = bottomMost + crossing!.laneSpacing * Phaser.Math.FloatBetween(1.1, 2.6);
             }
@@ -1036,6 +1063,8 @@ export class DungeonScene extends Scene {
   }
 
   private _onStairsOverlap(): void {
+    // Vault floor has no onward staircase progression.
+    if (this.config.gameSceneKey === 'VaultScene') return;
     if (!this.stairsUnlocked) return;
 
     // Prevent re-entry
@@ -1163,12 +1192,23 @@ export class DungeonScene extends Scene {
       return;
     }
 
-    if (this.config.gameSceneKey === 'WheelScene') {
-      if (activeMusic?.key !== 'wheel-choir' || !activeMusic.isPlaying) {
-        AudioManager.playMusic(this, 'wheel-choir', { loop: true, restart: true, volume: 0.78 });
+    if (this.crossingMode) {
+      if (activeMusic?.key !== 'chip-cross' || !activeMusic.isPlaying) {
+        AudioManager.playMusic(this, 'chip-cross', { loop: true, restart: true, volume: 1.0 });
       } else {
         (activeMusic as Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound).setVolume(
-          AudioManager.getMusicVolume(this) * 0.78,
+          AudioManager.getMusicVolume(this) * 1.0,
+        );
+      }
+      return;
+    }
+
+    if (this.config.gameSceneKey === 'WheelScene') {
+      if (activeMusic?.key !== 'wheel-choir' || !activeMusic.isPlaying) {
+        AudioManager.playMusic(this, 'wheel-choir', { loop: true, restart: true, volume: 0.5 });
+      } else {
+        (activeMusic as Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound).setVolume(
+          AudioManager.getMusicVolume(this) * 0.5,
         );
       }
       return;
@@ -1343,9 +1383,15 @@ export class DungeonScene extends Scene {
 
     redraw(false);
     this.devLevelButtonZone.setInteractive({ cursor: 'pointer' });
-    this.devLevelButtonZone.on('pointerover', () => redraw(true));
+    this.devLevelButtonZone.on('pointerover', () => {
+      redraw(true);
+      AudioManager.playSfx(this, 'ui-hover', { volume: 0.8, cooldownMs: 45, allowOverlap: false });
+    });
     this.devLevelButtonZone.on('pointerout', () => redraw(false));
-    this.devLevelButtonZone.on('pointerdown', () => this.toggleDevLevelPanel());
+    this.devLevelButtonZone.on('pointerdown', () => {
+      AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 45, allowOverlap: false });
+      this.toggleDevLevelPanel();
+    });
   }
 
   private toggleDevLevelPanel(): void {
@@ -1396,12 +1442,16 @@ export class DungeonScene extends Scene {
       const bh = 28;
 
       const buttonBg = this.add.graphics();
-      buttonBg.fillStyle(0xc8a364, 1);
-      buttonBg.fillRect(bx - bw / 2, by - bh / 2, bw, bh);
-      buttonBg.fillStyle(0x3b2417, 1);
-      buttonBg.fillRect(bx - bw / 2 + 3, by - bh / 2 + 3, bw - 6, bh - 6);
-      buttonBg.fillStyle(0x5a2230, 0.92);
-      buttonBg.fillRect(bx - bw / 2 + 6, by - bh / 2 + 6, bw - 12, bh - 12);
+      const redrawButton = (hovered: boolean): void => {
+        buttonBg.clear();
+        buttonBg.fillStyle(hovered ? 0xf1cc82 : 0xc8a364, 1);
+        buttonBg.fillRect(bx - bw / 2, by - bh / 2, bw, bh);
+        buttonBg.fillStyle(0x3b2417, 1);
+        buttonBg.fillRect(bx - bw / 2 + 3, by - bh / 2 + 3, bw - 6, bh - 6);
+        buttonBg.fillStyle(hovered ? 0x6e2937 : 0x5a2230, 0.92);
+        buttonBg.fillRect(bx - bw / 2 + 6, by - bh / 2 + 6, bw - 12, bh - 12);
+      };
+      redrawButton(false);
 
       const label = this.add.text(bx, by, `F${floor}`, {
         fontFamily: 'Courier New',
@@ -1412,7 +1462,13 @@ export class DungeonScene extends Scene {
       }).setOrigin(0.5);
 
       const zone = this.add.zone(bx, by, bw, bh).setInteractive({ cursor: 'pointer' });
+      zone.on('pointerover', () => {
+        redrawButton(true);
+        AudioManager.playSfx(this, 'ui-hover', { volume: 0.8, cooldownMs: 45, allowOverlap: false });
+      });
+      zone.on('pointerout', () => redrawButton(false));
       zone.on('pointerdown', () => {
+        AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 45, allowOverlap: false });
         this.devLevelPanel?.setVisible(false);
         setFloor(floor);
         this.scene.restart({ floor, fromTransition: false });

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { getCoins, setCoins } from '../state/coinState';
+import { AudioManager } from '../audio/AudioManager';
 
 const DEV_UNLOCK_KEY = Phaser.Input.Keyboard.KeyCodes.F10;
 const DEV_MODE_STORAGE_KEY = 'casino.devMode.enabled';
@@ -72,9 +73,11 @@ export function registerDeveloperUnlockHotkey(
   const handler = () => {
     const enabled = toggleDeveloperMode();
     if (enabled) {
+      AudioManager.playSfx(scene, 'dev-mode-on', { volume: 0.95, cooldownMs: 120, allowOverlap: false });
       onEnable?.();
       return;
     }
+    AudioManager.playSfx(scene, 'dev-mode-off', { volume: 0.95, cooldownMs: 120, allowOverlap: false });
     onDisable?.();
   };
   key.on('down', handler);

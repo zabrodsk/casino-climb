@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { THEME } from './theme';
+import { AudioManager } from '../audio/AudioManager';
 
 const GEAR_DEPTH = 1000;
 
@@ -43,12 +44,16 @@ export function addGameplaySettingsGear(
   redraw(false);
 
   hitArea.setInteractive({ cursor: 'pointer' });
-  hitArea.on('pointerover', () => redraw(true));
+  hitArea.on('pointerover', () => {
+    redraw(true);
+    AudioManager.playSfx(scene, 'ui-hover', { volume: 0.8, cooldownMs: 45, allowOverlap: false });
+  });
   hitArea.on('pointerout', () => redraw(false));
   hitArea.on('pointerdown', () => {
     if (scene.scene.isActive('GameplaySettingsScene')) {
       return;
     }
+    AudioManager.playSfx(scene, 'ui-click', { volume: 0.85, cooldownMs: 45, allowOverlap: false });
     scene.scene.launch('GameplaySettingsScene', { targetSceneKey });
     scene.scene.bringToTop('GameplaySettingsScene');
   });

@@ -1,6 +1,13 @@
 import Phaser from 'phaser';
 
-export type MusicKey = 'menu-music' | 'casino-music' | 'crash-game' | 'wheel-choir';
+export type MusicKey =
+  | 'menu-music'
+  | 'casino-music'
+  | 'crash-game'
+  | 'wheel-choir'
+  | 'dice-game'
+  | 'blackjack-jazz'
+  | 'chip-cross';
 
 export type SfxKey =
   | 'ui-click'
@@ -30,7 +37,11 @@ export type SfxKey =
   | 'env-casino-murmur'
   | 'stairs-unlock'
   | 'floor-transition'
-  | 'step';
+  | 'step'
+  | 'vault-enter'
+  | 'dev-mode-on'
+  | 'dev-mode-off'
+  | 'card-woosh';
 
 export type AudioLevels = {
   master: number;
@@ -66,6 +77,9 @@ const MUSIC_ASSETS: Record<MusicKey, string> = {
   'casino-music': 'assets/audio/casino-music.mp3',
   'crash-game': 'assets/audio/crash-game.mp3',
   'wheel-choir': 'assets/audio/wheel-choir.mp3',
+  'dice-game': 'assets/audio/dice-game.mp3',
+  'blackjack-jazz': 'assets/audio/blackjack-jazz.mp3',
+  'chip-cross': 'assets/audio/chip-cross.mp3',
 };
 
 const SFX_ASSETS: Record<SfxKey, string> = {
@@ -97,6 +111,10 @@ const SFX_ASSETS: Record<SfxKey, string> = {
   'stairs-unlock': 'assets/audio/sfx/stairs-unlock.wav',
   'floor-transition': 'assets/audio/sfx/floor-transition.wav',
   step: 'assets/audio/sfx/step.wav',
+  'vault-enter': 'assets/audio/sfx/vault-sfx.mp3',
+  'dev-mode-on': 'assets/audio/sfx/devMode-On.mp3',
+  'dev-mode-off': 'assets/audio/sfx/devMode-Off.mp3',
+  'card-woosh': 'assets/audio/sfx/card-woosh.mp3',
 };
 
 class AudioManagerImpl {

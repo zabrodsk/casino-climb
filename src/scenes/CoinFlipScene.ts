@@ -264,6 +264,10 @@ export class CoinFlipScene extends Scene {
 
     this.updatePlayButton();
     this.refreshBetButtons();
+    AudioManager.playMusic(this, 'dice-game', { loop: true, restart: true });
+    this.events.once('shutdown', () => {
+      AudioManager.playMusic(this, 'casino-music', { loop: true, restart: true });
+    });
 
     addGameplaySettingsGear(this, 'CoinFlipScene');
     registerDeveloperUnlockHotkey(this, () => {

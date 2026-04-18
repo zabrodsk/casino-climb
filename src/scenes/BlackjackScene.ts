@@ -181,6 +181,10 @@ export class BlackjackScene extends Scene {
     this.time.delayedCall(400, () => {
       this._showSpeech('Select a bet, then hit DEAL. Get closer to 21 than the dealer without going over. HIT draws a card. STAND lets the dealer play.');
     });
+    AudioManager.playMusic(this, 'blackjack-jazz', { loop: true, restart: true });
+    this.events.once('shutdown', () => {
+      AudioManager.playMusic(this, 'casino-music', { loop: true, restart: true });
+    });
 
     addGameplaySettingsGear(this, 'BlackjackScene');
     registerDeveloperUnlockHotkey(this, () => {

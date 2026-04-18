@@ -39,7 +39,7 @@ export class TransitionScene extends Scene {
     }).setOrigin(0.5);
 
     this._addMarqueeLights(H);
-    AudioManager.playSfx(this, 'transition-enter', { volume: 0.6, cooldownMs: 300, allowOverlap: false });
+    AudioManager.playSfx(this, 'transition-enter', { volume: 0.45, cooldownMs: 300, allowOverlap: false });
 
     this.cameras.main.fadeIn(350, 0, 0, 0);
 
@@ -93,9 +93,13 @@ export class TransitionScene extends Scene {
     this.add.text(W / 2, 626, 'ACCEPT AND CONTINUE', buttonLabelStyle(18)).setOrigin(0.5).setDepth(12);
     drawNestedButton(buttonBg, W / 2, 626, 260, 50, false);
     const zone = this.add.zone(W / 2, 626, 260, 50).setDepth(13).setInteractive({ cursor: 'pointer' });
-    zone.on('pointerover', () => drawNestedButton(buttonBg, W / 2, 626, 260, 50, true));
+    zone.on('pointerover', () => {
+      drawNestedButton(buttonBg, W / 2, 626, 260, 50, true);
+      AudioManager.playSfx(this, 'ui-hover', { volume: 0.8, cooldownMs: 45, allowOverlap: false });
+    });
     zone.on('pointerout', () => drawNestedButton(buttonBg, W / 2, 626, 260, 50, false));
     zone.on('pointerdown', () => {
+      AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 45, allowOverlap: false });
       if (reward.type === 'revive') {
         grantReviveToken();
       } else {

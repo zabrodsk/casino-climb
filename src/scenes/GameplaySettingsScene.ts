@@ -47,7 +47,10 @@ export class GameplaySettingsScene extends Scene {
     const backdrop = this.add.rectangle(0, 0, width, height, 0x06030f, 0.72).setOrigin(0);
     backdrop.setDepth(3000);
     backdrop.setInteractive({ cursor: 'pointer' });
-    backdrop.on('pointerdown', () => this.closeOverlay());
+    backdrop.on('pointerdown', () => {
+      AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 45, allowOverlap: false });
+      this.closeOverlay();
+    });
 
     const panel = this.add.graphics();
     panel.fillStyle(0x45143c, 0.98);
@@ -70,7 +73,13 @@ export class GameplaySettingsScene extends Scene {
 
     const closeButton = this.add.rectangle(panelX + panelW - 30, panelY + 39, 30, 24, 0x8b1b42);
     closeButton.setDepth(3002).setInteractive({ useHandCursor: true });
-    closeButton.on('pointerdown', () => this.closeOverlay());
+    closeButton.on('pointerover', () => {
+      AudioManager.playSfx(this, 'ui-hover', { volume: 0.8, cooldownMs: 45, allowOverlap: false });
+    });
+    closeButton.on('pointerdown', () => {
+      AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 45, allowOverlap: false });
+      this.closeOverlay();
+    });
     this.add.text(panelX + panelW - 30, panelY + 39, 'X', {
       fontFamily: 'Courier New',
       fontSize: '18px',
@@ -92,9 +101,15 @@ export class GameplaySettingsScene extends Scene {
 
     const resumeZone = this.add.zone(resumeX, actionY, 180, 50).setDepth(3004);
     resumeZone.setInteractive({ cursor: 'pointer' });
-    resumeZone.on('pointerover', () => drawNestedButton(resumeBtn, resumeX, actionY, 180, 50, true));
+    resumeZone.on('pointerover', () => {
+      drawNestedButton(resumeBtn, resumeX, actionY, 180, 50, true);
+      AudioManager.playSfx(this, 'ui-hover', { volume: 0.8, cooldownMs: 45, allowOverlap: false });
+    });
     resumeZone.on('pointerout', () => drawNestedButton(resumeBtn, resumeX, actionY, 180, 50, false));
-    resumeZone.on('pointerdown', () => this.closeOverlay());
+    resumeZone.on('pointerdown', () => {
+      AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 45, allowOverlap: false });
+      this.closeOverlay();
+    });
 
     const homeBtn = this.add.graphics().setDepth(3002);
     const homeX = panelX + panelW - 190;
@@ -106,9 +121,15 @@ export class GameplaySettingsScene extends Scene {
 
     const homeZone = this.add.zone(homeX, actionY, 180, 50).setDepth(3004);
     homeZone.setInteractive({ cursor: 'pointer' });
-    homeZone.on('pointerover', () => drawNestedButton(homeBtn, homeX, actionY, 180, 50, true));
+    homeZone.on('pointerover', () => {
+      drawNestedButton(homeBtn, homeX, actionY, 180, 50, true);
+      AudioManager.playSfx(this, 'ui-hover', { volume: 0.8, cooldownMs: 45, allowOverlap: false });
+    });
     homeZone.on('pointerout', () => drawNestedButton(homeBtn, homeX, actionY, 180, 50, false));
-    homeZone.on('pointerdown', () => this.goHome());
+    homeZone.on('pointerdown', () => {
+      AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 45, allowOverlap: false });
+      this.goHome();
+    });
 
     this.input.on('pointermove', this.onPointerMove, this);
     this.input.on('pointerup', this.onPointerUp, this);
@@ -167,8 +188,14 @@ export class GameplaySettingsScene extends Scene {
       this.updateSliderFromPointer(key, pointerX);
     };
 
-    track.on('pointerdown', (pointer: Input.Pointer) => beginDrag(pointer.x));
-    knob.on('pointerdown', (pointer: Input.Pointer) => beginDrag(pointer.x));
+    track.on('pointerdown', (pointer: Input.Pointer) => {
+      AudioManager.playSfx(this, 'ui-click', { volume: 0.75, cooldownMs: 35, allowOverlap: false });
+      beginDrag(pointer.x);
+    });
+    knob.on('pointerdown', (pointer: Input.Pointer) => {
+      AudioManager.playSfx(this, 'ui-click', { volume: 0.75, cooldownMs: 35, allowOverlap: false });
+      beginDrag(pointer.x);
+    });
   }
 
   private onPointerMove(pointer: Input.Pointer): void {

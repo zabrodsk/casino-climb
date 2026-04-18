@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { drawFramedPanel, FONT, COLOR } from './theme';
+import { AudioManager } from '../audio/AudioManager';
 
 const BUBBLE_H = 80;
 const BUBBLE_W_MIN = 420;
@@ -55,6 +56,10 @@ export const DialogueBus = {
         if (destroyed) return;
         i++;
         textObj.setText(text.slice(0, i));
+        const char = text[i - 1] ?? '';
+        if (char.trim().length > 0 && i % 2 === 0) {
+          AudioManager.playSfx(scene, 'ui-hover', { volume: 0.18, cooldownMs: 35, allowOverlap: false });
+        }
         if (i >= text.length) {
           revealTimer = null;
           dismissTimer = scene.time.delayedCall(3500, () => {

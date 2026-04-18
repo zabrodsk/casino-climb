@@ -739,6 +739,10 @@ export class MenuScene extends Scene {
       callback: () => {
         index += 1;
         target.setText(text.slice(0, index));
+        const char = text[index - 1] ?? '';
+        if (char.trim().length > 0 && index % 2 === 0) {
+          AudioManager.playSfx(this, 'ui-hover', { volume: 0.22, cooldownMs: 35, allowOverlap: false });
+        }
       },
     });
     this.introTimers.push(timer);
