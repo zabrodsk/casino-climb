@@ -698,36 +698,38 @@ export class MenuScene extends Scene {
     this.introLineTexts.forEach((text) => text.setText('').setAlpha(1));
     this.introPrompt.setAlpha(0);
     this.introPrompt.setText('PRESS ANY KEY TO CONTINUE');
+    this.introOverlay.setVisible(false).setAlpha(1);
 
-    this.introOverlay.setVisible(true);
-    this.tweens.add({
-      targets: this.introOverlay,
-      alpha: 1,
-      duration: 220,
-      ease: 'Quad.easeOut',
-    });
+    const beginMemoryStir = () => {
+      this.introOverlay?.setVisible(true).setAlpha(1);
+      this.introTimers.forEach((timer) => timer.remove(false));
+      this.introTimers = [];
 
-    this.introTimers.forEach((timer) => timer.remove(false));
-    this.introTimers = [];
-
-    INTRO_LINES.forEach((line, index) => {
-      const timer = this.time.delayedCall(index * 1150, () => {
-        this.typeLine(this.introLineTexts[index], line);
+      INTRO_LINES.forEach((line, index) => {
+        const timer = this.time.delayedCall(index * 1150, () => {
+          this.typeLine(this.introLineTexts[index], line);
+        });
+        this.introTimers.push(timer);
       });
-      this.introTimers.push(timer);
-    });
 
-    const promptTimer = this.time.delayedCall(INTRO_LINES.length * 1150 + 360, () => {
-      this.introContinueReady = true;
-      this.tweens.add({
-        targets: this.introPrompt,
-        alpha: { from: 0.35, to: 1 },
-        duration: 760,
-        yoyo: true,
-        repeat: -1,
+      const promptTimer = this.time.delayedCall(INTRO_LINES.length * 1150 + 360, () => {
+        this.introContinueReady = true;
+        this.tweens.add({
+          targets: this.introPrompt,
+          alpha: { from: 0.35, to: 1 },
+          duration: 760,
+          yoyo: true,
+          repeat: -1,
+        });
       });
+      this.introTimers.push(promptTimer);
+    };
+
+    this.cameras.main.fadeOut(920, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      beginMemoryStir();
+      this.cameras.main.fadeIn(1040, 0, 0, 0);
     });
-    this.introTimers.push(promptTimer);
   }
 
   private typeLine(target: GameObjects.Text, text: string): void {
