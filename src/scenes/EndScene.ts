@@ -12,6 +12,8 @@ import { resetRun } from '../state/coinState';
 import { resetNarrativeRunState } from '../state/narrativeState';
 import { resetMemoryRunState } from '../state/memoryState';
 
+const AUTO_START_RUN_STORAGE_KEY = 'casino.autostart.floor1';
+
 type Phase = 'reveal' | 'choice' | 'leave_epilogue' | 'thanks';
 
 type Beat = { title: string; lines: string[] };
@@ -265,7 +267,7 @@ export class EndScene extends Scene {
     resetRun();
     this.cameras.main.fadeOut(320, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.scene.start('DungeonScene', { floor: 1 });
+      this._forcePageReload(true);
     });
   }
 
@@ -348,7 +350,7 @@ export class EndScene extends Scene {
       duration: 600,
     });
 
-    this.time.delayedCall(3200, () => this._returnToMenu());
+    this.time.delayedCall(4000, () => this._returnToMenu());
   }
 
   private _returnToMenu(): void {
@@ -360,8 +362,25 @@ export class EndScene extends Scene {
     resetRun();
     this.cameras.main.fadeOut(500, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.scene.start('MenuScene');
+      this._forcePageReload();
     });
+  }
+
+  private _forcePageReload(autoStartFloor1 = false): void {
+    if (typeof window !== 'undefined' && window.location) {
+      if (autoStartFloor1 && window.sessionStorage) {
+        try {
+          window.sessionStorage.setItem(AUTO_START_RUN_STORAGE_KEY, '1');
+        } catch {
+          // Ignore storage failures and continue with reload fallback behavior.
+        }
+      }
+      window.location.reload();
+      return;
+    }
+
+    // Fallback for non-browser runtimes.
+    this.scene.start('MenuScene');
   }
 
   // ── Skip input ──────────────────────────────────────────
@@ -369,8 +388,8 @@ export class EndScene extends Scene {
   private _onSkipInput(): void {
     if (this.transitioning || this.skipBusy) return;
     if (this.phase === 'reveal') this._advanceReveal();
-    else if (this.phase === 'leave_epilogue') this._advanceEpilogue();
-    else if (this.phase === 'thanks') this._returnToMenu();
+    // Keep leave sequence order deterministic: nature epilogue -> thanks -> menu.
+    // Do not allow skip input to jump these beats.
   }
 
   // ── Beat rendering ──────────────────────────────────────

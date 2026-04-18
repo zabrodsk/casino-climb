@@ -1,6 +1,8 @@
 import Phaser, { Scene, GameObjects, Input, Math as PhaserMath } from 'phaser';
 import { AudioLevels, AudioManager } from '../audio/AudioManager';
 
+const AUTO_START_RUN_STORAGE_KEY = 'casino.autostart.floor1';
+
 const INTRO_LINES = [
   'You wake up.',
   'Bright lights. The smell of money.',
@@ -44,6 +46,7 @@ export class MenuScene extends Scene {
   private introPlaying = false;
   private introContinueReady = false;
   private transitioningToRun = false;
+  private introSkipEnabledAt = 0;
 
   private soundLevels: AudioLevels = {
     master: 100,
@@ -51,8 +54,8 @@ export class MenuScene extends Scene {
     sfx: 100,
   };
 
-  private readonly keyboardHandler = () => this.handleGlobalContinue();
-  private readonly pointerHandler = () => this.handleGlobalContinue();
+  private readonly keyboardHandler = (event: KeyboardEvent) => this.handleKeyboardContinue(event);
+  private readonly pointerHandler = (pointer: Input.Pointer) => this.handlePointerContinue(pointer);
 
   constructor() {
     super('MenuScene');
@@ -78,6 +81,7 @@ export class MenuScene extends Scene {
     this.introPlaying = false;
     this.introContinueReady = false;
     this.transitioningToRun = false;
+    this.introSkipEnabledAt = 0;
     this.soundLevels = {
       master: levels.master,
       music: levels.music,
@@ -85,6 +89,10 @@ export class MenuScene extends Scene {
     };
 
     this.cameras.main.setRoundPixels(true);
+    if (this.consumeAutoStartRunFlag()) {
+      this.scene.start('DungeonScene', { floor: 1 });
+      return;
+    }
 
     this.drawBackground();
     this.createAtmosphere();
@@ -673,6 +681,7 @@ export class MenuScene extends Scene {
 
     this.introPlaying = true;
     this.introContinueReady = false;
+    this.introSkipEnabledAt = this.time.now + 180;
     this.draggingSlider = undefined;
 
     // Swap from lobby music to dark ambient as the memory scene fades in
@@ -740,12 +749,51 @@ export class MenuScene extends Scene {
     this.beginRun();
   }
 
+  private consumeAutoStartRunFlag(): boolean {
+    if (typeof window === 'undefined' || !window.sessionStorage) {
+      return false;
+    }
+    try {
+      const value = window.sessionStorage.getItem(AUTO_START_RUN_STORAGE_KEY);
+      if (value !== '1') {
+        return false;
+      }
+      window.sessionStorage.removeItem(AUTO_START_RUN_STORAGE_KEY);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private handleKeyboardContinue(event: KeyboardEvent): void {
+    if (!this.introPlaying || this.transitioningToRun) return;
+    if (this.time.now < this.introSkipEnabledAt) return;
+
+    if (event.code === 'Space') {
+      this.beginRun();
+      return;
+    }
+
+    // Keep "any key to continue" behavior once intro is fully shown.
+    this.handleGlobalContinue();
+  }
+
+  private handlePointerContinue(pointer: Input.Pointer): void {
+    if (!this.introPlaying || this.transitioningToRun) return;
+    if (pointer.button !== 0) return;
+    if (this.time.now < this.introSkipEnabledAt) return;
+
+    this.beginRun();
+  }
+
   private beginRun(): void {
     if (this.transitioningToRun) return;
 
     this.transitioningToRun = true;
     this.introPlaying = false;
     this.introContinueReady = false;
+    this.introTimers.forEach((timer) => timer.remove(false));
+    this.introTimers = [];
     if (this.introPrompt) {
       this.tweens.killTweensOf(this.introPrompt);
     }

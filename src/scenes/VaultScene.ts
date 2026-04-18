@@ -14,7 +14,6 @@ const TIMING_TRACK_RIGHT = 740;
 const TIMING_ROW_Y = 344;
 const STRATEGY_CORRECT: StrategyOption = '+6';
 const WAGER_COST = 75;
-const WAGER_REWARD = 150;
 
 export class VaultScene extends Scene {
   private currentCoins = 200;
@@ -143,6 +142,7 @@ export class VaultScene extends Scene {
     registerDeveloperUnlockHotkey(this, () => this.resolveVaultSuccess(true));
     this.input.keyboard?.on('keydown-ESC', () => this.leaveVault());
     this.enterTimingPhase();
+    this.cameras.main.fadeIn(300, 0, 0, 0);
   }
 
   private drawBackground(width: number, height: number): void {
@@ -357,9 +357,7 @@ export class VaultScene extends Scene {
     this.refreshCoins();
     AudioManager.playSfx(this, 'coin-settle', { volume: 0.8, cooldownMs: 90, allowOverlap: false });
 
-    this.showResult('The vault takes its proof, then gives it back doubled.', COLOR.goldText, () => {
-      this.currentCoins += WAGER_REWARD;
-      this.refreshCoins();
+    this.showResult('The vault takes its proof and opens.', COLOR.goldText, () => {
       this.resolveVaultSuccess(false);
     });
   }

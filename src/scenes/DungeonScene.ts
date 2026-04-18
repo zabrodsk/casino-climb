@@ -378,6 +378,7 @@ export class DungeonScene extends Scene {
     // ── game-complete listener ─────────────────────────────────────────────
     this.events.on('game-complete', this._onGameComplete, this);
     this.events.once('shutdown', () => {
+      this.events.off('game-complete', this._onGameComplete, this);
       this.floorEntrySpeechTimer?.remove(false);
       this.floorEntrySpeechTimer = null;
       if (this.envTimer) {
@@ -1007,11 +1008,30 @@ export class DungeonScene extends Scene {
       AudioManager.stopMusic(this);
     }
 
-    this.player.setVelocity(0, 0);
-    this.cameras.main.fadeOut(300, 0, 0, 0);
-    this.cameras.main.once('camerafadeoutcomplete', () => {
+    const launchMinigame = () => {
+      // Ensure we always enter a fresh minigame scene instance.
+      if (
+        this.scene.isActive(this.config.gameSceneKey)
+        || this.scene.isPaused(this.config.gameSceneKey)
+      ) {
+        this.scene.stop(this.config.gameSceneKey);
+      }
       this.scene.launch(this.config.gameSceneKey, { coins: getCoins(), floor: this.currentFloor });
       this.scene.pause('DungeonScene');
+    };
+
+    this.player.setVelocity(0, 0);
+    if (this.config.gameSceneKey === 'VaultScene') {
+      // Vault is sensitive to cross-scene fade state on re-entry; launch directly.
+      this.cameras.main.resetFX();
+      this.cameras.main.setAlpha(1);
+      launchMinigame();
+      return;
+    }
+
+    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      launchMinigame();
     });
   }
 
@@ -1154,7 +1174,7 @@ export class DungeonScene extends Scene {
       return;
     }
 
-    if (activeMusic?.key === 'wheel-choir') {
+    if (activeMusic?.key !== 'casino-music' || !activeMusic.isPlaying) {
       AudioManager.playMusic(this, 'casino-music', { loop: true, restart: true });
     }
   }
