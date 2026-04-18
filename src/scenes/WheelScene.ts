@@ -34,6 +34,7 @@ export class WheelScene extends Scene {
 
   private spinDurationMs = 5200;
   private spinSound: Phaser.Sound.BaseSound | null = null;
+  private floorTwinkleTweens: Phaser.Tweens.Tween[] = [];
 
   constructor() {
     super('WheelScene');
@@ -69,6 +70,8 @@ export class WheelScene extends Scene {
 
     this.events.once('shutdown', () => {
       this.stopSpinSound();
+      this.floorTwinkleTweens.forEach((tween) => tween.stop());
+      this.floorTwinkleTweens = [];
     });
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
@@ -85,32 +88,122 @@ export class WheelScene extends Scene {
     bg.fillStyle(0x1f0f18, 1);
     bg.fillRect(0, 210, width, 340);
 
-    // Space-themed floor area.
-    bg.fillStyle(0x070b22, 1);
-    bg.fillRect(0, 550, width, 218);
-    bg.fillStyle(0x0b1334, 0.85);
-    bg.fillRect(0, 550, width, 80);
-    bg.fillStyle(0x05091a, 0.9);
-    bg.fillRect(0, 630, width, 138);
+    const floorY = 550;
+    const floorH = height - floorY;
 
-    // Subtle nebula haze.
-    bg.fillStyle(0x3d2d7a, 0.18);
-    bg.fillEllipse(width * 0.18, 648, 320, 120);
-    bg.fillStyle(0x1f6ca8, 0.14);
-    bg.fillEllipse(width * 0.52, 610, 420, 140);
-    bg.fillStyle(0x5a2d87, 0.13);
-    bg.fillEllipse(width * 0.82, 690, 300, 120);
+    // Galactic floor base: midnight blue to black gradient.
+    const floorBase = this.add.graphics();
+    floorBase.fillGradientStyle(0x0d1538, 0x0d1538, 0x03060f, 0x03060f, 1);
+    floorBase.fillRect(0, floorY, width, floorH);
 
-    // Starfield (deterministic placement).
-    for (let i = 0; i < 220; i += 1) {
-      const fx = (i * 73) % width;
-      const fy = 552 + ((i * 131) % 210);
-      const twinkle = ((i * 17) % 100) / 100;
-      const size = i % 11 === 0 ? 2 : 1;
-      const alpha = 0.32 + twinkle * 0.58;
-      const color = i % 9 === 0 ? 0xb6d3ff : (i % 7 === 0 ? 0xffe7b3 : 0xeaf2ff);
-      bg.fillStyle(color, alpha);
-      bg.fillRect(fx, fy, size, size);
+    // Nebula bands with stronger contrast so the floor reads as cosmic immediately.
+    const nebula = this.add.graphics();
+    nebula.fillStyle(0x4e47a4, 0.24);
+    nebula.fillEllipse(width * 0.12, floorY + 66, 420, 130);
+    nebula.fillStyle(0x1f7cc2, 0.2);
+    nebula.fillEllipse(width * 0.52, floorY + 54, 520, 150);
+    nebula.fillStyle(0x6f3fb1, 0.18);
+    nebula.fillEllipse(width * 0.86, floorY + 112, 360, 120);
+    nebula.fillStyle(0x24406f, 0.15);
+    nebula.fillEllipse(width * 0.4, floorY + 170, 460, 110);
+
+    // Deterministic star layers: far (dense/dim), mid, and near (sparse/bright).
+    const farStars = this.add.graphics();
+    for (let i = 0; i < 260; i += 1) {
+      const x = (i * 67) % width;
+      const y = floorY + ((i * 149) % floorH);
+      const alpha = 0.12 + (((i * 31) % 70) / 1000);
+      farStars.fillStyle(0xdce7ff, alpha);
+      farStars.fillRect(x, y, 1, 1);
+    }
+
+    const midStars = this.add.graphics();
+    for (let i = 0; i < 120; i += 1) {
+      const x = (i * 89 + 37) % width;
+      const y = floorY + ((i * 113 + 19) % floorH);
+      const alpha = 0.22 + (((i * 23) % 100) / 700);
+      const color = i % 5 === 0 ? 0xbfd6ff : 0xf3f7ff;
+      midStars.fillStyle(color, alpha);
+      midStars.fillRect(x, y, 1, 1);
+    }
+
+    const nearStars = this.add.graphics();
+    for (let i = 0; i < 52; i += 1) {
+      const x = (i * 131 + 53) % width;
+      const y = floorY + ((i * 101 + 71) % floorH);
+      const alpha = 0.38 + (((i * 17) % 80) / 200);
+      const color = i % 6 === 0 ? 0xffefc9 : 0xeff6ff;
+      nearStars.fillStyle(color, Math.min(alpha, 0.72));
+      nearStars.fillRect(x, y, 2, 2);
+    }
+
+    // Low-alpha constellations for recognizable "space" motifs.
+    const constellations = this.add.graphics();
+    constellations.lineStyle(1, 0xc8ddff, 0.22);
+    constellations.beginPath();
+    constellations.moveTo(118, floorY + 68);
+    constellations.lineTo(150, floorY + 84);
+    constellations.lineTo(178, floorY + 64);
+    constellations.lineTo(212, floorY + 88);
+    constellations.strokePath();
+    constellations.beginPath();
+    constellations.moveTo(748, floorY + 96);
+    constellations.lineTo(776, floorY + 122);
+    constellations.lineTo(818, floorY + 108);
+    constellations.lineTo(850, floorY + 136);
+    constellations.strokePath();
+    constellations.beginPath();
+    constellations.moveTo(468, floorY + 156);
+    constellations.lineTo(504, floorY + 168);
+    constellations.lineTo(536, floorY + 150);
+    constellations.lineTo(566, floorY + 172);
+    constellations.strokePath();
+
+    // A bounded set of twinkling near stars (lightweight animation).
+    this.floorTwinkleTweens.forEach((tween) => tween.stop());
+    this.floorTwinkleTweens = [];
+    for (let i = 0; i < 22; i += 1) {
+      const x = (i * 173 + 41) % width;
+      const y = floorY + ((i * 97 + 33) % floorH);
+      const star = this.add.rectangle(x, y, i % 4 === 0 ? 3 : 2, i % 4 === 0 ? 3 : 2, i % 3 === 0 ? 0xffefc9 : 0xeef5ff);
+      star.setAlpha(0.24 + (i % 5) * 0.07);
+      const twinkle = this.tweens.add({
+        targets: star,
+        alpha: { from: 0.18 + (i % 4) * 0.04, to: 0.8 },
+        duration: 1400 + i * 90,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+      this.floorTwinkleTweens.push(twinkle);
+    }
+
+    // Soft edge fog/vignette so floor effects never reduce UI legibility.
+    const floorFog = this.add.graphics();
+    floorFog.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.24);
+    floorFog.fillRect(0, floorY, width, 28);
+    floorFog.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.3);
+    floorFog.fillRect(0, height - 56, width, 56);
+    floorFog.fillStyle(0x000000, 0.16);
+    floorFog.fillRect(0, floorY, 80, floorH);
+    floorFog.fillRect(width - 80, floorY, 80, floorH);
+
+    // Keep all floor visuals behind interactive scene content.
+    [
+      floorBase,
+      nebula,
+      farStars,
+      midStars,
+      nearStars,
+      constellations,
+      floorFog,
+    ].forEach((obj) => obj.setDepth(-1));
+    this.children.list
+      .filter((obj) => obj instanceof Phaser.GameObjects.Rectangle && obj.y >= floorY)
+      .forEach((obj) => obj.setDepth(-1));
+    for (const tween of this.floorTwinkleTweens) {
+      const targets = tween.targets as Phaser.GameObjects.GameObject[];
+      targets.forEach((t) => t.setDepth(-1));
     }
   }
 

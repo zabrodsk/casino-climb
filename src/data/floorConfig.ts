@@ -124,7 +124,7 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
     stairsPos: { col: 14, row: 2 },
     playerStart: { col: 4, row: 10 },
     tableLabel: 'WHEEL',
-    floorTextures: { primary: 'parlor-floor-a', accent: 'parlor-floor-b' },
+    floorTextures: { primary: 'fate-floor-a', accent: 'fate-floor-b' },
     useCompositeTable: true,
     compositeTableTexture: 'table-wheel',
     slotMachines: [
