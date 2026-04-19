@@ -388,23 +388,26 @@ export class WheelScene extends Scene {
     const passBtnText = this.add.text(W / 2 - 140, 660, 'PASS BY', buttonLabelStyle(22)).setOrigin(0.5);
     drawNestedButton(passBtn, W / 2 - 140, 660, 180, 56, false);
     const passZone = this.add.zone(W / 2 - 140, 660, 180, 56).setInteractive({ cursor: 'pointer' });
-    passZone.on('pointerover', () => drawNestedButton(passBtn, W / 2 - 140, 660, 180, 56, true));
-    passZone.on('pointerout', () => drawNestedButton(passBtn, W / 2 - 140, 660, 180, 56, false));
-    passZone.on('pointerdown', () => {
-      passZone.disableInteractive();
-      this.showSpeech('You walk past the wheel. Wise... or cowardly?');
-      this.time.delayedCall(1800, () => this.leave());
-    });
 
     const fateBtn = this.add.graphics();
     const fateBtnText = this.add.text(W / 2 + 140, 660, 'TEMPT FATE', buttonLabelStyle(22)).setOrigin(0.5);
     this.drawFateButton(fateBtn, W / 2 + 140, 660, 200, 56, false);
     const fateZone = this.add.zone(W / 2 + 140, 660, 200, 56).setInteractive({ cursor: 'pointer' });
+
+    passZone.on('pointerover', () => drawNestedButton(passBtn, W / 2 - 140, 660, 180, 56, true));
+    passZone.on('pointerout', () => drawNestedButton(passBtn, W / 2 - 140, 660, 180, 56, false));
+    passZone.on('pointerdown', () => {
+      passZone.destroy();
+      fateZone.destroy();
+      this.showSpeech('You walk past the wheel. Wise... or cowardly?');
+      this.time.delayedCall(1800, () => this.leave());
+    });
+
     fateZone.on('pointerover', () => this.drawFateButton(fateBtn, W / 2 + 140, 660, 200, 56, true));
     fateZone.on('pointerout', () => this.drawFateButton(fateBtn, W / 2 + 140, 660, 200, 56, false));
     fateZone.on('pointerdown', () => {
-      fateZone.disableInteractive();
-      passZone.disableInteractive();
+      fateZone.destroy();
+      passZone.destroy();
       passBtn.setVisible(false);
       passBtnText.setVisible(false);
       fateBtn.setVisible(false);
@@ -492,21 +495,21 @@ export class WheelScene extends Scene {
   private buildResultPanel(): void {
     const W = 1024;
     const panelW = 480;
-    const panelH = 140;
+    const panelH = 160;
     const px = (W - panelW) / 2;
-    const py = 570;
+    const py = 505;
 
     this.resultPanel = this.add.graphics().setVisible(false);
     drawFramedPanel(this.resultPanel, px, py, panelW, panelH, { borderWidth: 2, alpha: 0.95 });
 
-    this.resultTitle = this.add.text(W / 2, py + 30, '', {
+    this.resultTitle = this.add.text(W / 2, py + 36, '', {
       fontSize: '28px',
       fontFamily: FONT.mono,
       fontStyle: 'bold',
       color: COLOR.winGreen,
     }).setOrigin(0.5).setVisible(false).setResolution(2);
 
-    this.resultCoins = this.add.text(W / 2, py + 64, '', {
+    this.resultCoins = this.add.text(W / 2, py + 80, '', {
       fontSize: '18px',
       fontFamily: FONT.mono,
       color: '#ffffff',
@@ -514,7 +517,7 @@ export class WheelScene extends Scene {
       wordWrap: { width: 430 },
     }).setOrigin(0.5).setVisible(false).setResolution(2);
 
-    this.resultFlavor = this.add.text(W / 2, py + 92, '', {
+    this.resultFlavor = this.add.text(W / 2, py + 118, '', {
       fontSize: '15px',
       fontFamily: FONT.mono,
       color: '#e5e7eb',
