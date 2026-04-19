@@ -30,7 +30,6 @@ const BALL_TRACK_R = WHEEL_R + 6; // = 166
 const BALL_R = 6;
 
 const CHIP_VALUES = [10, 25, 50, 100] as const;
-type ChipValue = typeof CHIP_VALUES[number];
 
 interface BetSpot {
   kind: BetKind;
@@ -52,8 +51,9 @@ export class RouletteScene extends Scene {
 
   private coinsText!: GameObjects.Text;
   private statusText!: GameObjects.Text;
-  private chipSelector: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; value: ChipValue }> = [];
-  private selectedChip: ChipValue = 25;
+  private chipSelector: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; value: number; zone: GameObjects.Zone }> = [];
+  private selectedChip = 25;
+  private allInChipButton!: { bg: GameObjects.Graphics; label: GameObjects.Text; zone: GameObjects.Zone };
 
   private wheelContainer!: GameObjects.Container;
   private ball!: GameObjects.Arc;
@@ -490,18 +490,38 @@ export class RouletteScene extends Scene {
       }).setOrigin(0.5).setResolution(2);
       const zone = this.add.zone(x, y, 80, 52).setInteractive({ cursor: 'pointer' });
       zone.on('pointerdown', () => {
+        if (this.isLowCoinChipMode()) return;
         this.selectedChip = value;
-        this.chipSelector.forEach((c) => this.drawChipButton(c.bg, 0, 0, c.value, c.value === this.selectedChip, c.label));
+        this.refreshChipSelector();
       });
-      this.chipSelector.push({ bg, label, value });
+      this.chipSelector.push({ bg, label, value, zone });
     }
+
+    const allInBg = this.add.graphics().setVisible(false);
+    const allInLabel = this.add.text(634, y, '', {
+      fontSize: '16px',
+      fontFamily: FONT.mono,
+      fontStyle: 'bold',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setResolution(2).setVisible(false);
+    const allInZone = this.add.zone(634, y, 90, 52).setVisible(false);
+    allInZone.on('pointerdown', () => {
+      if (!this.isLowCoinChipMode()) return;
+      this.selectedChip = this.currentCoins;
+      this.refreshChipSelector();
+      AudioManager.playSfx(this, 'bet-select', { volume: 1.0, cooldownMs: 50, allowOverlap: false });
+    });
+    this.allInChipButton = { bg: allInBg, label: allInLabel, zone: allInZone };
+    this.refreshChipSelector();
   }
 
   private drawChipButton(
     g: GameObjects.Graphics,
     cx: number,
     cy: number,
-    value: ChipValue,
+    value: number,
     selected: boolean,
     existingLabel?: GameObjects.Text,
   ): void {
@@ -613,6 +633,12 @@ export class RouletteScene extends Scene {
     const settlement = settleBets(this.bets, result);
     this.currentCoins = Math.max(0, this.currentCoins + settlement.totalReturn);
     this.coinsText.setText(`Coins: ${this.currentCoins}`);
+    this.refreshChipSelector();
+    if (this.currentCoins <= 0) {
+      this.statusText.setText('Out of coins.');
+      this.time.delayedCall(700, () => this.leave());
+      return;
+    }
 
     const pocket = pocketForNumber(result);
     const colorLabel = pocket.color.toUpperCase();
@@ -704,6 +730,40 @@ export class RouletteScene extends Scene {
     this.totalBetText.setText(`Total Bet: ${total}`);
   }
 
+  private isLowCoinChipMode(): boolean {
+    return this.currentCoins > 0 && this.currentCoins < 10;
+  }
+
+  private refreshChipSelector(): void {
+    const lowCoinMode = this.isLowCoinChipMode();
+    if (lowCoinMode) {
+      this.selectedChip = this.currentCoins;
+      this.chipSelector.forEach(({ bg, label, zone }) => {
+        bg.setVisible(false);
+        label.setVisible(false);
+        zone.disableInteractive();
+      });
+      this.drawChipButton(this.allInChipButton.bg, 634, 562, this.currentCoins, true);
+      this.allInChipButton.bg.setVisible(true);
+      this.allInChipButton.label.setText(String(this.currentCoins)).setVisible(true);
+      this.allInChipButton.zone.setVisible(true).setInteractive({ cursor: 'pointer' });
+      return;
+    }
+
+    if (!CHIP_VALUES.includes(this.selectedChip as (typeof CHIP_VALUES)[number])) {
+      this.selectedChip = 25;
+    }
+    this.chipSelector.forEach((c) => {
+      c.bg.setVisible(true);
+      c.label.setVisible(true);
+      c.zone.setInteractive({ cursor: 'pointer' });
+      this.drawChipButton(c.bg, 0, 0, c.value, c.value === this.selectedChip, c.label);
+    });
+    this.allInChipButton.bg.setVisible(false);
+    this.allInChipButton.label.setVisible(false);
+    this.allInChipButton.zone.disableInteractive().setVisible(false);
+  }
+
   // ── Audio (mirrors WheelScene pattern) ────────────────────────────────
   private resolveSpinDurationMs(): number {
     if (!this.cache.audio.exists('wheel-spin')) return 5200;
@@ -750,7 +810,7 @@ export class RouletteScene extends Scene {
       try {
         this.scene.get('DungeonScene').events.emit('game-complete', {
           coins: this.currentCoins,
-          won: true,
+          won: this.currentCoins > 0,
         });
       } catch (_) { /* no-op */ }
       this.scene.stop('RouletteScene');

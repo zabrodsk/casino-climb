@@ -18,7 +18,9 @@ export class CoinFlipScene extends Scene {
   private floorNumber: number = 1;
   private winTarget: number = DEFAULT_TARGET;
   private selectedBet: number = 0;
+  private lastBetCost: number = 0;
   private riskType: RiskType = 'flip';
+  private coinGuess: 'heads' | 'tails' = 'heads';
   private diceGuess: 'low' | 'high' = 'low';
   private animating: boolean = false;
 
@@ -28,9 +30,13 @@ export class CoinFlipScene extends Scene {
   private playBtn!: GameObjects.Graphics;
   private playBtnText!: GameObjects.Text;
   private leaveBtn!: GameObjects.Graphics;
-  private betButtons!: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; bet: number }>;
+  private betButtons!: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; bet: number; zone: GameObjects.Zone }>;
+  private allInBetButton!: { bg: GameObjects.Graphics; label: GameObjects.Text; zone: GameObjects.Zone };
   private flipBtn!: { bg: GameObjects.Graphics; label: GameObjects.Text };
   private diceBtn!: { bg: GameObjects.Graphics; label: GameObjects.Text };
+  private flipGuessGroup!: GameObjects.Container;
+  private headsBtn!: { bg: GameObjects.Graphics; label: GameObjects.Text };
+  private tailsBtn!: { bg: GameObjects.Graphics; label: GameObjects.Text };
   private diceGuessGroup!: GameObjects.Container;
   private lowBtn!: { bg: GameObjects.Graphics; label: GameObjects.Text };
   private highBtn!: { bg: GameObjects.Graphics; label: GameObjects.Text };
@@ -47,7 +53,9 @@ export class CoinFlipScene extends Scene {
     this.floorNumber = data.floor ?? 1;
     this.winTarget = FLOOR_CONFIG[this.floorNumber]?.target ?? DEFAULT_TARGET;
     this.selectedBet = 0;
+    this.lastBetCost = 0;
     this.riskType = 'flip';
+    this.coinGuess = 'heads';
     this.diceGuess = 'low';
     this.animating = false;
   }
@@ -138,8 +146,20 @@ export class CoinFlipScene extends Scene {
       zone.on('pointerout', () => { if (this.selectedBet !== bet) drawNestedButton(bg, x, betY, btnW, btnH, false); });
       zone.on('pointerdown', () => { if (!this.animating) this.selectBet(bet); });
 
-      this.betButtons.push({ bg, label, bet });
+      this.betButtons.push({ bg, label, bet, zone });
     });
+
+    const allInBg = this.add.graphics().setVisible(false);
+    const allInLabel = this.add.text(W / 2, betY, '', buttonLabelStyle(18)).setOrigin(0.5).setVisible(false);
+    const allInZone = this.add.zone(W / 2, betY, 220, btnH).setVisible(false);
+    allInZone.on('pointerdown', () => {
+      if (this.animating || !this.isLowCoinBetMode()) return;
+      this.selectedBet = this.currentCoins;
+      AudioManager.playSfx(this, 'bet-select', { volume: 1.3, cooldownMs: 50, allowOverlap: false });
+      this.refreshBetButtons();
+      this.updatePlayButton();
+    });
+    this.allInBetButton = { bg: allInBg, label: allInLabel, zone: allInZone };
 
     // --- Risk mode toggle ---
     this.add.text(W / 2, 258, 'SELECT MODE', {
@@ -180,13 +200,37 @@ export class CoinFlipScene extends Scene {
     const diceZone = this.add.zone(W / 2 + 110, modeY, modeBtnW, modeBtnH).setInteractive({ cursor: 'pointer' });
     diceZone.on('pointerdown', () => { if (!this.animating) this.selectMode('dice'); });
 
-    // --- Dice guess group (LOW / HIGH) ---
-    this.diceGuessGroup = this.add.container(0, 0);
-    this.diceGuessGroup.setVisible(false);
+    // --- Coin guess group (HEADS / TAILS) ---
+    this.flipGuessGroup = this.add.container(0, 0);
+    this.flipGuessGroup.setVisible(true);
 
     const guessY = 376;
     const guessBtnW = 130;
     const guessBtnH = 40;
+
+    const headsBg = this.add.graphics();
+    const headsLabel = this.add.text(W / 2 - 90, guessY, 'HEADS', buttonLabelStyle(14)).setOrigin(0.5);
+    drawNestedButton(headsBg, W / 2 - 90, guessY, guessBtnW, guessBtnH, true);
+    this.headsBtn = { bg: headsBg, label: headsLabel };
+
+    const tailsBg = this.add.graphics();
+    const tailsLabel = this.add.text(W / 2 + 90, guessY, 'TAILS', buttonLabelStyle(14)).setOrigin(0.5);
+    drawNestedButton(tailsBg, W / 2 + 90, guessY, guessBtnW, guessBtnH, false);
+    this.tailsBtn = { bg: tailsBg, label: tailsLabel };
+
+    const headsZone = this.add.zone(W / 2 - 90, guessY, guessBtnW, guessBtnH).setInteractive({ cursor: 'pointer' });
+    headsZone.on('pointerdown', () => { if (!this.animating) this.selectCoinGuess('heads'); });
+    const tailsZone = this.add.zone(W / 2 + 90, guessY, guessBtnW, guessBtnH).setInteractive({ cursor: 'pointer' });
+    tailsZone.on('pointerdown', () => { if (!this.animating) this.selectCoinGuess('tails'); });
+
+    this.flipGuessGroup.add([headsBg, headsLabel, tailsBg, tailsLabel]);
+
+    (this.flipGuessGroup as any).headsZone = headsZone;
+    (this.flipGuessGroup as any).tailsZone = tailsZone;
+
+    // --- Dice guess group (LOW / HIGH) ---
+    this.diceGuessGroup = this.add.container(0, 0);
+    this.diceGuessGroup.setVisible(false);
 
     const lowBg = this.add.graphics();
     const lowLabel = this.add.text(W / 2 - 90, guessY, 'LOW (1-3)', buttonLabelStyle(14)).setOrigin(0.5);
@@ -305,6 +349,7 @@ export class CoinFlipScene extends Scene {
   }
 
   private selectBet(bet: number) {
+    if (this.isLowCoinBetMode()) return;
     this.selectedBet = this.selectedBet === bet ? 0 : bet;
     AudioManager.playSfx(this, 'bet-select', { volume: 1.3, cooldownMs: 50, allowOverlap: false });
     this.refreshBetButtons();
@@ -319,8 +364,18 @@ export class CoinFlipScene extends Scene {
     const betSpacing = 140;
     const betStartX = W / 2 - betSpacing;
 
-    this.betButtons.forEach(({ bg, label, bet }, i) => {
+    const lowCoinMode = this.isLowCoinBetMode();
+    this.betButtons.forEach(({ bg, label, bet, zone }, i) => {
       const x = betStartX + i * betSpacing;
+      if (lowCoinMode) {
+        bg.setVisible(false);
+        label.setVisible(false);
+        zone.disableInteractive();
+        return;
+      }
+      bg.setVisible(true);
+      label.setVisible(true);
+      zone.setInteractive({ cursor: 'pointer' });
       const disabled = this.getBetCost(bet) > this.currentCoins;
       const active = this.selectedBet === bet;
 
@@ -335,6 +390,23 @@ export class CoinFlipScene extends Scene {
         label.setColor(COLOR.ivory).setStroke(COLOR.woodDeep, 5);
       }
     });
+
+    if (lowCoinMode) {
+      this.selectedBet = this.currentCoins;
+      this._drawSelectedBtn(this.allInBetButton.bg, W / 2, betY, 220, btnH);
+      this.allInBetButton.label
+        .setText(`BET ${this.currentCoins}`)
+        .setColor(COLOR.ivory)
+        .setStroke(COLOR.woodDeep, 5)
+        .setVisible(true);
+      this.allInBetButton.bg.setVisible(true);
+      this.allInBetButton.zone.setVisible(true).setInteractive({ cursor: 'pointer' });
+      return;
+    }
+
+    this.allInBetButton.bg.setVisible(false);
+    this.allInBetButton.label.setVisible(false);
+    this.allInBetButton.zone.disableInteractive().setVisible(false);
   }
 
   private selectMode(mode: RiskType) {
@@ -346,6 +418,9 @@ export class CoinFlipScene extends Scene {
       this.flipBtn.label.setColor(COLOR.ivory);
       drawNestedButton(this.diceBtn.bg, 1024 / 2 + 110, 305, 180, 50, false);
       this.diceBtn.label.setColor(COLOR.ivorySoft);
+      this.flipGuessGroup.setVisible(true);
+      (this.flipGuessGroup as any).headsZone?.setVisible(true);
+      (this.flipGuessGroup as any).tailsZone?.setVisible(true);
       this.diceGuessGroup.setVisible(false);
       (this.diceGuessGroup as any).lowZone?.setVisible(false);
       (this.diceGuessGroup as any).highZone?.setVisible(false);
@@ -354,9 +429,32 @@ export class CoinFlipScene extends Scene {
       this.diceBtn.label.setColor(COLOR.ivory);
       drawNestedButton(this.flipBtn.bg, 1024 / 2 - 110, 305, 180, 50, false);
       this.flipBtn.label.setColor(COLOR.ivorySoft);
+      this.flipGuessGroup.setVisible(false);
+      (this.flipGuessGroup as any).headsZone?.setVisible(false);
+      (this.flipGuessGroup as any).tailsZone?.setVisible(false);
       this.diceGuessGroup.setVisible(true);
       (this.diceGuessGroup as any).lowZone?.setVisible(true);
       (this.diceGuessGroup as any).highZone?.setVisible(true);
+    }
+  }
+
+  private selectCoinGuess(guess: 'heads' | 'tails') {
+    this.coinGuess = guess;
+    AudioManager.playSfx(this, 'ui-click', { volume: 0.75, cooldownMs: 50, allowOverlap: false });
+    const guessY = 376;
+    const guessBtnW = 130;
+    const guessBtnH = 40;
+
+    if (guess === 'heads') {
+      this._drawSelectedBtn(this.headsBtn.bg, 1024 / 2 - 90, guessY, guessBtnW, guessBtnH);
+      this.headsBtn.label.setColor(COLOR.ivory).setStroke(COLOR.woodDeep, 5);
+      drawNestedButton(this.tailsBtn.bg, 1024 / 2 + 90, guessY, guessBtnW, guessBtnH, false);
+      this.tailsBtn.label.setColor(COLOR.ivorySoft).setStroke(COLOR.woodDeep, 5);
+    } else {
+      this._drawSelectedBtn(this.tailsBtn.bg, 1024 / 2 + 90, guessY, guessBtnW, guessBtnH);
+      this.tailsBtn.label.setColor(COLOR.ivory).setStroke(COLOR.woodDeep, 5);
+      drawNestedButton(this.headsBtn.bg, 1024 / 2 - 90, guessY, guessBtnW, guessBtnH, false);
+      this.headsBtn.label.setColor(COLOR.ivorySoft).setStroke(COLOR.woodDeep, 5);
     }
   }
 
@@ -381,11 +479,26 @@ export class CoinFlipScene extends Scene {
   }
 
   private canPlay(): boolean {
-    return isValidBet(this.currentCoins, this.getBetCost()) && !this.animating;
+    return this.isBetPlayable() && !this.animating;
   }
 
   private getBetCost(bet = this.selectedBet): number {
+    if (this.isLowCoinBetMode()) {
+      return this.currentCoins;
+    }
     return getDiscountedBetAmount(bet, this.floorNumber);
+  }
+
+  private isLowCoinBetMode(): boolean {
+    return this.currentCoins > 0 && this.currentCoins < 10;
+  }
+
+  private isBetPlayable(): boolean {
+    const betCost = this.getBetCost();
+    if (this.isLowCoinBetMode()) {
+      return betCost > 0 && betCost <= this.currentCoins;
+    }
+    return isValidBet(this.currentCoins, betCost);
   }
 
   private updatePlayButton() {
@@ -405,6 +518,7 @@ export class CoinFlipScene extends Scene {
     AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 40, allowOverlap: false });
     betFlash(this);
     this.animating = true;
+    this.lastBetCost = this.getBetCost();
     this.resultText.setText('');
     this.targetReachedText.setVisible(false);
     this.updatePlayButton();
@@ -504,13 +618,14 @@ export class CoinFlipScene extends Scene {
   private resolvePlay() {
     const result = play({
       coins: this.currentCoins,
-      bet: this.getBetCost(),
+      bet: this.lastBetCost,
       riskType: this.riskType,
+      coinGuess: this.coinGuess,
       diceGuess: this.diceGuess,
     });
 
     if (this.riskType === 'flip') {
-      const side = result.displayResult === 'Heads!' ? 'H' : 'T';
+      const side = result.displayResult.toLowerCase().includes('heads') ? 'H' : 'T';
       const cx = 1024 / 2;
       const cy = 450;
       this.animGraphic.clear();
@@ -539,7 +654,7 @@ export class CoinFlipScene extends Scene {
     this.resultText.setText(
       result.won
         ? `${result.displayResult} — +${result.payout / 2} coins!`
-        : `${result.displayResult} — Lost ${this.getBetCost()} coins`
+        : `${result.displayResult} — Lost ${this.lastBetCost} coins`
     );
     this.resultText.setColor(result.won ? COLOR.winGreen : COLOR.loseRed);
     AudioManager.playSfx(this, result.won ? 'win' : 'lose', {
@@ -561,7 +676,7 @@ export class CoinFlipScene extends Scene {
     }
 
     this.refreshBetButtons();
-    if (!isValidBet(this.currentCoins, this.getBetCost())) {
+    if (!this.isBetPlayable()) {
       this.selectedBet = 0;
     }
     this.updatePlayButton();

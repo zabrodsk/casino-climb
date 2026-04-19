@@ -41,7 +41,8 @@ export class CrashScene extends Scene {
   private cashOutBtn!: GameObjects.Graphics;
   private cashOutBtnText!: GameObjects.Text;
   private leaveBtn!: GameObjects.Graphics;
-  private betButtons!: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; bet: number }>;
+  private betButtons!: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; bet: number; zone: GameObjects.Zone }>;
+  private allInBetButton!: { bg: GameObjects.Graphics; label: GameObjects.Text; zone: GameObjects.Zone };
   private flashOverlay!: GameObjects.Graphics;
 
   // Zone refs stored for enable/disable
@@ -154,8 +155,19 @@ export class CrashScene extends Scene {
       });
       zone.on('pointerdown', () => { if (!this.playing) this.selectBet(bet); });
 
-      this.betButtons.push({ bg, label, bet });
+      this.betButtons.push({ bg, label, bet, zone });
     });
+    const allInBg = this.add.graphics().setVisible(false);
+    const allInLabel = this.add.text(W / 2, betY, '', buttonLabelStyle(18)).setOrigin(0.5).setVisible(false);
+    const allInZone = this.add.zone(W / 2, betY, 220, btnH).setVisible(false);
+    allInZone.on('pointerdown', () => {
+      if (this.playing || !this.isLowCoinBetMode()) return;
+      this.selectedBet = this.currentCoins;
+      AudioManager.playSfx(this, 'bet-select', { volume: 1.3, cooldownMs: 50, allowOverlap: false });
+      this.refreshBetButtons();
+      this.updatePlayButton();
+    });
+    this.allInBetButton = { bg: allInBg, label: allInLabel, zone: allInZone };
 
     // --- Multiplier display (center) ---
     this.multDisplay = this.add.text(W / 2, 310, '1.00x', {
@@ -277,6 +289,7 @@ export class CrashScene extends Scene {
   }
 
   private selectBet(bet: number) {
+    if (this.isLowCoinBetMode()) return;
     this.selectedBet = this.selectedBet === bet ? 0 : bet;
     AudioManager.playSfx(this, 'bet-select', { volume: 1.3, cooldownMs: 50, allowOverlap: false });
     this.refreshBetButtons();
@@ -291,8 +304,18 @@ export class CrashScene extends Scene {
     const betSpacing = 140;
     const betStartX = W / 2 - betSpacing;
 
-    this.betButtons.forEach(({ bg, label, bet }, i) => {
+    const lowCoinMode = this.isLowCoinBetMode();
+    this.betButtons.forEach(({ bg, label, bet, zone }, i) => {
       const x = betStartX + i * betSpacing;
+      if (lowCoinMode) {
+        bg.setVisible(false);
+        label.setVisible(false);
+        zone.disableInteractive();
+        return;
+      }
+      bg.setVisible(true);
+      label.setVisible(true);
+      zone.setInteractive({ cursor: 'pointer' });
       const disabled = this.getBetCost(bet) > this.currentCoins;
       const active = this.selectedBet === bet;
 
@@ -307,14 +330,46 @@ export class CrashScene extends Scene {
         label.setColor(COLOR.ivory).setStroke(COLOR.woodDeep, 5);
       }
     });
+
+    if (lowCoinMode) {
+      this.selectedBet = this.currentCoins;
+      this._drawSelectedBtn(this.allInBetButton.bg, W / 2, betY, 220, btnH);
+      this.allInBetButton.label
+        .setText(`BET ${this.currentCoins}`)
+        .setColor(COLOR.ivory)
+        .setStroke(COLOR.woodDeep, 5)
+        .setVisible(true);
+      this.allInBetButton.bg.setVisible(true);
+      this.allInBetButton.zone.setVisible(true).setInteractive({ cursor: 'pointer' });
+      return;
+    }
+
+    this.allInBetButton.bg.setVisible(false);
+    this.allInBetButton.label.setVisible(false);
+    this.allInBetButton.zone.disableInteractive().setVisible(false);
   }
 
   private canPlay(): boolean {
-    return isValidBet(this.currentCoins, this.getBetCost()) && !this.playing;
+    return this.isBetPlayable() && !this.playing;
   }
 
   private getBetCost(bet = this.selectedBet): number {
+    if (this.isLowCoinBetMode()) {
+      return this.currentCoins;
+    }
     return getDiscountedBetAmount(bet, this.floorNumber);
+  }
+
+  private isLowCoinBetMode(): boolean {
+    return this.currentCoins > 0 && this.currentCoins < 10;
+  }
+
+  private isBetPlayable(): boolean {
+    const betCost = this.getBetCost();
+    if (this.isLowCoinBetMode()) {
+      return betCost > 0 && betCost <= this.currentCoins;
+    }
+    return isValidBet(this.currentCoins, betCost);
   }
 
   private updatePlayButton() {
@@ -476,6 +531,10 @@ export class CrashScene extends Scene {
 
     this.resultText.setText(`CRASHED @ ${this.crashPoint.toFixed(2)}x — lost ${betCost}`);
     this.resultText.setColor(COLOR.loseRed);
+    if (this.currentCoins <= 0) {
+      this.time.delayedCall(700, () => this.leave());
+      return;
+    }
 
     HouseController.say(this, 'gameSpecific', 'crashLost');
     if (this.currentCoins < 120) {
@@ -491,7 +550,7 @@ export class CrashScene extends Scene {
     this.playBtnText.setVisible(true);
     this._playZone.setVisible(true);
 
-    if (!isValidBet(this.currentCoins, this.getBetCost())) {
+    if (!this.isBetPlayable()) {
       this.selectedBet = 0;
     }
     this.refreshBetButtons();
@@ -548,11 +607,14 @@ export class CrashScene extends Scene {
     this.playBtnText.setVisible(true);
     this._playZone.setVisible(true);
 
-    if (!isValidBet(this.currentCoins, this.getBetCost())) {
+    if (!this.isBetPlayable()) {
       this.selectedBet = 0;
     }
     this.refreshBetButtons();
     this.updatePlayButton();
+    if (this.currentCoins <= 0) {
+      this.time.delayedCall(700, () => this.leave());
+    }
   }
 
   leave() {

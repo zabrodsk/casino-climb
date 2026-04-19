@@ -21,7 +21,6 @@ import { HouseController } from '../ui/HouseController';
 import { DialogueBus } from '../ui/DialogueBus';
 
 const WAGERS = [10, 25, 50, 100] as const;
-type Wager = typeof WAGERS[number];
 
 const REEL_W = 110;
 const REEL_H = 140;
@@ -45,7 +44,7 @@ export class SlotMachineScene extends Scene {
 
   private coinsText!: GameObjects.Text;
   private statusText!: GameObjects.Text;
-  private selectedWager: Wager = 25;
+  private selectedWager = 25;
 
   private reelContainers: GameObjects.Container[] = [];
   private reelStrips: Array<{ symbols: SlotSymbol[]; height: number }> = [];
@@ -54,7 +53,9 @@ export class SlotMachineScene extends Scene {
 
   private pullBtn!: GameObjects.Graphics;
   private pullZone!: GameObjects.Zone;
-  private wagerButtons: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; value: Wager; zone: GameObjects.Zone }> = [];
+  private wagerButtons: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; value: number; zone: GameObjects.Zone }> = [];
+  private wagerLabel!: GameObjects.Text;
+  private allInWagerButton!: { bg: GameObjects.Graphics; label: GameObjects.Text; zone: GameObjects.Zone };
 
   private leverArm!: GameObjects.Graphics;
   private leverKnob!: GameObjects.Arc;
@@ -336,18 +337,34 @@ export class SlotMachineScene extends Scene {
       const btn = { bg, label, value, zone };
       zone.on('pointerdown', () => {
         if (this.spinning) return;
+        if (this.isLowCoinWagerMode()) return;
         this.selectedWager = value;
-        this.wagerButtons.forEach((w) => this.drawWagerButton(w.bg, w.label.x, w.label.y, w.value, w.value === this.selectedWager));
+        this.refreshWagerControls();
       });
       this.wagerButtons.push(btn);
     }
 
-    this.add.text(CENTER_X, y - 44, `Wager: ${this.selectedWager}`, {
+    this.wagerLabel = this.add.text(CENTER_X, y - 44, `Wager: ${this.selectedWager}`, {
       fontSize: '18px', fontFamily: FONT.mono, color: '#ffdf6a',
     }).setOrigin(0.5).setResolution(2);
+
+    const allInBg = this.add.graphics().setVisible(false);
+    const allInLabel = this.add.text(CENTER_X, y, '', {
+      fontSize: '20px', fontFamily: FONT.mono, fontStyle: 'bold',
+      color: '#ffffff', stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(0.5).setResolution(2).setVisible(false);
+    const allInZone = this.add.zone(CENTER_X, y, 140, 54).setVisible(false);
+    allInZone.on('pointerdown', () => {
+      if (this.spinning || !this.isLowCoinWagerMode()) return;
+      this.selectedWager = this.currentCoins;
+      this.refreshWagerControls();
+      AudioManager.playSfx(this, 'bet-select', { volume: 1.0, cooldownMs: 50, allowOverlap: false });
+    });
+    this.allInWagerButton = { bg: allInBg, label: allInLabel, zone: allInZone };
+    this.refreshWagerControls();
   }
 
-  private drawWagerButton(g: GameObjects.Graphics, cx: number, cy: number, value: Wager, selected: boolean): void {
+  private drawWagerButton(g: GameObjects.Graphics, cx: number, cy: number, value: number, selected: boolean): void {
     g.clear();
     const fill = value === 10 ? 0x2a7ac9 : value === 25 ? 0x1d8a3a : value === 50 ? 0xb0a040 : 0x8f1818;
     g.fillStyle(0x0a0a0a, 1);
@@ -416,6 +433,7 @@ export class SlotMachineScene extends Scene {
     this.pullZone.disableInteractive();
     this.currentCoins -= this.selectedWager;
     this.coinsText.setText(`Coins: ${this.currentCoins}`);
+    this.refreshWagerControls();
     this.statusText.setText('Reels spinning...');
 
     // Pulse the status text while spinning
@@ -514,6 +532,12 @@ export class SlotMachineScene extends Scene {
     }
     this.currentCoins += payout;
     this.coinsText.setText(`Coins: ${this.currentCoins}`);
+    this.refreshWagerControls();
+    if (this.currentCoins <= 0) {
+      this.statusText.setText('Out of coins.');
+      this.time.delayedCall(700, () => this.leave());
+      return;
+    }
 
     const net = payout - this.selectedWager;
     const heading = net > 0 ? `WIN +${net}` : net < 0 ? `LOSS ${net}` : 'PUSH';
@@ -662,6 +686,42 @@ export class SlotMachineScene extends Scene {
     DialogueBus.say(this, text);
   }
 
+  private isLowCoinWagerMode(): boolean {
+    return this.currentCoins > 0 && this.currentCoins < 10;
+  }
+
+  private refreshWagerControls(): void {
+    const lowCoinMode = this.isLowCoinWagerMode();
+    if (lowCoinMode) {
+      this.selectedWager = this.currentCoins;
+      this.wagerButtons.forEach(({ bg, label, zone }) => {
+        bg.setVisible(false);
+        label.setVisible(false);
+        zone.disableInteractive();
+      });
+      this.drawWagerButton(this.allInWagerButton.bg, CENTER_X, this.allInWagerButton.label.y, this.currentCoins, true);
+      this.allInWagerButton.bg.setVisible(true);
+      this.allInWagerButton.label.setText(String(this.currentCoins)).setVisible(true);
+      this.allInWagerButton.zone.setVisible(true).setInteractive({ cursor: 'pointer' });
+      this.wagerLabel.setText(`Wager: ${this.currentCoins}`);
+      return;
+    }
+
+    if (!WAGERS.includes(this.selectedWager as (typeof WAGERS)[number])) {
+      this.selectedWager = 25;
+    }
+    this.wagerButtons.forEach((w) => {
+      w.bg.setVisible(true);
+      w.label.setVisible(true);
+      w.zone.setInteractive({ cursor: 'pointer' });
+      this.drawWagerButton(w.bg, w.label.x, w.label.y, w.value, w.value === this.selectedWager);
+    });
+    this.allInWagerButton.bg.setVisible(false);
+    this.allInWagerButton.label.setVisible(false);
+    this.allInWagerButton.zone.disableInteractive().setVisible(false);
+    this.wagerLabel.setText(`Wager: ${this.selectedWager}`);
+  }
+
   private leave(): void {
     this.stopSpinSound();
     this.cameras.main.fadeOut(300, 0, 0, 0);
@@ -669,7 +729,7 @@ export class SlotMachineScene extends Scene {
       try {
         this.scene.get('DungeonScene').events.emit('game-complete', {
           coins: this.currentCoins,
-          won: true,
+          won: this.currentCoins > 0,
         });
       } catch (_) { /* no-op */ }
       this.scene.stop('SlotMachineScene');

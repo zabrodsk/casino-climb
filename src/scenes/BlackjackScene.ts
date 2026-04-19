@@ -80,7 +80,8 @@ export class BlackjackScene extends Scene {
   private splitAction!: ActionButton;
 
   private leaveBtn!: GameObjects.Graphics;
-  private betButtons!: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; bet: number }>;
+  private betButtons!: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; bet: number; zone: GameObjects.Zone }>;
+  private allInBetButton!: { bg: GameObjects.Graphics; label: GameObjects.Text; zone: GameObjects.Zone };
 
   constructor() {
     super('BlackjackScene');
@@ -272,8 +273,20 @@ export class BlackjackScene extends Scene {
         }
       });
 
-      this.betButtons.push({ bg, label, bet });
+      this.betButtons.push({ bg, label, bet, zone });
     });
+
+    const allInBg = this.add.graphics().setVisible(false);
+    const allInLabel = this.add.text(W / 2, betY, '', buttonLabelStyle(18)).setOrigin(0.5).setVisible(false);
+    const allInZone = this.add.zone(W / 2, betY, 220, btnH).setVisible(false);
+    allInZone.on('pointerdown', () => {
+      if (this.roundActive || !this.isLowCoinBetMode()) return;
+      AudioManager.playSfx(this, 'bet-select', { volume: 1.3, cooldownMs: 50, allowOverlap: false });
+      this.selectedBet = this.currentCoins;
+      this.updateBetButtons();
+      this.updateActionButtons();
+    });
+    this.allInBetButton = { bg: allInBg, label: allInLabel, zone: allInZone };
   }
 
   private _createHandsArea(): void {
@@ -369,7 +382,7 @@ export class BlackjackScene extends Scene {
   }
 
   private canDeal(): boolean {
-    return !this.roundActive && isValidBet(this.currentCoins, this.getBetCost());
+    return !this.roundActive && this.isBetPlayable();
   }
 
   private canDoubleActive(): boolean {
@@ -392,7 +405,22 @@ export class BlackjackScene extends Scene {
   }
 
   private getBetCost(bet = this.selectedBet): number {
+    if (this.isLowCoinBetMode()) {
+      return this.currentCoins;
+    }
     return getDiscountedBetAmount(bet, this.floorNumber);
+  }
+
+  private isLowCoinBetMode(): boolean {
+    return this.currentCoins > 0 && this.currentCoins < 10;
+  }
+
+  private isBetPlayable(): boolean {
+    const betCost = this.getBetCost();
+    if (this.isLowCoinBetMode()) {
+      return betCost > 0 && betCost <= this.currentCoins;
+    }
+    return isValidBet(this.currentCoins, betCost);
   }
 
   private updateBetButtons(): void {
@@ -403,8 +431,18 @@ export class BlackjackScene extends Scene {
     const spacing = 140;
     const startX = W / 2 - spacing;
 
-    this.betButtons.forEach(({ bg, label, bet }, index) => {
+    const lowCoinMode = this.isLowCoinBetMode();
+    this.betButtons.forEach(({ bg, label, bet, zone }, index) => {
       const x = startX + index * spacing;
+      if (lowCoinMode) {
+        bg.setVisible(false);
+        label.setVisible(false);
+        zone.disableInteractive();
+        return;
+      }
+      bg.setVisible(true);
+      label.setVisible(true);
+      zone.setInteractive({ cursor: 'pointer' });
       const disabled = this.roundActive || this.getBetCost(bet) > this.currentCoins;
       const active = this.selectedBet === bet;
 
@@ -421,6 +459,29 @@ export class BlackjackScene extends Scene {
         label.setColor(COLOR.ivory).setStroke(COLOR.woodDeep, 5);
       }
     });
+
+    if (lowCoinMode) {
+      this.selectedBet = this.currentCoins;
+      if (this.roundActive) {
+        this.drawDisabledButton(this.allInBetButton.bg, W / 2, betY, 220, btnH);
+        this.setDisabledLabel(this.allInBetButton.label);
+        this.allInBetButton.zone.disableInteractive();
+      } else {
+        drawNestedButton(this.allInBetButton.bg, W / 2, betY, 220, btnH, true);
+        this.allInBetButton.bg.lineStyle(2, THEME.ivory, 0.7);
+        this.allInBetButton.bg.strokeRect(W / 2 - 110, betY - btnH / 2, 220, btnH);
+        this.allInBetButton.label.setColor(COLOR.ivory).setStroke(COLOR.woodDeep, 5);
+        this.allInBetButton.zone.setInteractive({ cursor: 'pointer' });
+      }
+      this.allInBetButton.label.setText(`BET ${this.currentCoins}`).setVisible(true);
+      this.allInBetButton.bg.setVisible(true);
+      this.allInBetButton.zone.setVisible(true);
+      return;
+    }
+
+    this.allInBetButton.bg.setVisible(false);
+    this.allInBetButton.label.setVisible(false);
+    this.allInBetButton.zone.disableInteractive().setVisible(false);
   }
 
   private updateActionButtons(): void {
@@ -663,7 +724,12 @@ export class BlackjackScene extends Scene {
       this.targetReachedText.setText('Target reached! You may advance.').setVisible(true);
     }
 
-    if (!isValidBet(this.currentCoins, this.getBetCost())) {
+    if (this.currentCoins <= 0) {
+      this.time.delayedCall(700, () => this.leave());
+      return;
+    }
+
+    if (!this.isBetPlayable()) {
       this.selectedBet = 0;
     }
 

@@ -11,6 +11,7 @@ export interface CoinFlipInput {
   coins: number;
   bet: number;
   riskType: RiskType;
+  coinGuess?: 'heads' | 'tails'; // for coin mode
   diceGuess?: 'low' | 'high'; // for dice mode: low = 1-3, high = 4-6
 }
 
@@ -19,12 +20,12 @@ export interface CoinFlipInput {
  * Dice Duel: 1-6 die. Player guesses low (1-3) or high (4-6). 50% chance. Payout = 2 × bet.
  */
 export function play(input: CoinFlipInput): CoinFlipResult {
-  const { coins, bet, riskType, diceGuess = 'low' } = input;
+  const { coins, bet, riskType, coinGuess = 'heads', diceGuess = 'low' } = input;
 
   if (riskType === 'flip') {
     const flip = Math.random() < 0.5 ? 'heads' : 'tails';
-    const won = flip === 'heads';
-    const displayResult = won ? 'Heads!' : 'Tails';
+    const won = flip === coinGuess;
+    const displayResult = flip === 'heads' ? 'Heads!' : 'Tails!';
     return {
       won,
       payout: won ? bet * 2 : 0,
