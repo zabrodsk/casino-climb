@@ -227,6 +227,13 @@ export class DungeonScene extends Scene {
       // Hide the tileset table tile; composite sprite is placed below
       this.propLayer.removeTileAt(tablePos.col, tablePos.row);
       const tableTexture = cfg.compositeTableTexture ?? 'casino-table';
+      const primaryTableScale = cfg.gameSceneKey === 'WheelScene'
+        ? 2
+        : cfg.gameSceneKey === 'BlackjackScene'
+          ? 1.35
+          : cfg.gameSceneKey === 'CoinFlipScene'
+            ? 0.05
+          : 1;
       this.add
         .image(
           tablePos.col * TILE_SIZE + TILE_SIZE / 2,
@@ -235,7 +242,7 @@ export class DungeonScene extends Scene {
         )
         .setOrigin(0.5, 0.5)
         .setDepth(3)
-        .setScale(cfg.gameSceneKey === 'WheelScene' ? 2 : 1);
+        .setScale(primaryTableScale);
     } else {
       const tableTile = this.propLayer.getTileAt(tablePos.col, tablePos.row);
       if (tableTile) tableTile.tint = cfg.propTint.table;
@@ -259,13 +266,14 @@ export class DungeonScene extends Scene {
           )
           .setOrigin(0.5, 0.5)
           .setDepth(3)
-          .setScale(it.spriteScale ?? 1);
+          .setScale(it.spriteScale ?? 1)
+          .setAngle(it.rotationDeg ?? 0);
       }
     }
 
     if (isFateRoom) {
-      const slotRow = this.add.image(TILE_SIZE + 2, TILE_SIZE + 6, 'fate-slot-row')
-        .setOrigin(0, 0)
+      const slotRow = this.add.image(0, TILE_SIZE, 'fate-slot-row')
+        .setOrigin(-0.4, -0.05)
         .setDepth(3);
       const targetHeight = TILE_SIZE * 10;
       slotRow.setScale(targetHeight / slotRow.height);

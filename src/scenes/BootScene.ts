@@ -22,6 +22,8 @@ export class BootScene extends Scene {
     // Load tileset image (304x208, 16x16 tiles, 19 cols x 13 rows)
     this.load.image('dungeon-tiles', 'assets/tilemaps/dungeon_tileset.png');
     this.load.image('fate-slot-row', 'assets/sprites/slot-machine-row.png');
+    this.load.image('table-dice-art', 'assets/sprites/dice-table-art.png');
+    this.load.image('table-blackjack-art', 'assets/sprites/blackjack-table-art.png');
     this.load.image('table-roulette-art', 'assets/sprites/roulette-table.png');
 
     AudioManager.preload(this);
@@ -640,48 +642,50 @@ export class BootScene extends Scene {
     g.fillRect(10, 10, 1, 1);
     g.generateTexture('vault-floor-b', 16, 16);
 
-    // Lobby table: coin + dice laid out to sell the floor 1 minigames.
-    g.clear();
-    g.fillStyle(0xc9a66b);
-    g.fillRect(0, 0, 48, 32);
-    g.fillStyle(0x8a7448);
-    g.fillRect(1, 1, 46, 30);
-    g.fillStyle(0x1a5a2a);
-    g.fillRect(2, 2, 44, 28);
-    g.fillStyle(0xc9a66b);
-    g.fillRect(12, 8, 24, 2);
-    g.fillRect(14, 6, 20, 2);
-    g.fillRect(18, 4, 12, 2);
-    g.fillRect(20, 3, 8, 1);
-    g.fillStyle(0xffd878);
-    g.fillCircle(14, 20, 5);
-    g.fillStyle(0x7a4e18);
-    g.fillRect(13, 17, 2, 6);
-    g.fillRect(11, 19, 6, 2);
-    g.fillStyle(0xf5eeda);
-    g.fillRect(25, 16, 7, 7);
-    g.fillRect(33, 14, 7, 7);
-    g.fillStyle(0xc9a66b);
-    g.fillRect(25, 16, 7, 1);
-    g.fillRect(25, 22, 7, 1);
-    g.fillRect(33, 14, 7, 1);
-    g.fillRect(33, 20, 7, 1);
-    g.fillStyle(0x2e1b00);
-    g.fillRect(27, 18, 1, 1);
-    g.fillRect(30, 18, 1, 1);
-    g.fillRect(28, 21, 1, 1);
-    g.fillRect(35, 16, 1, 1);
-    g.fillRect(38, 16, 1, 1);
-    g.fillRect(35, 19, 1, 1);
-    g.fillRect(38, 19, 1, 1);
-    g.fillStyle(0xc94a3a);
-    g.fillRect(4, 24, 5, 2);
-    g.fillRect(5, 22, 4, 2);
-    g.fillRect(39, 24, 5, 2);
-    g.fillRect(39, 22, 4, 2);
-    g.fillStyle(0x000000);
-    g.fillRect(0, 30, 48, 2);
-    g.generateTexture('table-lobby', 48, 32);
+    // Lobby table: generate fallback only when a custom texture was not preloaded.
+    if (!this.textures.exists('table-lobby')) {
+      g.clear();
+      g.fillStyle(0xc9a66b);
+      g.fillRect(0, 0, 48, 32);
+      g.fillStyle(0x8a7448);
+      g.fillRect(1, 1, 46, 30);
+      g.fillStyle(0x1a5a2a);
+      g.fillRect(2, 2, 44, 28);
+      g.fillStyle(0xc9a66b);
+      g.fillRect(12, 8, 24, 2);
+      g.fillRect(14, 6, 20, 2);
+      g.fillRect(18, 4, 12, 2);
+      g.fillRect(20, 3, 8, 1);
+      g.fillStyle(0xffd878);
+      g.fillCircle(14, 20, 5);
+      g.fillStyle(0x7a4e18);
+      g.fillRect(13, 17, 2, 6);
+      g.fillRect(11, 19, 6, 2);
+      g.fillStyle(0xf5eeda);
+      g.fillRect(25, 16, 7, 7);
+      g.fillRect(33, 14, 7, 7);
+      g.fillStyle(0xc9a66b);
+      g.fillRect(25, 16, 7, 1);
+      g.fillRect(25, 22, 7, 1);
+      g.fillRect(33, 14, 7, 1);
+      g.fillRect(33, 20, 7, 1);
+      g.fillStyle(0x2e1b00);
+      g.fillRect(27, 18, 1, 1);
+      g.fillRect(30, 18, 1, 1);
+      g.fillRect(28, 21, 1, 1);
+      g.fillRect(35, 16, 1, 1);
+      g.fillRect(38, 16, 1, 1);
+      g.fillRect(35, 19, 1, 1);
+      g.fillRect(38, 19, 1, 1);
+      g.fillStyle(0xc94a3a);
+      g.fillRect(4, 24, 5, 2);
+      g.fillRect(5, 22, 4, 2);
+      g.fillRect(39, 24, 5, 2);
+      g.fillRect(39, 22, 4, 2);
+      g.fillStyle(0x000000);
+      g.fillRect(0, 30, 48, 2);
+      g.generateTexture('table-lobby', 48, 32);
+    }
 
     // Crash table: monitor-like betting station with chart spike and cash-out strips.
     g.clear();

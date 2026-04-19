@@ -5,6 +5,8 @@ export interface FloorInteractable {
   compositeTableTexture?: string;
   /** Render scale for the composite sprite; mirrors WheelScene default (2) for the wheel. */
   spriteScale?: number;
+  /** Optional clockwise rotation in degrees for the interactable sprite. */
+  rotationDeg?: number;
 }
 
 export interface FloorConfig {
@@ -67,7 +69,7 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
     tableLabel: 'TABLE',
     floorTextures: { primary: 'casino-carpet-a', accent: 'casino-carpet-b' },
     useCompositeTable: true,
-    compositeTableTexture: 'table-lobby',
+    compositeTableTexture: 'table-dice-art',
     slotMachines: [
       { col: 3,  row: 2 },
       { col: 6,  row: 2 },
@@ -115,7 +117,7 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
     tableLabel: 'BLACKJACK',
     floorTextures: { primary: 'parlor-floor-a', accent: 'parlor-floor-b' },
     useCompositeTable: true,
-    compositeTableTexture: 'table-blackjack',
+    compositeTableTexture: 'table-blackjack-art',
     slotMachines: [
       { col: 3,  row: 2 },
       { col: 13, row: 2 },
@@ -144,7 +146,7 @@ export const FLOOR_CONFIG: Record<number, FloorConfig> = {
         gameSceneKey: 'RouletteScene',
         tableLabel: 'ROULETTE',
         compositeTableTexture: 'table-roulette-art',
-        spriteScale: 0.1,
+        spriteScale: 0.09,
       },
       {
         pos: { col: 1, row: 2 },

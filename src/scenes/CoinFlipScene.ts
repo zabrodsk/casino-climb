@@ -111,6 +111,7 @@ export class CoinFlipScene extends Scene {
     divider.lineStyle(1, THEME.goldDim, 0.3);
     divider.lineBetween(60, 118, W - 60, 118);
 
+
     // --- Bet buttons ---
     const betY = 185;
     this.add.text(W / 2, 148, 'SELECT BET', {
