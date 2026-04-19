@@ -22,11 +22,11 @@ import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 import { HouseController } from '../ui/HouseController';
 import { DialogueBus } from '../ui/DialogueBus';
 
-const WHEEL_CX = 320;
-const WHEEL_CY = 320;
-const WHEEL_R = 178;
-const POCKET_INNER = 132;
-const BALL_TRACK_R = WHEEL_R + 6;
+const WHEEL_CX = 210;
+const WHEEL_CY = 345;
+const WHEEL_R = 160;
+const POCKET_INNER = 119;
+const BALL_TRACK_R = WHEEL_R + 6; // = 166
 const BALL_R = 6;
 
 const CHIP_VALUES = [10, 25, 50, 100] as const;
@@ -70,9 +70,12 @@ export class RouletteScene extends Scene {
   private resultPanel!: GameObjects.Graphics;
   private resultTitle!: GameObjects.Text;
   private resultDetail!: GameObjects.Text;
+  private resultGlow!: GameObjects.Graphics;
   private continueBtn!: GameObjects.Graphics;
   private continueBtnText!: GameObjects.Text;
   private continueZone!: GameObjects.Zone;
+
+  private totalBetText!: GameObjects.Text;
 
   private spinning = false;
 
@@ -106,12 +109,13 @@ export class RouletteScene extends Scene {
     this.buildBettingBoard();
     this.buildChipSelector();
     this.buildActionButtons();
+    this.buildTotalBetDisplay();
     this.buildResultPanel();
 
-    this.statusText = this.add.text(W / 2, H - 28, 'Place chips, then SPIN.', {
-      fontSize: '18px',
+    this.statusText = this.add.text(512, H - 20, 'Place chips, then SPIN.', {
+      fontSize: '16px',
       fontFamily: FONT.mono,
-      color: '#e6e6e6',
+      color: '#c0c0c0',
     }).setOrigin(0.5).setResolution(2);
 
     addGameplaySettingsGear(this, 'RouletteScene');
@@ -129,23 +133,31 @@ export class RouletteScene extends Scene {
     bg.fillStyle(0x1a0c13, 1);
     bg.fillRect(0, 0, w, 100);
 
-    // Felt background behind the wheel
+    // Left felt — wheel zone
     const felt = this.add.graphics();
     felt.fillStyle(0x0d5a2e, 1);
-    felt.fillRoundedRect(30, 120, 600, 520, 24);
+    felt.fillRoundedRect(10, 105, 415, 555, 20);
     felt.lineStyle(6, 0x5a2510, 1);
-    felt.strokeRoundedRect(30, 120, 600, 520, 24);
+    felt.strokeRoundedRect(10, 105, 415, 555, 20);
     felt.lineStyle(2, 0xe0a242, 0.8);
-    felt.strokeRoundedRect(40, 130, 580, 500, 20);
+    felt.strokeRoundedRect(20, 115, 395, 535, 16);
 
-    // Right-side betting felt
+    // Right felt — board zone
     const rightFelt = this.add.graphics();
     rightFelt.fillStyle(0x0a4a26, 1);
-    rightFelt.fillRoundedRect(660, 120, 334, 520, 20);
+    rightFelt.fillRoundedRect(432, 105, 582, 555, 20);
     rightFelt.lineStyle(6, 0x5a2510, 1);
-    rightFelt.strokeRoundedRect(660, 120, 334, 520, 20);
+    rightFelt.strokeRoundedRect(432, 105, 582, 555, 20);
     rightFelt.lineStyle(2, 0xe0a242, 0.8);
-    rightFelt.strokeRoundedRect(670, 130, 314, 500, 16);
+    rightFelt.strokeRoundedRect(442, 115, 562, 535, 16);
+
+    // Thin vertical gold rail/divider between the two panels
+    const rail = this.add.graphics();
+    rail.fillStyle(0x5a2510, 1);
+    rail.fillRect(425, 105, 8, 555);
+    rail.lineStyle(1, 0xe0a242, 0.6);
+    rail.lineBetween(426, 108, 426, 657);
+    rail.lineBetween(432, 108, 432, 657);
   }
 
   private drawHeader(w: number): void {
@@ -253,100 +265,86 @@ export class RouletteScene extends Scene {
 
   // ── Betting board ─────────────────────────────────────────────────────
   private buildBettingBoard(): void {
-    const boardX = 680;
-    const boardY = 150;
-    const cellW = 48;
-    const cellH = 32;
+    const boardX = 444;   // left edge of board content
+    const boardY = 128;   // top of grid
+    const cellW = 38;
+    const cellH = 36;
+    const gap = 2;
 
-    // Header: "0"
-    this.addSpot({
-      kind: 'straight',
-      number: 0,
-      label: '0',
-      x: boardX,
-      y: boardY,
-      w: cellW,
-      h: cellH * 3 + 4,
-      color: 0x1d8a3a,
-    });
+    // "0" cell — spans all 3 rows
+    const zeroH = 3 * (cellH + gap) - gap; // = 112
+    this.addSpot({ kind: 'straight', number: 0, label: '0',
+      x: boardX, y: boardY, w: cellW, h: zeroH, color: 0x1d8a3a });
 
-    // 1-36 grid (3 rows x 12 cols), laid out in two stacks of 6 cols each for space
-    // We'll use 3 rows x 12 cols but scaled smaller to fit
-    const gridLeft = boardX + cellW + 6;
-    const smallW = 24;
-    const smallH = 28;
-    for (let col = 0; col < 12; col += 1) {
-      for (let row = 0; row < 3; row += 1) {
+    // Number grid: 12 cols × 3 rows
+    // Numbers: col*3+(3-row) gives: col0=[3,2,1], col1=[6,5,4], ..., col11=[36,35,34]
+    const gridLeft = boardX + cellW + 8;  // = 490
+    for (let col = 0; col < 12; col++) {
+      for (let row = 0; row < 3; row++) {
         const number = col * 3 + (3 - row);
         const pocket = pocketForNumber(number);
-        const color = pocket.color === 'red' ? 0x8f1818 : 0x1a1a1a;
-        this.addSpot({
-          kind: 'straight',
-          number,
+        const color = pocket.color === 'red' ? 0x8f1818 : 0x141414;
+        this.addSpot({ kind: 'straight', number,
           label: String(number),
-          x: gridLeft + col * (smallW + 2),
-          y: boardY + row * (smallH + 2),
-          w: smallW,
-          h: smallH,
-          color,
-        });
+          x: gridLeft + col * (cellW + gap),
+          y: boardY + row * (cellH + gap),
+          w: cellW, h: cellH, color });
       }
     }
 
-    // Dozens row under the grid
-    const dozenY = boardY + 3 * (smallH + 2) + 8;
-    const dozenW = 12 * (smallW + 2) / 3 - 2;
-    for (let i = 0; i < 3; i += 1) {
-      const kind = (['dozen1', 'dozen2', 'dozen3'] as const)[i];
-      const labels = ['1-12', '13-24', '25-36'];
-      this.addSpot({
-        kind,
-        label: labels[i],
-        x: gridLeft + i * (dozenW + 2),
-        y: dozenY,
-        w: dozenW,
-        h: 28,
-        color: 0x3f6144,
-      });
+    // Column 2:1 bets — right of each row
+    const colsX = gridLeft + 12 * (cellW + gap) + 4;  // = 490 + 12*40 + 4 = 974
+    for (let i = 0; i < 3; i++) {
+      const kind = (['col1', 'col2', 'col3'] as const)[2 - i];
+      this.addSpot({ kind, label: '2:1',
+        x: colsX, y: boardY + i * (cellH + gap),
+        w: 30, h: cellH, color: 0x2e5c3a });
+    }
+
+    // Dozens row
+    const gridW = 12 * (cellW + gap) - gap;  // = 478
+    const dozenW = Math.floor(gridW / 3) - 1;  // = 158
+    const dozenY = boardY + 3 * (cellH + gap) + 8;  // = 128 + 114 + 8 = 250
+    const dozenLabels: [BetKind, string][] = [['dozen1', '1st 12'], ['dozen2', '2nd 12'], ['dozen3', '3rd 12']];
+    for (let i = 0; i < 3; i++) {
+      this.addSpot({ kind: dozenLabels[i][0], label: dozenLabels[i][1],
+        x: gridLeft + i * (dozenW + 1),
+        y: dozenY, w: dozenW, h: 30, color: 0x2e5c3a });
     }
 
     // Outside bets row
-    const outsideY = dozenY + 36;
-    const outsideW = 48;
-    const outsides: Array<{ kind: BetKind; label: string; color: number }> = [
-      { kind: 'low', label: '1-18', color: 0x3f6144 },
-      { kind: 'even', label: 'EVEN', color: 0x3f6144 },
-      { kind: 'red', label: 'RED', color: 0x8f1818 },
-      { kind: 'black', label: 'BLACK', color: 0x1a1a1a },
-      { kind: 'odd', label: 'ODD', color: 0x3f6144 },
-      { kind: 'high', label: '19-36', color: 0x3f6144 },
+    const outsideW = Math.floor(gridW / 6) - 1;  // = 78
+    const outsideY = dozenY + 38;  // = 288
+    const outsides: Array<{ kind: BetKind; label: string; sub: string; color: number }> = [
+      { kind: 'low',   label: '1–18',  sub: '1:1', color: 0x2e5c3a },
+      { kind: 'even',  label: 'EVEN',  sub: '1:1', color: 0x2e5c3a },
+      { kind: 'red',   label: 'RED',   sub: '1:1', color: 0x8f1818 },
+      { kind: 'black', label: 'BLACK', sub: '1:1', color: 0x141414 },
+      { kind: 'odd',   label: 'ODD',   sub: '1:1', color: 0x2e5c3a },
+      { kind: 'high',  label: '19–36', sub: '1:1', color: 0x2e5c3a },
     ];
-    for (let i = 0; i < outsides.length; i += 1) {
-      this.addSpot({
-        kind: outsides[i].kind,
-        label: outsides[i].label,
-        x: gridLeft + i * (outsideW + 2),
-        y: outsideY,
-        w: outsideW,
-        h: 34,
-        color: outsides[i].color,
-      });
+    for (let i = 0; i < outsides.length; i++) {
+      this.addSpot({ kind: outsides[i].kind, label: outsides[i].label,
+        x: gridLeft + i * (outsideW + 1),
+        y: outsideY, w: outsideW, h: 34, color: outsides[i].color });
     }
 
-    // Column bets on the right of the number grid
-    const colsX = gridLeft + 12 * (smallW + 2) + 4;
-    for (let i = 0; i < 3; i += 1) {
-      const kind = (['col1', 'col2', 'col3'] as const)[2 - i]; // top=col3, mid=col2, bot=col1 (row 0 top = col3)
-      this.addSpot({
-        kind,
-        label: '2:1',
-        x: colsX,
-        y: boardY + i * (smallH + 2),
-        w: 36,
-        h: smallH,
-        color: 0x3f6144,
-      });
-    }
+    // Payout reference
+    const refY = 330;  // below outside bets
+    const refX = gridLeft;
+    this.add.text(refX, refY, 'PAYOUTS', {
+      fontSize: '11px', fontFamily: FONT.mono, color: '#e0a242', fontStyle: 'bold',
+    }).setResolution(2);
+    const payoutLines = [
+      'Straight   35:1',
+      'Dozen/Col   2:1',
+      'Even money  1:1',
+    ];
+    payoutLines.forEach((line, i) => {
+      this.add.text(refX, refY + 16 + i * 16, line, {
+        fontSize: '11px', fontFamily: FONT.mono, color: '#b0b0b0',
+      }).setResolution(2);
+    });
   }
 
   private addSpot(spot: Omit<BetSpot, 'total' | 'chipText'>): void {
@@ -412,6 +410,21 @@ export class RouletteScene extends Scene {
     spot.chipText?.setText(String(spot.total));
     this.statusText.setText(`Staked ${this.selectedChip} on ${spot.label}.`);
     AudioManager.playSfx(this, 'ui-click', { volume: 0.7, cooldownMs: 40, allowOverlap: true });
+
+    // Tactile feedback: briefly scale chip text up then back
+    if (spot.chipText) {
+      this.tweens.killTweensOf(spot.chipText);
+      spot.chipText.setScale(1.4);
+      this.tweens.add({
+        targets: spot.chipText,
+        scaleX: 1.0,
+        scaleY: 1.0,
+        duration: 220,
+        ease: 'Back.easeOut',
+      });
+    }
+
+    this.updateTotalBetDisplay();
   }
 
   private remainingCoins(): number {
@@ -421,11 +434,11 @@ export class RouletteScene extends Scene {
 
   // ── Chip selector + action buttons ────────────────────────────────────
   private buildChipSelector(): void {
-    const y = 700;
-    const startX = 80;
+    const y = 690;
+    const startX = 510;
     for (let i = 0; i < CHIP_VALUES.length; i += 1) {
       const value = CHIP_VALUES[i];
-      const x = startX + i * 110;
+      const x = startX + i * 96;
       const bg = this.add.graphics();
       this.drawChipButton(bg, x, y, value, value === this.selectedChip);
       const label = this.add.text(x, y, String(value), {
@@ -473,20 +486,23 @@ export class RouletteScene extends Scene {
 
   private buildActionButtons(): void {
     const W = 1024;
+
+    // SPIN button
     this.spinBtn = this.add.graphics();
-    this.add.text(W - 150, 700, 'SPIN', buttonLabelStyle(22)).setOrigin(0.5);
-    drawNestedButton(this.spinBtn, W - 150, 700, 200, 60, false);
-    this.spinZone = this.add.zone(W - 150, 700, 200, 60).setInteractive({ cursor: 'pointer' });
-    this.spinZone.on('pointerover', () => drawNestedButton(this.spinBtn, W - 150, 700, 200, 60, true));
-    this.spinZone.on('pointerout', () => drawNestedButton(this.spinBtn, W - 150, 700, 200, 60, false));
+    drawNestedButton(this.spinBtn, W - 80, 690, 140, 50, false);
+    this.add.text(W - 80, 690, 'SPIN', buttonLabelStyle(20)).setOrigin(0.5);
+    this.spinZone = this.add.zone(W - 80, 690, 140, 50).setInteractive({ cursor: 'pointer' });
+    this.spinZone.on('pointerover', () => drawNestedButton(this.spinBtn, W - 80, 690, 140, 50, true));
+    this.spinZone.on('pointerout', () => drawNestedButton(this.spinBtn, W - 80, 690, 140, 50, false));
     this.spinZone.on('pointerdown', () => this.doSpin());
 
+    // CLEAR button
     this.clearBtn = this.add.graphics();
-    this.add.text(W - 340, 700, 'CLEAR', buttonLabelStyle(18)).setOrigin(0.5);
-    drawNestedButton(this.clearBtn, W - 340, 700, 140, 50, false);
-    this.clearZone = this.add.zone(W - 340, 700, 140, 50).setInteractive({ cursor: 'pointer' });
-    this.clearZone.on('pointerover', () => drawNestedButton(this.clearBtn, W - 340, 700, 140, 50, true));
-    this.clearZone.on('pointerout', () => drawNestedButton(this.clearBtn, W - 340, 700, 140, 50, false));
+    drawNestedButton(this.clearBtn, W - 240, 690, 120, 44, false);
+    this.add.text(W - 240, 690, 'CLEAR', buttonLabelStyle(17)).setOrigin(0.5);
+    this.clearZone = this.add.zone(W - 240, 690, 120, 44).setInteractive({ cursor: 'pointer' });
+    this.clearZone.on('pointerover', () => drawNestedButton(this.clearBtn, W - 240, 690, 120, 44, true));
+    this.clearZone.on('pointerout', () => drawNestedButton(this.clearBtn, W - 240, 690, 120, 44, false));
     this.clearZone.on('pointerdown', () => this.clearBets());
   }
 
@@ -495,6 +511,7 @@ export class RouletteScene extends Scene {
     this.bets = [];
     this.betSpots.forEach((s) => { s.total = 0; s.chipText?.setText(''); });
     this.statusText.setText('Bets cleared.');
+    this.updateTotalBetDisplay();
   }
 
   // ── Spin ──────────────────────────────────────────────────────────────
@@ -519,10 +536,12 @@ export class RouletteScene extends Scene {
     this.playSpinSound();
     this.showSpeech('Rien ne va plus...');
 
-    // Wheel tween: rotate container
+    // Wheel tween: rotate container (randomised so each spin looks different)
+    const randomSpins = 4 + Math.floor(Math.random() * 5); // 4–8 full rotations
+    const randomExtra = Math.floor(Math.random() * 360);   // 0–359° additional
     this.tweens.add({
       targets: this.wheelContainer,
-      angle: '-=' + (360 * 5),
+      angle: '-=' + (360 * randomSpins + randomExtra),
       duration: this.spinDurationMs,
       ease: 'Cubic.easeOut',
     });
@@ -576,31 +595,53 @@ export class RouletteScene extends Scene {
     this.continueBtnText.setVisible(true);
     this.continueZone.setInteractive({ cursor: 'pointer' });
 
+    // Win glow: green tint rectangle that fades out behind the panel
+    if (settlement.totalReturn > 0) {
+      const W = 1024;
+      const glowW = 520;
+      const glowH = 200;
+      this.resultGlow.clear();
+      this.resultGlow.fillStyle(0x00ff66, 0.22);
+      this.resultGlow.fillRoundedRect((W - glowW) / 2, 388, glowW, glowH, 28);
+      this.resultGlow.setAlpha(1).setVisible(true);
+      this.tweens.add({
+        targets: this.resultGlow,
+        alpha: 0,
+        duration: 900,
+        ease: 'Quad.easeOut',
+        onComplete: () => this.resultGlow.setVisible(false),
+      });
+    }
+
     // Clear bet chips from board
     this.betSpots.forEach((s) => { s.total = 0; s.chipText?.setText(''); });
     this.bets = [];
+    this.updateTotalBetDisplay();
     this.showSpeech(heading === 'PUSH' ? 'Even hands.' : heading.startsWith('WIN') ? 'The felt pays.' : 'The house collects.');
   }
 
   private buildResultPanel(): void {
     const W = 1024;
-    const panelW = 440;
-    const panelH = 140;
+    const panelW = 460;
+    const panelH = 160;
     const px = (W - panelW) / 2;
-    const py = 480;
+    const py = 400;
+
+    // Win glow — rendered behind the panel
+    this.resultGlow = this.add.graphics().setVisible(false);
 
     this.resultPanel = this.add.graphics().setVisible(false);
     drawFramedPanel(this.resultPanel, px, py, panelW, panelH, { borderWidth: 2, alpha: 0.95 });
 
-    this.resultTitle = this.add.text(W / 2, py + 32, '', {
-      fontSize: '28px', fontFamily: FONT.mono, fontStyle: 'bold', color: COLOR.winGreen,
+    this.resultTitle = this.add.text(W / 2, py + 38, '', {
+      fontSize: '38px', fontFamily: FONT.mono, fontStyle: 'bold', color: COLOR.winGreen,
     }).setOrigin(0.5).setVisible(false).setResolution(2);
 
-    this.resultDetail = this.add.text(W / 2, py + 88, '', {
-      fontSize: '16px', fontFamily: FONT.mono, color: '#e5e7eb', align: 'center',
+    this.resultDetail = this.add.text(W / 2, py + 106, '', {
+      fontSize: '19px', fontFamily: FONT.mono, color: '#e5e7eb', align: 'center',
     }).setOrigin(0.5).setVisible(false).setResolution(2);
 
-    const contY = py + panelH + 30;
+    const contY = py + panelH + 34;
     this.continueBtn = this.add.graphics().setVisible(false);
     this.continueBtnText = this.add.text(W / 2, contY, 'CONTINUE', buttonLabelStyle(22)).setOrigin(0.5).setVisible(false);
     drawNestedButton(this.continueBtn, W / 2, contY, 200, 52, false);
@@ -611,6 +652,19 @@ export class RouletteScene extends Scene {
       this.continueZone.disableInteractive();
       this.leave();
     });
+  }
+
+  private buildTotalBetDisplay(): void {
+    this.totalBetText = this.add.text(510, 670, 'Total Bet: 0', {
+      fontSize: '15px',
+      fontFamily: FONT.mono,
+      color: '#ffdf6a',
+    }).setResolution(2);
+  }
+
+  private updateTotalBetDisplay(): void {
+    const total = this.bets.reduce((s, b) => s + b.amount, 0);
+    this.totalBetText.setText(`Total Bet: ${total}`);
   }
 
   // ── Audio (mirrors WheelScene pattern) ────────────────────────────────
