@@ -49,6 +49,8 @@ export class SlotMachineScene extends Scene {
 
   private reelContainers: GameObjects.Container[] = [];
   private reelStrips: Array<{ symbols: SlotSymbol[]; height: number }> = [];
+  private reelStartY = 0;
+  private paylineGraphics!: GameObjects.Graphics;
 
   private pullBtn!: GameObjects.Graphics;
   private pullZone!: GameObjects.Zone;
@@ -174,9 +176,11 @@ export class SlotMachineScene extends Scene {
     g.fillStyle(0x0a0a0a, 1);
     g.fillRoundedRect(windowX + 4, windowY - 6, 3 * REEL_W + 2 * REEL_GAP + 12, REEL_H + 12, 4);
 
-    // Payline
-    g.lineStyle(3, 0xc94a3a, 0.9);
-    g.lineBetween(windowX + 10, CENTER_Y, windowX + 10 + 3 * REEL_W + 2 * REEL_GAP, CENTER_Y);
+    // Payline (separate graphics object so we can tween its alpha on wins)
+    this.paylineGraphics = this.add.graphics();
+    this.paylineGraphics.lineStyle(3, 0xc94a3a, 0.9);
+    this.paylineGraphics.lineBetween(windowX + 10, CENTER_Y, windowX + 10 + 3 * REEL_W + 2 * REEL_GAP, CENTER_Y);
+    this.paylineGraphics.setDepth(4);
 
     // Coin tray at bottom
     g.fillStyle(0x3a2010, 1);
@@ -192,6 +196,7 @@ export class SlotMachineScene extends Scene {
   private buildReels(): void {
     const startX = CENTER_X - (3 * REEL_W + 2 * REEL_GAP) / 2;
     const topY = CENTER_Y - REEL_H / 2;
+    this.reelStartY = topY;
 
     for (let i = 0; i < 3; i += 1) {
       const rx = startX + i * (REEL_W + REEL_GAP);
@@ -369,18 +374,33 @@ export class SlotMachineScene extends Scene {
   }
 
   private buildPayoutLegend(): void {
-    const x = 60;
+    const x = 20;
+    const legendW = 160;
     let y = 140;
-    this.add.text(x, y, 'PAYOUTS (x3 / x2)', {
+    this.add.text(x, y, 'PAYOUTS (3x / 2x)', {
       fontSize: '14px', fontFamily: FONT.mono, color: '#ffdf6a', fontStyle: 'bold',
     }).setResolution(2);
-    y += 24;
-    for (const sym of SLOT_SYMBOLS) {
+    y += 22;
+
+    // Divider under header
+    const divG = this.add.graphics();
+    divG.lineStyle(1, 0xffdf6a, 0.5);
+    divG.lineBetween(x, y, x + legendW, y);
+    y += 8;
+
+    for (let idx = 0; idx < SLOT_SYMBOLS.length; idx += 1) {
+      const sym = SLOT_SYMBOLS[idx];
       const p = SYMBOL_PAYOUT[sym];
-      this.add.text(x, y, `${sym.toUpperCase().padEnd(7, ' ')} ${p.three}x / ${p.two}x`, {
-        fontSize: '13px', fontFamily: FONT.mono, color: '#e6e6e6',
+      this.add.text(x, y, `${sym.toUpperCase().padEnd(7, ' ')}  ${p.three}x/${p.two}x`, {
+        fontSize: '15px', fontFamily: FONT.mono, color: '#e6e6e6',
       }).setResolution(2);
-      y += 20;
+      y += 22;
+
+      // Divider between entries (skip after last)
+      if (idx < SLOT_SYMBOLS.length - 1) {
+        divG.lineStyle(1, 0x5a3a28, 0.7);
+        divG.lineBetween(x, y - 2, x + legendW, y - 2);
+      }
     }
   }
 
@@ -398,6 +418,17 @@ export class SlotMachineScene extends Scene {
     this.coinsText.setText(`Coins: ${this.currentCoins}`);
     this.statusText.setText('Reels spinning...');
 
+    // Pulse the status text while spinning
+    this.tweens.add({
+      targets: this.statusText,
+      alpha: 0.4,
+      duration: 300,
+      yoyo: true,
+      repeat: 3,
+      ease: 'Sine.easeInOut',
+      onComplete: () => { this.statusText.setAlpha(1); },
+    });
+
     // Lever pull animation
     this.tweens.add({
       targets: this.leverKnob,
@@ -411,26 +442,52 @@ export class SlotMachineScene extends Scene {
     this.playSpinSound();
     this.showSpeech('Cross your fingers...');
 
-    // Each reel scrolls down by a large distance then snaps to show its symbol.
-    // The "winning" symbol will be set after the animation by redrawing.
-    const durations = [Math.max(1200, this.spinDurationMs * 0.35), Math.max(1800, this.spinDurationMs * 0.6), Math.max(2200, this.spinDurationMs * 0.85)];
-    let completed = 0;
+    // Build a 32-symbol strip per reel. Result at index 2.
+    // Container starts PRE_SCROLL symbols above normal so 22 symbols blur past before result lands.
+    const RESULT_IDX = 2;
+    const PRE_SCROLL = 16;
+    const SCROLL_SYMBOLS = 8 - RESULT_IDX; // 6 — distance from initial center (8) to result (2)
+    const STRIP_LEN = 32;
 
     for (let i = 0; i < 3; i += 1) {
       const container = this.reelContainers[i];
       const strip = this.reelStrips[i];
-      const distance = strip.height;
-      const startY = container.y;
+
+      const fresh: SlotSymbol[] = [];
+      for (let j = 0; j < STRIP_LEN; j += 1) {
+        fresh.push(SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)]);
+      }
+      fresh[RESULT_IDX] = result[i];
+      strip.symbols = fresh;
+      strip.height = STRIP_LEN * SYMBOL_H;
+
+      container.removeAll(true);
+      for (let j = 0; j < strip.symbols.length; j += 1) {
+        const y = j * SYMBOL_H - SYMBOL_H * 8 + REEL_H / 2;
+        this.drawSymbol(container, strip.symbols[j], 0, y);
+      }
+
+      // Start container shifted UP so symbol (8 + PRE_SCROLL = 24) is at center.
+      // The tween scrolls DOWN to bring symbol 2 (result) to center — 22 symbols fly past.
+      container.y = this.reelStartY - PRE_SCROLL * SYMBOL_H;
+    }
+
+    const durations = [
+      Math.max(1800, this.spinDurationMs * 0.5),
+      Math.max(2400, this.spinDurationMs * 0.72),
+      Math.max(3000, this.spinDurationMs * 0.95),
+    ];
+    let completed = 0;
+
+    for (let i = 0; i < 3; i += 1) {
+      const container = this.reelContainers[i];
 
       this.tweens.add({
         targets: container,
-        y: startY + distance,
+        y: this.reelStartY + SCROLL_SYMBOLS * SYMBOL_H, // from (reelStartY - PRE_SCROLL*SYMBOL_H) → result lands at center
         duration: durations[i],
         ease: 'Cubic.easeOut',
         onComplete: () => {
-          container.y = startY;
-          // Replace the "center" symbol on this reel with the result symbol
-          this.replaceCenterSymbol(i, result[i]);
           completed += 1;
           if (completed === 3) {
             this.stopSpinSound();
@@ -438,19 +495,6 @@ export class SlotMachineScene extends Scene {
           }
         },
       });
-    }
-  }
-
-  private replaceCenterSymbol(reelIdx: number, symbol: SlotSymbol): void {
-    const container = this.reelContainers[reelIdx];
-    // Destroy all children and re-render a fresh strip with the target symbol at center.
-    container.removeAll(true);
-    const strip = this.reelStrips[reelIdx];
-    const centerIdx = 8;
-    for (let j = 0; j < strip.symbols.length; j += 1) {
-      if (j === centerIdx) strip.symbols[j] = symbol;
-      const y = j * SYMBOL_H - centerIdx * SYMBOL_H + REEL_H / 2;
-      this.drawSymbol(container, strip.symbols[j], 0, y);
     }
   }
 
@@ -479,6 +523,66 @@ export class SlotMachineScene extends Scene {
       : out.kind === 'two-left' || out.kind === 'two-right'
         ? `${reels.map((s) => s.toUpperCase()).join(' · ')}\nPair ${out.matchedSymbol}. Payout ${payout}.`
         : `${reels.map((s) => s.toUpperCase()).join(' · ')}\nNo match.`;
+
+    // ── Win animations ────────────────────────────────────────────────────
+    if (payout > 0) {
+      // Flash the red payline
+      this.tweens.add({
+        targets: this.paylineGraphics,
+        alpha: 0,
+        duration: 120,
+        yoyo: true,
+        repeat: 4,
+        ease: 'Sine.easeInOut',
+        onComplete: () => { this.paylineGraphics.setAlpha(1); },
+      });
+
+      // Floating payout text that rises and fades
+      const floatText = this.add.text(CENTER_X, CENTER_Y - 20, `+${payout}`, {
+        fontSize: '42px',
+        fontFamily: FONT.mono,
+        fontStyle: 'bold',
+        color: '#00ff88',
+        stroke: '#004422',
+        strokeThickness: 4,
+      }).setOrigin(0.5).setDepth(20).setResolution(2);
+      this.tweens.add({
+        targets: floatText,
+        y: CENTER_Y - 60,
+        alpha: 0,
+        duration: 1200,
+        ease: 'Cubic.easeOut',
+        onComplete: () => { floatText.destroy(); },
+      });
+
+      if (out.kind === 'three') {
+        // Pop effect on each reel container
+        for (const container of this.reelContainers) {
+          this.tweens.add({
+            targets: container,
+            scaleX: 1.08,
+            scaleY: 1.08,
+            duration: 160,
+            yoyo: true,
+            ease: 'Cubic.easeOut',
+          });
+        }
+
+        // Golden glow around the reel window
+        const windowY = CENTER_Y - REEL_H / 2;
+        const windowX = CENTER_X - (3 * REEL_W + 2 * REEL_GAP) / 2 - 10;
+        const glow = this.add.graphics().setDepth(6).setAlpha(0.8);
+        glow.lineStyle(4, 0xffdf6a, 0.8);
+        glow.strokeRoundedRect(windowX, windowY - 10, 3 * REEL_W + 2 * REEL_GAP + 20, REEL_H + 20, 6);
+        this.tweens.add({
+          targets: glow,
+          alpha: 0,
+          duration: 1000,
+          ease: 'Cubic.easeIn',
+          onComplete: () => { glow.destroy(); },
+        });
+      }
+    }
 
     this.resultPanel.setVisible(true);
     this.resultTitle.setText(heading).setColor(titleColor).setVisible(true);

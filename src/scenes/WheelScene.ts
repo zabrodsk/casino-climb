@@ -427,14 +427,20 @@ export class WheelScene extends Scene {
   private doSpin(): void {
     const chosen = spinWheel();
     const chosenMidDeg = chosen.startDeg + chosen.arcDeg / 2;
-    const targetAngle = 360 * 6 - chosenMidDeg;
+
+    // Calculate relative rotation: random extra spins + precise delta to land chosen segment at pointer
+    const extraSpins = 5 + Math.floor(Math.random() * 5); // 5–9 random full rotations
+    const currentAngle = ((this.wheelContainer.angle % 360) + 360) % 360;
+    const targetNorm = ((360 - chosenMidDeg) % 360 + 360) % 360;
+    const delta = (targetNorm - currentAngle + 360) % 360;
+    const totalRotation = extraSpins * 360 + delta;
 
     this.playSpinSound();
     this.showSpeech('The wheel turns...');
 
     this.tweens.add({
       targets: this.wheelContainer,
-      angle: targetAngle,
+      angle: '+=' + totalRotation,
       duration: this.spinDurationMs,
       ease: 'Cubic.easeOut',
       onComplete: () => {
