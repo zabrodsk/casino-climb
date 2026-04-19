@@ -8,6 +8,7 @@ import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { isDeveloperModeEnabled, registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 import { resetMemoryRunState } from '../state/memoryState';
 import { HouseController } from '../ui/HouseController';
+import { VirtualJoystick } from '../ui/VirtualJoystick';
 
 // Prop tile indices into dungeon_tileset.png. Floor + walls render as procedural
 // stone sprites (see BootScene); only the table + stairs still come from the tileset.
@@ -145,6 +146,12 @@ export class DungeonScene extends Scene {
   private crossingBaseY = 0;
   private crossingCurrentColumnIndex = 0;
   private lastCardWooshAt = 0;
+
+  private joystick: VirtualJoystick | null = null;
+  private touchCollectBtn: { arc: GameObjects.Arc; label: GameObjects.Text; zone: GameObjects.Zone } | null = null;
+  private touchCashBtn: { arc: GameObjects.Arc; label: GameObjects.Text; zone: GameObjects.Zone } | null = null;
+  private touchCollectPressed = false;
+  private touchCashPressed = false;
 
   constructor() {
     super({ key: 'DungeonScene' });
@@ -334,6 +341,14 @@ export class DungeonScene extends Scene {
       right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
 
+    const hasTouch = this.sys.game.device.input.touch ||
+                 'ontouchstart' in window ||
+                 navigator.maxTouchPoints > 0;
+    if (hasTouch) {
+      this.joystick = new VirtualJoystick(this);
+      this.buildTouchActionButtons();
+    }
+
     // ── Camera ────────────────────────────────────────────────────────────
     this.cameras.main.setBounds(-TILE_SIZE, -TILE_SIZE, mapW + TILE_SIZE * 2, mapH + TILE_SIZE * 2);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -461,6 +476,8 @@ export class DungeonScene extends Scene {
       this.destroyDevLevelSelector();
       this.devModeLabel?.destroy();
       this.devModeLabel = undefined;
+      this.joystick?.destroy();
+      this.joystick = null;
     });
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
@@ -725,9 +742,35 @@ export class DungeonScene extends Scene {
     );
   }
 
+  private buildTouchActionButtons(): void {
+    const H = this.scale.height;
+    const makeBtn = (x: number, y: number, label: string, color: number, onPress: () => void) => {
+      const arc = this.add.arc(x, y, 38).setFillStyle(color, 0.80)
+        .setStrokeStyle(2, 0xe0a242, 0.85).setScrollFactor(0).setDepth(200).setVisible(false);
+      const txt = this.add.text(x, y, label, {
+        fontSize: '11px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setVisible(false);
+      const zone = this.add.zone(x, y, 76, 76).setScrollFactor(0).setDepth(202).setInteractive();
+      zone.setVisible(false);
+      zone.on('pointerdown', onPress);
+      return { arc, label: txt, zone };
+    };
+    this.touchCollectBtn = makeBtn(934, H - 90, 'COLLECT', 0x1d5a1d, () => { this.touchCollectPressed = true; });
+    this.touchCashBtn    = makeBtn(820, H - 90, 'CASH',    0x5a1d1d, () => { this.touchCashPressed = true; });
+  }
+
+  private setTouchCrossingBtnsVisible(v: boolean): void {
+    if (!this.touchCollectBtn || !this.touchCashBtn) return;
+    [this.touchCollectBtn, this.touchCashBtn].forEach(({ arc, label, zone }) => {
+      arc.setVisible(v); label.setVisible(v); zone.setVisible(v);
+      if (v) zone.setInteractive(); else zone.disableInteractive();
+    });
+  }
+
   private _startCrossingRun(): void {
     if (this.crossingBusy || this.crossingReturning || this.selectedCrossingBet <= 0) return;
     this.crossingRunActive = true;
+    this.setTouchCrossingBtnsVisible(true);
     this.crossingMultiplier = this.config.crossing?.startMultiplier ?? 1;
     this.crossingCurrentColumnIndex = 0;
     this.player.setPosition(this.config.crossing?.chipX ?? this.player.x, this.crossingBaseY);
@@ -792,6 +835,7 @@ export class DungeonScene extends Scene {
     const profit = grossPayout - this.selectedCrossingBet;
     setCoins(getCoins() + profit);
     this.crossingRunActive = false;
+    this.setTouchCrossingBtnsVisible(false);
     this.hud.showSpeech(`You bank ${grossPayout}. The House lets you breathe for a second.`);
     AudioManager.playSfx(this, 'goal-victory', { volume: 0.5, cooldownMs: 250, allowOverlap: false });
 
@@ -803,6 +847,7 @@ export class DungeonScene extends Scene {
 
   private _bustCrossingRun(): void {
     this.crossingRunActive = false;
+    this.setTouchCrossingBtnsVisible(false);
     setCoins(Math.max(0, getCoins() - this.selectedCrossingBet));
     this.hud.showSpeech('A card clips you. The House drags your bet off the felt.');
     AudioManager.playSfx(this, 'game-over', { volume: 0.6, cooldownMs: 250, allowOverlap: false });
@@ -964,16 +1009,20 @@ export class DungeonScene extends Scene {
     let vx = 0;
     let vy = 0;
 
-    if (this.cursors.left.isDown || this.wasd.left.isDown) vx = -speed;
-    else if (this.cursors.right.isDown || this.wasd.right.isDown) vx = speed;
+    if (this.joystick && (this.joystick.dx !== 0 || this.joystick.dy !== 0)) {
+      vx = this.joystick.dx * speed;
+      vy = this.joystick.dy * speed;
+    } else {
+      if (this.cursors.left.isDown || this.wasd.left.isDown) vx = -speed;
+      else if (this.cursors.right.isDown || this.wasd.right.isDown) vx = speed;
 
-    if (this.cursors.up.isDown || this.wasd.up.isDown) vy = -speed;
-    else if (this.cursors.down.isDown || this.wasd.down.isDown) vy = speed;
+      if (this.cursors.up.isDown || this.wasd.up.isDown) vy = -speed;
+      else if (this.cursors.down.isDown || this.wasd.down.isDown) vy = speed;
 
-    if (vx !== 0 && vy !== 0) {
-      const norm = Math.SQRT2;
-      vx = vx / norm;
-      vy = vy / norm;
+      if (vx !== 0 && vy !== 0) {
+        vx /= Math.SQRT2;
+        vy /= Math.SQRT2;
+      }
     }
 
     body.setVelocity(vx, vy);
@@ -1054,14 +1103,16 @@ export class DungeonScene extends Scene {
       this._updatePlayerMovement(canFreeRoam);
       this._updateCrossingPrompt();
 
-      if (Phaser.Input.Keyboard.JustDown(this.crossingInteractKey)) {
+      if (Phaser.Input.Keyboard.JustDown(this.crossingInteractKey) || this.touchCollectPressed) {
+        this.touchCollectPressed = false;
         if (this.crossingRunActive) {
           this._attemptCrossingStep();
         } else if (this._isNearCrossingStartChip() && this.selectedCrossingBet > 0) {
           this._startCrossingRun();
         }
       }
-      if (Phaser.Input.Keyboard.JustDown(this.crossingCashOutKey)) {
+      if (Phaser.Input.Keyboard.JustDown(this.crossingCashOutKey) || this.touchCashPressed) {
+        this.touchCashPressed = false;
         this._cashOutCrossingRun();
       }
 

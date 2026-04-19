@@ -22,10 +22,10 @@ import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 import { HouseController } from '../ui/HouseController';
 import { DialogueBus } from '../ui/DialogueBus';
 
-const WHEEL_CX = 210;
-const WHEEL_CY = 345;
-const WHEEL_R = 160;
-const POCKET_INNER = 119;
+const WHEEL_CX = 208;
+const WHEEL_CY = 340;
+const WHEEL_R = 172;
+const POCKET_INNER = 126;
 const BALL_TRACK_R = WHEEL_R + 6; // = 166
 const BALL_R = 6;
 
@@ -158,6 +158,10 @@ export class RouletteScene extends Scene {
     rail.lineStyle(1, 0xe0a242, 0.6);
     rail.lineBetween(426, 108, 426, 657);
     rail.lineBetween(432, 108, 432, 657);
+
+    this.add.text(723, 118, 'BETTING TABLE', {
+      fontSize: '13px', fontFamily: FONT.mono, color: '#e0a242', fontStyle: 'bold',
+    }).setOrigin(0.5).setResolution(2);
   }
 
   private drawHeader(w: number): void {
@@ -265,20 +269,21 @@ export class RouletteScene extends Scene {
 
   // ── Betting board ─────────────────────────────────────────────────────
   private buildBettingBoard(): void {
-    const boardX = 444;   // left edge of board content
-    const boardY = 128;   // top of grid
-    const cellW = 38;
-    const cellH = 36;
+    const boardX = 438;
+    const boardY = 132;
+    const cellW = 41;
+    const cellH = 48;
     const gap = 2;
+    const zeroW = 46;
+    const gridLeft = boardX + zeroW + 6;  // = 490
+    const gridWidth = 12 * (cellW + gap) - gap;  // = 514
 
-    // "0" cell — spans all 3 rows
-    const zeroH = 3 * (cellH + gap) - gap; // = 112
+    // ── 0 cell ──
+    const zeroH = 3 * (cellH + gap) - gap;  // = 148
     this.addSpot({ kind: 'straight', number: 0, label: '0',
-      x: boardX, y: boardY, w: cellW, h: zeroH, color: 0x1d8a3a });
+      x: boardX, y: boardY, w: zeroW, h: zeroH, color: 0x1d8a3a });
 
-    // Number grid: 12 cols × 3 rows
-    // Numbers: col*3+(3-row) gives: col0=[3,2,1], col1=[6,5,4], ..., col11=[36,35,34]
-    const gridLeft = boardX + cellW + 8;  // = 490
+    // ── Number grid: 12 cols × 3 rows ──
     for (let col = 0; col < 12; col++) {
       for (let row = 0; row < 3; row++) {
         const number = col * 3 + (3 - row);
@@ -292,57 +297,86 @@ export class RouletteScene extends Scene {
       }
     }
 
-    // Column 2:1 bets — right of each row
-    const colsX = gridLeft + 12 * (cellW + gap) + 4;  // = 490 + 12*40 + 4 = 974
-    for (let i = 0; i < 3; i++) {
-      const kind = (['col1', 'col2', 'col3'] as const)[2 - i];
-      this.addSpot({ kind, label: '2:1',
-        x: colsX, y: boardY + i * (cellH + gap),
-        w: 30, h: cellH, color: 0x2e5c3a });
-    }
+    const gridBottom = boardY + 3 * (cellH + gap) - gap;  // = 280
 
-    // Dozens row
-    const gridW = 12 * (cellW + gap) - gap;  // = 478
-    const dozenW = Math.floor(gridW / 3) - 1;  // = 158
-    const dozenY = boardY + 3 * (cellH + gap) + 8;  // = 128 + 114 + 8 = 250
+    // ── Gold divider + DOZENS ──
+    const div1 = this.add.graphics();
+    div1.lineStyle(1, 0xe0a242, 0.45);
+    div1.lineBetween(gridLeft - 2, gridBottom + 6, gridLeft + gridWidth + 2, gridBottom + 6);
+    this.add.text(gridLeft, gridBottom + 10, 'DOZENS', {
+      fontSize: '10px', fontFamily: FONT.mono, color: '#e0a242', fontStyle: 'bold',
+    }).setResolution(2);
+
+    const dozenY = gridBottom + 24;
+    const dozenW = Math.floor(gridWidth / 3) - 1;  // ≈ 170
+    const dozenH = 42;
     const dozenLabels: [BetKind, string][] = [['dozen1', '1st 12'], ['dozen2', '2nd 12'], ['dozen3', '3rd 12']];
     for (let i = 0; i < 3; i++) {
       this.addSpot({ kind: dozenLabels[i][0], label: dozenLabels[i][1],
-        x: gridLeft + i * (dozenW + 1),
-        y: dozenY, w: dozenW, h: 30, color: 0x2e5c3a });
+        x: gridLeft + i * (dozenW + 2),
+        y: dozenY, w: dozenW, h: dozenH, color: 0x2e5c3a });
     }
 
-    // Outside bets row
-    const outsideW = Math.floor(gridW / 6) - 1;  // = 78
-    const outsideY = dozenY + 38;  // = 288
-    const outsides: Array<{ kind: BetKind; label: string; sub: string; color: number }> = [
-      { kind: 'low',   label: '1–18',  sub: '1:1', color: 0x2e5c3a },
-      { kind: 'even',  label: 'EVEN',  sub: '1:1', color: 0x2e5c3a },
-      { kind: 'red',   label: 'RED',   sub: '1:1', color: 0x8f1818 },
-      { kind: 'black', label: 'BLACK', sub: '1:1', color: 0x141414 },
-      { kind: 'odd',   label: 'ODD',   sub: '1:1', color: 0x2e5c3a },
-      { kind: 'high',  label: '19–36', sub: '1:1', color: 0x2e5c3a },
+    const dozenBottom = dozenY + dozenH;  // ≈ 346
+
+    // ── Gold divider + COLUMN BETS ──
+    const div2 = this.add.graphics();
+    div2.lineStyle(1, 0xe0a242, 0.45);
+    div2.lineBetween(gridLeft - 2, dozenBottom + 6, gridLeft + gridWidth + 2, dozenBottom + 6);
+    this.add.text(gridLeft, dozenBottom + 10, 'COLUMN BETS', {
+      fontSize: '10px', fontFamily: FONT.mono, color: '#e0a242', fontStyle: 'bold',
+    }).setResolution(2);
+
+    const colY = dozenBottom + 24;
+    const colW = dozenW;
+    const colH = 40;
+    const colLabels: [BetKind, string][] = [['col1', 'COL 1  2:1'], ['col2', 'COL 2  2:1'], ['col3', 'COL 3  2:1']];
+    for (let i = 0; i < 3; i++) {
+      this.addSpot({ kind: colLabels[i][0], label: colLabels[i][1],
+        x: gridLeft + i * (colW + 2),
+        y: colY, w: colW, h: colH, color: 0x1a4a2a });
+    }
+
+    const colBottom = colY + colH;  // ≈ 410
+
+    // ── Gold divider + OUTSIDE BETS ──
+    const div3 = this.add.graphics();
+    div3.lineStyle(1, 0xe0a242, 0.45);
+    div3.lineBetween(gridLeft - 2, colBottom + 6, gridLeft + gridWidth + 2, colBottom + 6);
+    this.add.text(gridLeft, colBottom + 10, 'OUTSIDE BETS', {
+      fontSize: '10px', fontFamily: FONT.mono, color: '#e0a242', fontStyle: 'bold',
+    }).setResolution(2);
+
+    const outsideY = colBottom + 24;
+    const outsideW = Math.floor(gridWidth / 6) - 1;  // ≈ 84
+    const outsideH = 40;
+    const outsides: Array<{ kind: BetKind; label: string; color: number }> = [
+      { kind: 'low',   label: '1–18',  color: 0x2e5c3a },
+      { kind: 'even',  label: 'EVEN',  color: 0x2e5c3a },
+      { kind: 'red',   label: 'RED',   color: 0x8f1818 },
+      { kind: 'black', label: 'BLACK', color: 0x141414 },
+      { kind: 'odd',   label: 'ODD',   color: 0x2e5c3a },
+      { kind: 'high',  label: '19–36', color: 0x2e5c3a },
     ];
     for (let i = 0; i < outsides.length; i++) {
       this.addSpot({ kind: outsides[i].kind, label: outsides[i].label,
-        x: gridLeft + i * (outsideW + 1),
-        y: outsideY, w: outsideW, h: 34, color: outsides[i].color });
+        x: gridLeft + i * (outsideW + 2),
+        y: outsideY, w: outsideW, h: outsideH, color: outsides[i].color });
     }
 
-    // Payout reference
-    const refY = 330;  // below outside bets
-    const refX = gridLeft;
-    this.add.text(refX, refY, 'PAYOUTS', {
-      fontSize: '11px', fontFamily: FONT.mono, color: '#e0a242', fontStyle: 'bold',
+    const outsideBottom = outsideY + outsideH;  // ≈ 474
+
+    // ── Payout reference ──
+    const div4 = this.add.graphics();
+    div4.lineStyle(1, 0xe0a242, 0.3);
+    div4.lineBetween(gridLeft - 2, outsideBottom + 8, gridLeft + gridWidth + 2, outsideBottom + 8);
+    this.add.text(gridLeft, outsideBottom + 14, 'PAYOUTS', {
+      fontSize: '10px', fontFamily: FONT.mono, color: '#e0a242', fontStyle: 'bold',
     }).setResolution(2);
-    const payoutLines = [
-      'Straight   35:1',
-      'Dozen/Col   2:1',
-      'Even money  1:1',
-    ];
+    const payoutLines = ['Straight  35:1', 'Dozen / Column  2:1', 'Even money  1:1'];
     payoutLines.forEach((line, i) => {
-      this.add.text(refX, refY + 16 + i * 16, line, {
-        fontSize: '11px', fontFamily: FONT.mono, color: '#b0b0b0',
+      this.add.text(gridLeft, outsideBottom + 28 + i * 15, line, {
+        fontSize: '10px', fontFamily: FONT.mono, color: '#909090',
       }).setResolution(2);
     });
   }
@@ -434,22 +468,27 @@ export class RouletteScene extends Scene {
 
   // ── Chip selector + action buttons ────────────────────────────────────
   private buildChipSelector(): void {
-    const y = 690;
-    const startX = 510;
+    const y = 562;
+    // Label
+    this.add.text(490, y - 20, 'CHIP VALUE', {
+      fontSize: '10px', fontFamily: FONT.mono, color: '#e0a242', fontStyle: 'bold',
+    }).setResolution(2);
+    const startX = 508;
+    const spacing = 84;
     for (let i = 0; i < CHIP_VALUES.length; i += 1) {
       const value = CHIP_VALUES[i];
-      const x = startX + i * 96;
+      const x = startX + i * spacing;
       const bg = this.add.graphics();
       this.drawChipButton(bg, x, y, value, value === this.selectedChip);
       const label = this.add.text(x, y, String(value), {
-        fontSize: '18px',
+        fontSize: '16px',
         fontFamily: FONT.mono,
         fontStyle: 'bold',
         color: '#ffffff',
         stroke: '#000000',
         strokeThickness: 2,
       }).setOrigin(0.5).setResolution(2);
-      const zone = this.add.zone(x, y, 90, 54).setInteractive({ cursor: 'pointer' });
+      const zone = this.add.zone(x, y, 80, 52).setInteractive({ cursor: 'pointer' });
       zone.on('pointerdown', () => {
         this.selectedChip = value;
         this.chipSelector.forEach((c) => this.drawChipButton(c.bg, 0, 0, c.value, c.value === this.selectedChip, c.label));
@@ -485,24 +524,22 @@ export class RouletteScene extends Scene {
   }
 
   private buildActionButtons(): void {
-    const W = 1024;
-
     // SPIN button
     this.spinBtn = this.add.graphics();
-    drawNestedButton(this.spinBtn, W - 80, 690, 140, 50, false);
-    this.add.text(W - 80, 690, 'SPIN', buttonLabelStyle(20)).setOrigin(0.5);
-    this.spinZone = this.add.zone(W - 80, 690, 140, 50).setInteractive({ cursor: 'pointer' });
-    this.spinZone.on('pointerover', () => drawNestedButton(this.spinBtn, W - 80, 690, 140, 50, true));
-    this.spinZone.on('pointerout', () => drawNestedButton(this.spinBtn, W - 80, 690, 140, 50, false));
+    drawNestedButton(this.spinBtn, 938, 622, 130, 46, false);
+    this.add.text(938, 622, 'SPIN', buttonLabelStyle(20)).setOrigin(0.5);
+    this.spinZone = this.add.zone(938, 622, 130, 46).setInteractive({ cursor: 'pointer' });
+    this.spinZone.on('pointerover', () => drawNestedButton(this.spinBtn, 938, 622, 130, 46, true));
+    this.spinZone.on('pointerout', () => drawNestedButton(this.spinBtn, 938, 622, 130, 46, false));
     this.spinZone.on('pointerdown', () => this.doSpin());
 
     // CLEAR button
     this.clearBtn = this.add.graphics();
-    drawNestedButton(this.clearBtn, W - 240, 690, 120, 44, false);
-    this.add.text(W - 240, 690, 'CLEAR', buttonLabelStyle(17)).setOrigin(0.5);
-    this.clearZone = this.add.zone(W - 240, 690, 120, 44).setInteractive({ cursor: 'pointer' });
-    this.clearZone.on('pointerover', () => drawNestedButton(this.clearBtn, W - 240, 690, 120, 44, true));
-    this.clearZone.on('pointerout', () => drawNestedButton(this.clearBtn, W - 240, 690, 120, 44, false));
+    drawNestedButton(this.clearBtn, 820, 622, 110, 40, false);
+    this.add.text(820, 622, 'CLEAR', buttonLabelStyle(16)).setOrigin(0.5);
+    this.clearZone = this.add.zone(820, 622, 110, 40).setInteractive({ cursor: 'pointer' });
+    this.clearZone.on('pointerover', () => drawNestedButton(this.clearBtn, 820, 622, 110, 40, true));
+    this.clearZone.on('pointerout', () => drawNestedButton(this.clearBtn, 820, 622, 110, 40, false));
     this.clearZone.on('pointerdown', () => this.clearBets());
   }
 
@@ -655,8 +692,8 @@ export class RouletteScene extends Scene {
   }
 
   private buildTotalBetDisplay(): void {
-    this.totalBetText = this.add.text(510, 670, 'Total Bet: 0', {
-      fontSize: '15px',
+    this.totalBetText = this.add.text(490, 593, 'Total Bet: 0', {
+      fontSize: '14px',
       fontFamily: FONT.mono,
       color: '#ffdf6a',
     }).setResolution(2);

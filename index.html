@@ -3,12 +3,36 @@
 <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="/style.css">
     <title>Casino Climb</title>
+    <style>
+        #rotate-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #0a0a0a;
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #e0a242;
+            font-family: monospace;
+            font-size: 22px;
+            text-align: center;
+            gap: 16px;
+        }
+        @media (orientation: portrait) and (max-width: 1024px) {
+            #rotate-overlay { display: flex; }
+        }
+    </style>
 </head>
 
 <body>
+    <div id="rotate-overlay">
+        <div style="font-size: 52px;">&#8635;</div>
+        <div>Rotate to landscape<br>to play</div>
+    </div>
     <div id="app">
         <div id="game-container"></div>
     </div>
