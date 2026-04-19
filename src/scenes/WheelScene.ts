@@ -291,6 +291,7 @@ export class WheelScene extends Scene {
 
   private buildWheel(): void {
     this.wheelContainer = this.add.container(WHEEL_CX, WHEEL_CY);
+    this.wheelContainer.setDepth(10);
 
     const g = this.add.graphics();
     const labelObjects: GameObjects.Text[] = [];

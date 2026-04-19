@@ -241,19 +241,34 @@ export class DungeonScene extends Scene {
       if (tableTile) tableTile.tint = cfg.propTint.table;
     }
 
+    const isFateRoom = cfg.gameSceneKey === 'WheelScene';
+
     // Extra interactables: composite sprites for secondary stations
     for (const it of cfg.interactables ?? []) {
       this.propLayer.removeTileAt(it.pos.col, it.pos.row);
-      const texture = it.compositeTableTexture ?? 'casino-table';
-      this.add
-        .image(
-          it.pos.col * TILE_SIZE + TILE_SIZE / 2,
-          it.pos.row * TILE_SIZE + TILE_SIZE / 2,
-          texture,
-        )
-        .setOrigin(0.5, 0.5)
-        .setDepth(3)
-        .setScale(it.spriteScale ?? 1);
+      // In Room of Fate, slot machines are shown as one wall-row overlay image.
+      const hideLegacySlotSprite =
+        isFateRoom && it.gameSceneKey === 'SlotMachineScene';
+      if (!hideLegacySlotSprite) {
+        const texture = it.compositeTableTexture ?? 'casino-table';
+        this.add
+          .image(
+            it.pos.col * TILE_SIZE + TILE_SIZE / 2,
+            it.pos.row * TILE_SIZE + TILE_SIZE / 2,
+            texture,
+          )
+          .setOrigin(0.5, 0.5)
+          .setDepth(3)
+          .setScale(it.spriteScale ?? 1);
+      }
+    }
+
+    if (isFateRoom) {
+      const slotRow = this.add.image(TILE_SIZE + 2, TILE_SIZE + 6, 'fate-slot-row')
+        .setOrigin(0, 0)
+        .setDepth(3);
+      const targetHeight = TILE_SIZE * 10;
+      slotRow.setScale(targetHeight / slotRow.height);
     }
     // Remove tileset stairs tile; composite sprite replaces it
     this.propLayer.removeTileAt(stairsPos.col, stairsPos.row);
@@ -356,16 +371,19 @@ export class DungeonScene extends Scene {
         gameSceneKey: string,
         useComposite: boolean,
       ) => {
-        const labelY = pos.row * TILE_SIZE - (useComposite ? 20 : 4);
-        this.add
-          .text(pos.col * TILE_SIZE + 8, labelY, label, {
-            fontSize: '5px',
-            color: '#c9a66b',
-            fontFamily: 'monospace',
-            shadow: { offsetX: 0, offsetY: 1, color: '#000000', blur: 0, fill: true },
-          })
-          .setOrigin(0.5, 1)
-          .setDepth(6);
+        // Floor 4 uses custom art layout; hide station labels for cleaner composition.
+        if (!isFateRoom) {
+          const labelY = pos.row * TILE_SIZE - (useComposite ? 20 : 4);
+          this.add
+            .text(pos.col * TILE_SIZE + 8, labelY, label, {
+              fontSize: '5px',
+              color: '#c9a66b',
+              fontFamily: 'monospace',
+              shadow: { offsetX: 0, offsetY: 1, color: '#000000', blur: 0, fill: true },
+            })
+            .setOrigin(0.5, 1)
+            .setDepth(6);
+        }
 
         const zone = this.add
           .zone(pos.col * TILE_SIZE + 8, pos.row * TILE_SIZE + 8, 3 * TILE_SIZE, 3 * TILE_SIZE)
@@ -1220,9 +1238,14 @@ export class DungeonScene extends Scene {
       this.goalSoundsPlayed = false;
     }
 
-    // Nudge player 2 tiles south so they exit the trigger zone immediately
+    // Nudge player out of trigger zone after minigame close.
+    // Slot machines in the Fate room sit on the left wall, so move right instead of down.
     const exitPos = this.lastTablePos;
-    this.player.setPosition(exitPos.col * TILE_SIZE + 8, (exitPos.row + 2) * TILE_SIZE + 8);
+    if (this.config.gameSceneKey === 'WheelScene' && exitPos.col <= 1) {
+      this.player.setPosition((exitPos.col + 2) * TILE_SIZE + 8, exitPos.row * TILE_SIZE + 8);
+    } else {
+      this.player.setPosition(exitPos.col * TILE_SIZE + 8, (exitPos.row + 2) * TILE_SIZE + 8);
+    }
     this.justExitedTable = true;
 
     this.scene.resume('DungeonScene');

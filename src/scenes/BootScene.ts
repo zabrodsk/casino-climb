@@ -21,6 +21,8 @@ export class BootScene extends Scene {
 
     // Load tileset image (304x208, 16x16 tiles, 19 cols x 13 rows)
     this.load.image('dungeon-tiles', 'assets/tilemaps/dungeon_tileset.png');
+    this.load.image('fate-slot-row', 'assets/sprites/slot-machine-row.png');
+    this.load.image('table-roulette-art', 'assets/sprites/roulette-table.png');
 
     AudioManager.preload(this);
 
