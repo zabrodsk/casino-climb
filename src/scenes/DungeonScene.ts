@@ -105,6 +105,9 @@ export class DungeonScene extends Scene {
   private devLevelButtonLabel?: Phaser.GameObjects.Text;
   private devLevelButtonZone?: Phaser.GameObjects.Zone;
   private devLevelPanel?: Phaser.GameObjects.Container;
+  private devSetCoinsButtonBg?: Phaser.GameObjects.Graphics;
+  private devSetCoinsButtonLabel?: Phaser.GameObjects.Text;
+  private devSetCoinsButtonZone?: Phaser.GameObjects.Zone;
   private devModeLabel?: Phaser.GameObjects.Text;
 
   private stairsSprite!: Phaser.GameObjects.Image;
@@ -474,6 +477,7 @@ export class DungeonScene extends Scene {
         this.envTimer = null;
       }
       this.destroyDevLevelSelector();
+      this.destroyDevSetCoinsButton();
       this.devModeLabel?.destroy();
       this.devModeLabel = undefined;
       this.joystick?.destroy();
@@ -1449,6 +1453,7 @@ export class DungeonScene extends Scene {
   private applyDevModeState(): void {
     this.ensureDevModeLabel();
     this.ensureDevLevelSelector();
+    this.ensureDevSetCoinsButton();
 
     if (isDeveloperModeEnabled()) {
       this._unlockStairs(false);
@@ -1522,6 +1527,71 @@ export class DungeonScene extends Scene {
     this.devLevelButtonZone.on('pointerdown', () => {
       AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 45, allowOverlap: false });
       this.toggleDevLevelPanel();
+    });
+  }
+
+  private ensureDevSetCoinsButton(): void {
+    if (!isDeveloperModeEnabled()) {
+      this.destroyDevSetCoinsButton();
+      return;
+    }
+    if (this.devSetCoinsButtonBg) {
+      return;
+    }
+
+    const x = 92;
+    const y = 62;
+    const w = 132;
+    const h = 24;
+    const depth = 1000;
+
+    this.devSetCoinsButtonBg = this.add.graphics().setScrollFactor(0).setDepth(depth);
+    this.devSetCoinsButtonLabel = this.add.text(x, y, 'Set Coin Amount', {
+      fontFamily: 'Courier New',
+      fontSize: '11px',
+      color: '#f5e5c7',
+      stroke: '#24130e',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(depth + 1);
+    this.devSetCoinsButtonZone = this.add.zone(x, y, w, h).setScrollFactor(0).setDepth(depth + 2);
+
+    const redraw = (hovered: boolean): void => {
+      this.devSetCoinsButtonBg?.clear();
+      this.devSetCoinsButtonBg?.fillStyle(hovered ? 0xf1cc82 : 0xc8a364, 1);
+      this.devSetCoinsButtonBg?.fillRect(x - w / 2, y - h / 2, w, h);
+      this.devSetCoinsButtonBg?.fillStyle(0x3b2417, 1);
+      this.devSetCoinsButtonBg?.fillRect(x - w / 2 + 3, y - h / 2 + 3, w - 6, h - 6);
+      this.devSetCoinsButtonBg?.fillStyle(hovered ? 0x6e2937 : 0x5a2230, 0.92);
+      this.devSetCoinsButtonBg?.fillRect(x - w / 2 + 6, y - h / 2 + 6, w - 12, h - 12);
+    };
+
+    redraw(false);
+    this.devSetCoinsButtonZone.setInteractive({ cursor: 'pointer' });
+    this.devSetCoinsButtonZone.on('pointerover', () => {
+      redraw(true);
+      AudioManager.playSfx(this, 'ui-hover', { volume: 0.8, cooldownMs: 45, allowOverlap: false });
+    });
+    this.devSetCoinsButtonZone.on('pointerout', () => redraw(false));
+    this.devSetCoinsButtonZone.on('pointerdown', () => {
+      AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 45, allowOverlap: false });
+      const raw = window.prompt('Set coin amount:', String(getCoins()));
+      if (raw === null) return;
+      const value = Number.parseInt(raw.trim(), 10);
+      if (!Number.isFinite(value) || Number.isNaN(value) || value < 0) {
+        this.hud.showSpeech('Enter a valid coin amount (0 or more).');
+        return;
+      }
+
+      const nextCoins = Math.floor(value);
+      setCoins(nextCoins);
+      this._lastHudCoins = nextCoins;
+      this.hud.setCoins(nextCoins);
+      this.hud.setProgress(nextCoins, this.config.target);
+      if (this.crossingMode) {
+        this._refreshCrossingHud();
+        this._refreshCrossingButtons();
+      }
+      this.applyDevModeState();
     });
   }
 
@@ -1621,6 +1691,15 @@ export class DungeonScene extends Scene {
     this.devLevelButtonLabel = undefined;
     this.devLevelButtonBg = undefined;
     this.devLevelPanel = undefined;
+  }
+
+  private destroyDevSetCoinsButton(): void {
+    this.devSetCoinsButtonZone?.destroy();
+    this.devSetCoinsButtonLabel?.destroy();
+    this.devSetCoinsButtonBg?.destroy();
+    this.devSetCoinsButtonZone = undefined;
+    this.devSetCoinsButtonLabel = undefined;
+    this.devSetCoinsButtonBg = undefined;
   }
 
   private _scheduleEnvironmentSfx(): void {
