@@ -344,13 +344,8 @@ export class DungeonScene extends Scene {
       right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
 
-    const hasTouch = this.sys.game.device.input.touch ||
-                 'ontouchstart' in window ||
-                 navigator.maxTouchPoints > 0;
-    if (hasTouch) {
-      this.joystick = new VirtualJoystick(this);
-      this.buildTouchActionButtons();
-    }
+    this.joystick = new VirtualJoystick(this);
+    this.buildTouchActionButtons();
 
     // ── Camera ────────────────────────────────────────────────────────────
     this.cameras.main.setBounds(-TILE_SIZE, -TILE_SIZE, mapW + TILE_SIZE * 2, mapH + TILE_SIZE * 2);
