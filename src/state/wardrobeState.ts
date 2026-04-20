@@ -198,6 +198,8 @@ export function unequipCategory(cat: string): void {
 export function getPalette(): SpritePalette {
   const eq = getEquipped();
   const result: SpritePalette = {};
+  const activeFigure = eq.figure ?? 'figure-gambler';
+  const isStreetGambler = activeFigure === 'figure-gambler';
   // Apply figure first (sets characterId)
   if (eq.figure) {
     if (eq.figure === 'figure-gambler') {
@@ -207,13 +209,15 @@ export function getPalette(): SpritePalette {
       if (item) Object.assign(result, item.palette);
     }
   }
-  // Then hair/outfit/accessory overrides (only meaningful on Street Gambler base)
-  for (const cat of ['hair', 'outfit', 'accessory'] as const) {
-    const id = eq[cat];
-    if (!id) continue;
-    const item = WARDROBE_CATALOG.find(i => i.id === id);
-    if (!item) continue;
-    Object.assign(result, item.palette);
+  // Hair/outfit/accessory are only meant to customize the Street Gambler base.
+  if (isStreetGambler) {
+    for (const cat of ['hair', 'outfit', 'accessory'] as const) {
+      const id = eq[cat];
+      if (!id) continue;
+      const item = WARDROBE_CATALOG.find(i => i.id === id);
+      if (!item) continue;
+      Object.assign(result, item.palette);
+    }
   }
   return result;
 }

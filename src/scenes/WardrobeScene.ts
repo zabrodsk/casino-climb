@@ -147,35 +147,30 @@ export class WardrobeScene extends Scene {
       const zone = this.add.zone(tx + tabW / 2, ty + 28, tabW, 48).setInteractive({ useHandCursor: true });
       container.add(zone);
 
-      const redraw = (active: boolean) => {
+      const redraw = (active: boolean, locked: boolean) => {
         f.clear();
-        f.fillStyle(active ? 0x4d1f2f : 0x1a0c11, active ? 0.95 : 0.5);
+        if (locked) {
+          f.fillStyle(0x120a0d, 0.7);
+        } else {
+          f.fillStyle(active ? 0x4d1f2f : 0x1a0c11, active ? 0.95 : 0.5);
+        }
         f.fillRect(tx, ty, tabW, 48);
-        f.lineStyle(2, active ? 0xd4b27b : 0x5a3a2a, active ? 1 : 0.5);
+        f.lineStyle(2, locked ? 0x3e2a2f : active ? 0xd4b27b : 0x5a3a2a, locked ? 0.8 : active ? 1 : 0.5);
         f.strokeRect(tx, ty, tabW, 48);
-        label.setColor(active ? '#ffd8a2' : '#a08060');
+        label.setColor(locked ? '#5d4a4f' : active ? '#ffd8a2' : '#a08060');
+        zone.input && (zone.input.cursor = locked ? 'not-allowed' : 'pointer');
       };
 
-      redraw(tab === this.activeTab);
+      redraw(tab === this.activeTab, this.isTabLocked(tab));
       this.tabButtons.set(tab, container);
 
       zone.on('pointerdown', () => {
+        if (this.isTabLocked(tab)) return;
         if (this.activeTab === tab) return;
         AudioManager.playSfx(this, 'ui-click', { volume: 0.7, cooldownMs: 50, allowOverlap: false });
         this.activeTab = tab;
         this.selectedItem = null;
-        this.tabButtons.forEach((c, t) => {
-          const tf = c.list[0] as GameObjects.Graphics;
-          const tl = c.list[1] as GameObjects.Text;
-          const isActive = t === tab;
-          tf.clear();
-          tf.fillStyle(isActive ? 0x4d1f2f : 0x1a0c11, isActive ? 0.95 : 0.5);
-          const tIdx = tabs.indexOf(t);
-          tf.fillRect(panelX + tIdx * tabW, panelY, tabW, 48);
-          tf.lineStyle(2, isActive ? 0xd4b27b : 0x5a3a2a, isActive ? 1 : 0.5);
-          tf.strokeRect(panelX + tIdx * tabW, panelY, tabW, 48);
-          tl.setColor(isActive ? '#ffd8a2' : '#a08060');
-        });
+        this.refreshTabs(panelX, panelY, tabW);
         this.rebuildItemGrid();
         this.updateActionButton();
       });
@@ -405,6 +400,15 @@ export class WardrobeScene extends Scene {
       return;
     }
 
+    if (this.isTabLocked(item.category as Tab)) {
+      this.actionBtnFrame.fillStyle(0x1a1416);
+      this.actionBtnFrame.fillRoundedRect(btnX, btnY, btnW, btnH, 8);
+      this.actionBtnFrame.lineStyle(2, 0x4a3a3f);
+      this.actionBtnFrame.strokeRoundedRect(btnX, btnY, btnW, btnH, 8);
+      this.actionBtnLabel.setText('STREET GAMBLER ONLY').setColor('#7b676d');
+      return;
+    }
+
     const owned = item.id === 'figure-gambler' ? true : isOwned(item.id);
     const equipped = item.category === 'figure'
       ? getEquipped().figure === item.id
@@ -441,6 +445,7 @@ export class WardrobeScene extends Scene {
   private onActionButton(): void {
     const item = this.selectedItem;
     if (!item) return;
+    if (this.isTabLocked(item.category as Tab)) return;
 
     const equipped = item.category === 'figure'
       ? getEquipped().figure === item.id
@@ -466,16 +471,61 @@ export class WardrobeScene extends Scene {
 
     // Refresh palette, preview, UI
     this.previewPalette = { ...getPalette() };
+    if (item.category === 'figure' && this.activeTab !== 'figure' && this.isCurrentFigureLocked()) {
+      this.activeTab = 'figure';
+      this.selectedItem = null;
+    }
+    this.refreshPlayerTexture();
     generatePlayerTexture(this, 'wardrobe-preview', this.previewPalette);
     this.previewSprite.setTexture('wardrobe-preview');
     this.goldText.setText(`${getGold().toLocaleString()} G`);
+    this.refreshTabs(360, 100, Math.floor(600 / 4));
     this.rebuildItemGrid();
     this.updateActionButton();
   }
 
   private refreshPreview(): void {
     this.previewPalette = { ...getPalette() };
+    this.refreshPlayerTexture();
     generatePlayerTexture(this, 'wardrobe-preview', this.previewPalette);
     this.previewSprite.setTexture('wardrobe-preview');
+  }
+
+  private isCurrentFigureLocked(): boolean {
+    const figure = getEquipped().figure ?? 'figure-gambler';
+    return figure !== 'figure-gambler';
+  }
+
+  private isTabLocked(tab: Tab): boolean {
+    return tab !== 'figure' && this.isCurrentFigureLocked();
+  }
+
+  private refreshTabs(panelX: number, panelY: number, tabW: number): void {
+    const tabs: Tab[] = ['figure', 'hair', 'outfit', 'accessory'];
+    this.tabButtons.forEach((container, tab) => {
+      const graphics = container.list[0] as GameObjects.Graphics;
+      const label = container.list[1] as GameObjects.Text;
+      const zone = container.list[2] as GameObjects.Zone;
+      const isActive = tab === this.activeTab;
+      const isLocked = this.isTabLocked(tab);
+      const tabIndex = tabs.indexOf(tab);
+      const x = panelX + tabIndex * tabW;
+
+      graphics.clear();
+      if (isLocked) {
+        graphics.fillStyle(0x120a0d, 0.7);
+      } else {
+        graphics.fillStyle(isActive ? 0x4d1f2f : 0x1a0c11, isActive ? 0.95 : 0.5);
+      }
+      graphics.fillRect(x, panelY, tabW, 48);
+      graphics.lineStyle(2, isLocked ? 0x3e2a2f : isActive ? 0xd4b27b : 0x5a3a2a, isLocked ? 0.8 : isActive ? 1 : 0.5);
+      graphics.strokeRect(x, panelY, tabW, 48);
+      label.setColor(isLocked ? '#5d4a4f' : isActive ? '#ffd8a2' : '#a08060');
+      if (zone.input) zone.input.cursor = isLocked ? 'not-allowed' : 'pointer';
+    });
+  }
+
+  private refreshPlayerTexture(): void {
+    generatePlayerTexture(this, 'player', getPalette());
   }
 }
