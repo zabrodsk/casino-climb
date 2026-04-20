@@ -459,7 +459,9 @@ export class DungeonScene extends Scene {
 
     // Joystick + touch buttons must be created AFTER uiCam.ignore so the
     // uiCam renders them; tell main camera (5x zoom world cam) to ignore them.
-    const hasTouch = window.matchMedia('(pointer: coarse)').matches;
+    // (pointer: coarse) + (hover: none) = real touch-only device (phone/tablet)
+    // Mac trackpads report coarse but DO support hover, so this excludes them
+    const hasTouch = window.matchMedia('(pointer: coarse) and (hover: none)').matches;
     if (hasTouch) {
       this.joystick = new VirtualJoystick(this);
       this.cameras.main.ignore(this.joystick.getObjects());

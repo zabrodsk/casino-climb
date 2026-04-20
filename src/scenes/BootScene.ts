@@ -144,11 +144,18 @@ export class BootScene extends Scene {
     g.fillStyle(0x7a604f);
     g.fillRect(cx - 2, headTop + 12, 4, 1);
 
-    // Neck — height 3 so it meets torsoTop (upperY+22) with no gap
+    // Neck + shoulders: neck skin in center, shirt-colored shoulders on sides
+    // so the 14px-wide head connects smoothly to the 14px-wide torso
     g.fillStyle(skin);
     g.fillRect(cx - 2, headTop + 14, 4, 3);
     g.fillStyle(skinShade);
     g.fillRect(cx - 2, headTop + 15, 4, 2);
+    g.fillStyle(shirtDark);
+    g.fillRect(cx - 7, headTop + 14, 5, 3);  // left shoulder
+    g.fillRect(cx + 2, headTop + 14, 5, 3);  // right shoulder
+    g.fillStyle(shirtMid);
+    g.fillRect(cx - 6, headTop + 15, 4, 2);  // left shoulder highlight
+    g.fillRect(cx + 2, headTop + 15, 4, 2);  // right shoulder highlight
 
     // Body: reference-like shirt silhouette, but old/dirty gray shirt
     const torsoTop = upperY + 22;
