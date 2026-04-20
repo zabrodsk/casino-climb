@@ -486,8 +486,10 @@ export class DungeonScene extends Scene {
 
     // ── game-complete listener ─────────────────────────────────────────────
     this.events.on('game-complete', this._onGameComplete, this);
+    this.events.on('resume', this._onSceneResume, this);
     this.events.once('shutdown', () => {
       this.events.off('game-complete', this._onGameComplete, this);
+      this.events.off('resume', this._onSceneResume, this);
       this.floorEntrySpeechTimer?.remove(false);
       this.floorEntrySpeechTimer = null;
       if (this.envTimer) {
@@ -1086,6 +1088,8 @@ export class DungeonScene extends Scene {
   }
 
   update(): void {
+    this._recoverCamerasIfStuck();
+
     if (this.crossingMode) {
       const deltaSeconds = this.game.loop.delta / 1000;
       const crossing = this.config.crossing;
@@ -1893,6 +1897,29 @@ export class DungeonScene extends Scene {
       coins: getCoins(),
       minigameSceneKey: null,
     });
+  }
+
+  private _recoverCamerasIfStuck(): void {
+    const mainFadeRunning = this.cameras.main.fadeEffect?.isRunning ?? false;
+    if (!mainFadeRunning && this.cameras.main.alpha < 0.99) {
+      this.cameras.main.resetFX();
+      this.cameras.main.setAlpha(1);
+    }
+
+    const uiFadeRunning = this.uiCam.fadeEffect?.isRunning ?? false;
+    if (!uiFadeRunning && this.uiCam.alpha < 0.99) {
+      this.uiCam.resetFX();
+      this.uiCam.setAlpha(1);
+    }
+  }
+
+  private _onSceneResume(): void {
+    // Guaranteed camera normalization whenever coming back from a minigame pause.
+    this.cameras.main.resetFX();
+    this.cameras.main.setAlpha(1);
+    this.uiCam.resetFX();
+    this.uiCam.setAlpha(1);
+    this.doorTriggered = false;
   }
 
   private _playEnvironmentSfx(): void {

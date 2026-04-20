@@ -28,6 +28,13 @@ export function consumeRefreshResume(): RefreshResumePayload | null {
   if (typeof window === 'undefined' || !window.sessionStorage || !isRefreshResumeEnabled()) {
     return null;
   }
+  // Safety: apply refresh resume only for real browser reloads.
+  const navEntry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+  const isReload = navEntry?.type === 'reload'
+    || ((performance as Performance & { navigation?: { type?: number } }).navigation?.type === 1);
+  if (!isReload) {
+    return null;
+  }
   try {
     const raw = window.sessionStorage.getItem(REFRESH_RESUME_KEY);
     if (!raw) return null;
