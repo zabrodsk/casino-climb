@@ -6,6 +6,14 @@ import {
   evaluatePayline,
   spinReels,
 } from '../games/slotMachine';
+import {
+  createSlotMachineRoundState,
+  dismissSlotMachineResult,
+  getSlotMachineStatusText,
+  settleSlotMachineRound,
+  startSlotMachineSpin,
+  type SlotMachineRoundState,
+} from '../games/slotMachineRoundState';
 import { AudioManager } from '../audio/AudioManager';
 import {
   COLOR,
@@ -52,6 +60,7 @@ export class SlotMachineScene extends Scene {
   private paylineGraphics!: GameObjects.Graphics;
 
   private pullBtn!: GameObjects.Graphics;
+  private pullBtnText!: GameObjects.Text;
   private pullZone!: GameObjects.Zone;
   private wagerButtons: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; value: number; zone: GameObjects.Zone }> = [];
   private wagerLabel!: GameObjects.Text;
@@ -59,17 +68,28 @@ export class SlotMachineScene extends Scene {
 
   private leverArm!: GameObjects.Graphics;
   private leverKnob!: GameObjects.Arc;
+  private leverZone!: GameObjects.Zone;
 
   private resultPanel!: GameObjects.Graphics;
   private resultTitle!: GameObjects.Text;
   private resultDetail!: GameObjects.Text;
-  private continueBtn!: GameObjects.Graphics;
-  private continueBtnText!: GameObjects.Text;
-  private continueZone!: GameObjects.Zone;
+  private resultPrimaryBtn!: GameObjects.Graphics;
+  private resultPrimaryBtnText!: GameObjects.Text;
+  private resultPrimaryZone!: GameObjects.Zone;
+  private resultLeaveBtn!: GameObjects.Graphics;
+  private resultLeaveBtnText!: GameObjects.Text;
+  private resultLeaveZone!: GameObjects.Zone;
 
-  private spinning = false;
   private spinDurationMs = 5200;
   private spinSound: Phaser.Sound.BaseSound | null = null;
+  private roundState: SlotMachineRoundState = createSlotMachineRoundState();
+  private pendingResultTimer: Phaser.Time.TimerEvent | null = null;
+  private transientEffects: GameObjects.GameObject[] = [];
+  private exitRequested = false;
+  private readonly handleEsc = () => {
+    if (!this.roundState.canLeave || this.exitRequested) return;
+    this.leave();
+  };
 
   constructor() {
     super('SlotMachineScene');
@@ -77,14 +97,17 @@ export class SlotMachineScene extends Scene {
 
   init(data: { coins: number }): void {
     this.currentCoins = data.coins ?? 200;
-    this.spinning = false;
+    this.roundState = createSlotMachineRoundState();
+    this.pendingResultTimer = null;
+    this.transientEffects = [];
+    this.exitRequested = false;
   }
 
   create(): void {
     HouseController.disable();
     this.events.once('shutdown', () => {
+      this.cleanupSceneState();
       HouseController.enable();
-      this.stopSpinSound();
     });
     this.cameras.main.setRoundPixels(true);
 
@@ -103,15 +126,16 @@ export class SlotMachineScene extends Scene {
     this.buildPayoutLegend();
     this.buildResultPanel();
 
-    this.statusText = this.add.text(W / 2, H - 28, 'Choose wager, then PULL.', {
+    this.statusText = this.add.text(W / 2, H - 28, '', {
       fontSize: '18px',
       fontFamily: FONT.mono,
       color: '#e6e6e6',
     }).setOrigin(0.5).setResolution(2);
+    this.syncUiToRoundState();
 
     addGameplaySettingsGear(this, 'SlotMachineScene');
     registerDeveloperUnlockHotkey(this, () => this.leave());
-    this.input.keyboard?.on('keydown-ESC', () => this.leave());
+    this.input.keyboard?.on('keydown-ESC', this.handleEsc);
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
@@ -182,6 +206,13 @@ export class SlotMachineScene extends Scene {
     this.paylineGraphics.lineStyle(3, 0xc94a3a, 0.9);
     this.paylineGraphics.lineBetween(windowX + 10, CENTER_Y, windowX + 10 + 3 * REEL_W + 2 * REEL_GAP, CENTER_Y);
     this.paylineGraphics.setDepth(4);
+    this.add.text(CENTER_X, windowY + REEL_H + 26, 'CENTER PAYLINE', {
+      fontSize: '13px',
+      fontFamily: FONT.mono,
+      color: '#ffdf6a',
+      stroke: '#2a1008',
+      strokeThickness: 3,
+    }).setOrigin(0.5).setResolution(2);
 
     // Coin tray at bottom
     g.fillStyle(0x3a2010, 1);
@@ -315,10 +346,21 @@ export class SlotMachineScene extends Scene {
     const cabRight = CENTER_X + (3 * REEL_W + 2 * REEL_GAP) / 2 + 70;
     this.leverArm = this.add.graphics();
     this.leverArm.fillStyle(0x8a6a38, 1);
-    this.leverArm.fillRect(cabRight - 4, CENTER_Y - 10, 8, 120);
-    this.leverKnob = this.add.circle(cabRight, CENTER_Y - 20, 16, 0xc22657);
+    this.leverArm.fillRect(cabRight - 5, CENTER_Y - 18, 10, 132);
+    this.leverKnob = this.add.circle(cabRight, CENTER_Y - 24, 22, 0xc22657);
     this.leverKnob.setStrokeStyle(3, 0x6a1a2a, 1);
     this.leverKnob.setDepth(6);
+    this.leverZone = this.add.zone(cabRight, CENTER_Y + 28, 96, 188).setInteractive({ cursor: 'pointer' });
+    this.leverZone.on('pointerover', () => {
+      if (!this.roundState.canSpin) return;
+      this.leverKnob.setScale(1.08);
+      this.leverKnob.setFillStyle(0xdf3969, 1);
+    });
+    this.leverZone.on('pointerout', () => {
+      this.leverKnob.setScale(1);
+      this.leverKnob.setFillStyle(0xc22657, 1);
+    });
+    this.leverZone.on('pointerdown', () => this.doSpin());
   }
 
   private buildWagerButtons(): void {
@@ -336,7 +378,7 @@ export class SlotMachineScene extends Scene {
       const zone = this.add.zone(x, y, 90, 54).setInteractive({ cursor: 'pointer' });
       const btn = { bg, label, value, zone };
       zone.on('pointerdown', () => {
-        if (this.spinning) return;
+        if (!this.roundState.canSpin) return;
         if (this.isLowCoinWagerMode()) return;
         this.selectedWager = value;
         this.refreshWagerControls();
@@ -355,7 +397,7 @@ export class SlotMachineScene extends Scene {
     }).setOrigin(0.5).setResolution(2).setVisible(false);
     const allInZone = this.add.zone(CENTER_X, y, 140, 54).setVisible(false);
     allInZone.on('pointerdown', () => {
-      if (this.spinning || !this.isLowCoinWagerMode()) return;
+      if (!this.roundState.canSpin || !this.isLowCoinWagerMode()) return;
       this.selectedWager = this.currentCoins;
       this.refreshWagerControls();
       AudioManager.playSfx(this, 'bet-select', { volume: 1.0, cooldownMs: 50, allowOverlap: false });
@@ -381,12 +423,23 @@ export class SlotMachineScene extends Scene {
 
   private buildActionButton(): void {
     const y = 700;
+    this.add.text(CENTER_X, y - 42, 'ACTION', {
+      fontSize: '15px',
+      fontFamily: FONT.mono,
+      color: '#ffdf6a',
+    }).setOrigin(0.5).setResolution(2);
     this.pullBtn = this.add.graphics();
-    this.add.text(CENTER_X, y, 'PULL', buttonLabelStyle(24)).setOrigin(0.5);
+    this.pullBtnText = this.add.text(CENTER_X, y, 'SPIN', buttonLabelStyle(24)).setOrigin(0.5);
     drawNestedButton(this.pullBtn, CENTER_X, y, 240, 60, false);
     this.pullZone = this.add.zone(CENTER_X, y, 240, 60).setInteractive({ cursor: 'pointer' });
-    this.pullZone.on('pointerover', () => drawNestedButton(this.pullBtn, CENTER_X, y, 240, 60, true));
-    this.pullZone.on('pointerout', () => drawNestedButton(this.pullBtn, CENTER_X, y, 240, 60, false));
+    this.pullZone.on('pointerover', () => {
+      if (!this.roundState.canSpin) return;
+      drawNestedButton(this.pullBtn, CENTER_X, y, 240, 60, true);
+    });
+    this.pullZone.on('pointerout', () => {
+      if (!this.roundState.canSpin) return;
+      drawNestedButton(this.pullBtn, CENTER_X, y, 240, 60, false);
+    });
     this.pullZone.on('pointerdown', () => this.doSpin());
   }
 
@@ -423,18 +476,19 @@ export class SlotMachineScene extends Scene {
 
   // ── Spin ──────────────────────────────────────────────────────────────
   private doSpin(): void {
-    if (this.spinning) return;
+    if (!this.roundState.canSpin) return;
     if (this.currentCoins < this.selectedWager) {
       this.statusText.setText('Not enough coins.');
       return;
     }
 
-    this.spinning = true;
-    this.pullZone.disableInteractive();
+    this.roundState = startSlotMachineSpin(this.roundState);
     this.currentCoins -= this.selectedWager;
     this.coinsText.setText(`Coins: ${this.currentCoins}`);
     this.refreshWagerControls();
-    this.statusText.setText('Reels spinning...');
+    this.hideResultPanel();
+    this.clearTransientEffects();
+    this.syncUiToRoundState();
 
     // Pulse the status text while spinning
     this.tweens.add({
@@ -509,7 +563,11 @@ export class SlotMachineScene extends Scene {
           completed += 1;
           if (completed === 3) {
             this.stopSpinSound();
-            this.time.delayedCall(400, () => this.showResult(result));
+            this.pendingResultTimer?.remove(false);
+            this.pendingResultTimer = this.time.delayedCall(400, () => {
+              this.pendingResultTimer = null;
+              this.showResult(result);
+            });
           }
         },
       });
@@ -532,21 +590,17 @@ export class SlotMachineScene extends Scene {
     }
     this.currentCoins += payout;
     this.coinsText.setText(`Coins: ${this.currentCoins}`);
+    this.roundState = settleSlotMachineRound(this.roundState, { currentCoins: this.currentCoins, net: payout - this.selectedWager });
     this.refreshWagerControls();
-    if (this.currentCoins <= 0) {
-      this.statusText.setText('Out of coins.');
-      this.time.delayedCall(700, () => this.leave());
-      return;
-    }
 
     const net = payout - this.selectedWager;
     const heading = net > 0 ? `WIN +${net}` : net < 0 ? `LOSS ${net}` : 'PUSH';
     const titleColor = net > 0 ? COLOR.winGreen : net < 0 ? COLOR.loseRed : COLOR.goldText;
     const detail = out.kind === 'three'
-      ? `${reels.map((s) => s.toUpperCase()).join(' · ')}\nTriple ${out.matchedSymbol}! Payout ${payout}.`
+      ? `${reels.map((s) => s.toUpperCase()).join(' · ')}\nTriple ${out.matchedSymbol}. Stake ${this.selectedWager} · Payout ${payout}.`
       : out.kind === 'two-left' || out.kind === 'two-right'
-        ? `${reels.map((s) => s.toUpperCase()).join(' · ')}\nPair ${out.matchedSymbol}. Payout ${payout}.`
-        : `${reels.map((s) => s.toUpperCase()).join(' · ')}\nNo match.`;
+        ? `${reels.map((s) => s.toUpperCase()).join(' · ')}\nPair ${out.matchedSymbol}. Stake ${this.selectedWager} · Payout ${payout}.`
+        : `${reels.map((s) => s.toUpperCase()).join(' · ')}\nNo match. Stake ${this.selectedWager} lost.`;
 
     // ── Win animations ────────────────────────────────────────────────────
     if (payout > 0) {
@@ -578,6 +632,7 @@ export class SlotMachineScene extends Scene {
         ease: 'Cubic.easeOut',
         onComplete: () => { floatText.destroy(); },
       });
+      this.transientEffects.push(floatText);
 
       if (out.kind === 'three') {
         // Pop effect on each reel container
@@ -605,48 +660,147 @@ export class SlotMachineScene extends Scene {
           ease: 'Cubic.easeIn',
           onComplete: () => { glow.destroy(); },
         });
+        this.transientEffects.push(glow);
       }
     }
 
     this.resultPanel.setVisible(true);
     this.resultTitle.setText(heading).setColor(titleColor).setVisible(true);
     this.resultDetail.setText(detail).setVisible(true);
-    this.continueBtn.setVisible(true);
-    this.continueBtnText.setVisible(true);
-    this.continueZone.setInteractive({ cursor: 'pointer' });
+    this.resultPrimaryBtn.setVisible(this.roundState.phase !== 'bust');
+    this.resultPrimaryBtnText.setText(this.roundState.primaryAction === 'spin-again' ? 'SPIN AGAIN' : 'LEAVE').setVisible(this.roundState.phase !== 'bust');
+    if (this.roundState.phase !== 'bust') {
+      this.resultPrimaryZone.setInteractive({ cursor: 'pointer' });
+    } else {
+      this.resultPrimaryZone.disableInteractive();
+    }
+    this.resultLeaveBtn.setVisible(true);
+    this.resultLeaveBtnText.setVisible(true);
+    this.resultLeaveZone.setInteractive({ cursor: 'pointer' });
 
     this.showSpeech(net > 0 ? 'The reels smile on you.' : net < 0 ? 'No dice.' : 'Near miss.');
+    this.syncUiToRoundState();
   }
 
   private buildResultPanel(): void {
     const W = 1024;
     const panelW = 460;
-    const panelH = 150;
+    const panelH = 196;
     const px = (W - panelW) / 2;
-    const py = 470;
+    const py = 430;
 
     this.resultPanel = this.add.graphics().setVisible(false);
     drawFramedPanel(this.resultPanel, px, py, panelW, panelH, { borderWidth: 2, alpha: 0.95 });
 
-    this.resultTitle = this.add.text(W / 2, py + 32, '', {
+    this.resultTitle = this.add.text(W / 2, py + 28, '', {
       fontSize: '28px', fontFamily: FONT.mono, fontStyle: 'bold', color: COLOR.winGreen,
     }).setOrigin(0.5).setVisible(false).setResolution(2);
 
-    this.resultDetail = this.add.text(W / 2, py + 92, '', {
-      fontSize: '16px', fontFamily: FONT.mono, color: '#e5e7eb', align: 'center', wordWrap: { width: 420 },
+    this.resultDetail = this.add.text(W / 2, py + 84, '', {
+      fontSize: '17px', fontFamily: FONT.mono, color: '#e5e7eb', align: 'center', wordWrap: { width: 400 },
     }).setOrigin(0.5).setVisible(false).setResolution(2);
 
-    const contY = py + panelH + 30;
-    this.continueBtn = this.add.graphics().setVisible(false);
-    this.continueBtnText = this.add.text(W / 2, contY, 'CONTINUE', buttonLabelStyle(22)).setOrigin(0.5).setVisible(false);
-    drawNestedButton(this.continueBtn, W / 2, contY, 200, 52, false);
-    this.continueZone = this.add.zone(W / 2, contY, 200, 52);
-    this.continueZone.on('pointerover', () => drawNestedButton(this.continueBtn, W / 2, contY, 200, 52, true));
-    this.continueZone.on('pointerout', () => drawNestedButton(this.continueBtn, W / 2, contY, 200, 52, false));
-    this.continueZone.on('pointerdown', () => {
-      this.continueZone.disableInteractive();
+    const actionY = py + 156;
+    this.resultPrimaryBtn = this.add.graphics().setVisible(false);
+    this.resultPrimaryBtnText = this.add.text(W / 2 - 110, actionY, 'SPIN AGAIN', buttonLabelStyle(18)).setOrigin(0.5).setVisible(false);
+    drawNestedButton(this.resultPrimaryBtn, W / 2 - 110, actionY, 190, 46, false);
+    this.resultPrimaryZone = this.add.zone(W / 2 - 110, actionY, 190, 46);
+    this.resultPrimaryZone.on('pointerover', () => drawNestedButton(this.resultPrimaryBtn, W / 2 - 110, actionY, 190, 46, true));
+    this.resultPrimaryZone.on('pointerout', () => drawNestedButton(this.resultPrimaryBtn, W / 2 - 110, actionY, 190, 46, false));
+    this.resultPrimaryZone.on('pointerdown', () => this.handlePrimaryResultAction());
+
+    this.resultLeaveBtn = this.add.graphics().setVisible(false);
+    this.resultLeaveBtnText = this.add.text(W / 2 + 110, actionY, 'LEAVE', buttonLabelStyle(18)).setOrigin(0.5).setVisible(false);
+    drawNestedButton(this.resultLeaveBtn, W / 2 + 110, actionY, 160, 46, false);
+    this.resultLeaveZone = this.add.zone(W / 2 + 110, actionY, 160, 46);
+    this.resultLeaveZone.on('pointerover', () => drawNestedButton(this.resultLeaveBtn, W / 2 + 110, actionY, 160, 46, true));
+    this.resultLeaveZone.on('pointerout', () => drawNestedButton(this.resultLeaveBtn, W / 2 + 110, actionY, 160, 46, false));
+    this.resultLeaveZone.on('pointerdown', () => this.leave());
+  }
+
+  private handlePrimaryResultAction(): void {
+    if (this.roundState.primaryAction === 'leave') {
       this.leave();
+      return;
+    }
+
+    this.roundState = dismissSlotMachineResult(this.roundState, this.currentCoins);
+    this.hideResultPanel();
+    this.clearTransientEffects();
+    this.resetReelPresentation();
+    this.syncUiToRoundState();
+  }
+
+  private syncUiToRoundState(): void {
+    this.statusText.setText(getSlotMachineStatusText(this.roundState));
+    this.pullBtnText.setText(this.roundState.phase === 'spinning' ? 'SPINNING' : 'SPIN');
+    this.setPullButtonEnabled(this.roundState.canSpin);
+  }
+
+  private setPullButtonEnabled(enabled: boolean): void {
+    drawNestedButton(this.pullBtn, CENTER_X, 700, 240, 60, false);
+    this.pullBtn.setAlpha(enabled ? 1 : 0.5);
+    this.pullBtnText.setAlpha(enabled ? 1 : 0.65);
+    this.leverArm.setAlpha(enabled ? 1 : 0.55);
+    this.leverKnob.setAlpha(enabled ? 1 : 0.65);
+    if (enabled) {
+      this.pullZone.setInteractive({ cursor: 'pointer' });
+      this.leverZone.setInteractive({ cursor: 'pointer' });
+    } else {
+      this.pullZone.disableInteractive();
+      this.leverZone.disableInteractive();
+      this.leverKnob.setScale(1);
+      this.leverKnob.setFillStyle(0xc22657, 1);
+    }
+  }
+
+  private hideResultPanel(): void {
+    this.resultPanel.setVisible(false);
+    this.resultTitle.setVisible(false);
+    this.resultDetail.setVisible(false);
+    this.resultPrimaryBtn.setVisible(false);
+    this.resultPrimaryBtnText.setVisible(false);
+    this.resultPrimaryZone.disableInteractive();
+    this.resultLeaveBtn.setVisible(false);
+    this.resultLeaveBtnText.setVisible(false);
+    this.resultLeaveZone.disableInteractive();
+  }
+
+  private resetReelPresentation(): void {
+    this.paylineGraphics.setAlpha(1);
+    this.leverKnob.setY(CENTER_Y - 24);
+    this.leverKnob.setScale(1);
+    this.leverKnob.setFillStyle(0xc22657, 1);
+    this.reelContainers.forEach((container) => {
+      container.setY(this.reelStartY);
+      container.setScale(1);
+      container.setAlpha(1);
     });
+  }
+
+  private clearTransientEffects(): void {
+    this.transientEffects.forEach((effect) => {
+      if (!effect.active) return;
+      effect.destroy();
+    });
+    this.transientEffects = [];
+  }
+
+  private cleanupSceneState(): void {
+    this.pendingResultTimer?.remove(false);
+    this.pendingResultTimer = null;
+    this.tweens.killTweensOf([
+      this.statusText,
+      this.leverKnob,
+      this.paylineGraphics,
+      ...this.reelContainers,
+      ...this.transientEffects,
+    ]);
+    this.clearTransientEffects();
+    this.resetReelPresentation();
+    this.stopSpinSound();
+    this.hideResultPanel();
+    this.input.keyboard?.off('keydown-ESC', this.handleEsc);
   }
 
   // ── Audio ────────────────────────────────────────────────────────────
@@ -692,6 +846,7 @@ export class SlotMachineScene extends Scene {
 
   private refreshWagerControls(): void {
     const lowCoinMode = this.isLowCoinWagerMode();
+    const canAdjustWager = this.roundState.canSpin;
     if (lowCoinMode) {
       this.selectedWager = this.currentCoins;
       this.wagerButtons.forEach(({ bg, label, zone }) => {
@@ -702,7 +857,12 @@ export class SlotMachineScene extends Scene {
       this.drawWagerButton(this.allInWagerButton.bg, CENTER_X, this.allInWagerButton.label.y, this.currentCoins, true);
       this.allInWagerButton.bg.setVisible(true);
       this.allInWagerButton.label.setText(String(this.currentCoins)).setVisible(true);
-      this.allInWagerButton.zone.setVisible(true).setInteractive({ cursor: 'pointer' });
+      this.allInWagerButton.zone.setVisible(true);
+      if (canAdjustWager) {
+        this.allInWagerButton.zone.setInteractive({ cursor: 'pointer' });
+      } else {
+        this.allInWagerButton.zone.disableInteractive();
+      }
       this.wagerLabel.setText(`Wager: ${this.currentCoins}`);
       return;
     }
@@ -713,7 +873,11 @@ export class SlotMachineScene extends Scene {
     this.wagerButtons.forEach((w) => {
       w.bg.setVisible(true);
       w.label.setVisible(true);
-      w.zone.setInteractive({ cursor: 'pointer' });
+      if (canAdjustWager) {
+        w.zone.setInteractive({ cursor: 'pointer' });
+      } else {
+        w.zone.disableInteractive();
+      }
       this.drawWagerButton(w.bg, w.label.x, w.label.y, w.value, w.value === this.selectedWager);
     });
     this.allInWagerButton.bg.setVisible(false);
@@ -723,7 +887,18 @@ export class SlotMachineScene extends Scene {
   }
 
   private leave(): void {
+    if (this.exitRequested) return;
+    this.exitRequested = true;
+    this.pendingResultTimer?.remove(false);
+    this.pendingResultTimer = null;
     this.stopSpinSound();
+    this.input.keyboard?.off('keydown-ESC', this.handleEsc);
+    this.pullZone.disableInteractive();
+    this.leverZone.disableInteractive();
+    this.resultPrimaryZone.disableInteractive();
+    this.resultLeaveZone.disableInteractive();
+    this.wagerButtons.forEach(({ zone }) => zone.disableInteractive());
+    this.allInWagerButton.zone.disableInteractive();
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
       try {
