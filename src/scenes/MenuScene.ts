@@ -9,7 +9,7 @@ const INTRO_LINES = [
   "You don't remember how you got here.",
 ];
 
-type MenuButtonId = 'play' | 'settings';
+type MenuButtonId = 'play' | 'wardrobe' | 'settings';
 type SoundSliderKey = keyof AudioLevels;
 
 type SliderUi = {
@@ -337,8 +337,9 @@ export class MenuScene extends Scene {
   }
 
   private createButtons(): void {
-    this.createButton(this.baseWidth / 2, 340, 380, 98, 'PLAY', 'play', true);
-    this.createButton(this.baseWidth / 2, 454, 300, 74, 'SETTINGS', 'settings', false);
+    this.createButton(this.baseWidth / 2, 320, 380, 98, 'PLAY', 'play', true);
+    this.createButton(this.baseWidth / 2, 438, 300, 74, 'WARDROBE', 'wardrobe', false);
+    this.createButton(this.baseWidth / 2, 528, 300, 74, 'SETTINGS', 'settings', false);
   }
 
   private createSettingsPanel(): void {
@@ -670,6 +671,14 @@ export class MenuScene extends Scene {
     this.playUiClick();
     if (id === 'play') {
       this.startWakeIntro();
+      return;
+    }
+
+    if (id === 'wardrobe') {
+      this.cameras.main.fadeOut(200, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('WardrobeScene');
+      });
       return;
     }
 

@@ -1,5 +1,6 @@
 import { Scene, Tilemaps, Physics, GameObjects } from 'phaser';
 import { getCoins, getFloor, getRunStats, setCoins, setFloor, resetRun } from '../state/coinState';
+import { creditGold } from '../state/wardrobeState';
 import { HUD } from '../ui/HUD';
 import { FLOOR_CONFIG, FloorConfig } from '../data/floorConfig';
 import { drawFramedPanel, drawNestedButton, buttonLabelStyle, neonTitleStyle, bodyTextStyle } from '../ui/theme';
@@ -1208,6 +1209,9 @@ export class DungeonScene extends Scene {
 
     // Prevent re-entry
     this.stairsUnlocked = false;
+
+    // Credit 20% of current coins as wardrobe gold on floor ascension
+    creditGold(Math.floor(getCoins() * 0.20));
 
     const nextFloor = this.currentFloor + 1;
     setFloor(nextFloor);

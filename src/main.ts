@@ -1,6 +1,7 @@
 import { AUTO, CANVAS, Game, Scale } from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { MenuScene } from './scenes/MenuScene';
+import { WardrobeScene } from './scenes/WardrobeScene';
 import { GameplaySettingsScene } from './scenes/GameplaySettingsScene';
 import { TransitionScene } from './scenes/TransitionScene';
 import { DungeonScene } from './scenes/DungeonScene';
@@ -47,6 +48,7 @@ const config = {
     scene: [
         BootScene,
         MenuScene,
+        WardrobeScene,
         GameplaySettingsScene,
         TransitionScene,
         DungeonScene,
