@@ -47,6 +47,20 @@ export function disableDeveloperMode(): void {
 }
 
 export function resetDeveloperModeOnLaunch(): void {
+  if (typeof window === 'undefined') {
+    disableDeveloperMode();
+    return;
+  }
+
+  // Keep dev mode when the user explicitly refreshes the page.
+  const navEntry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+  const isReload = navEntry?.type === 'reload'
+    // Deprecated fallback for older browsers.
+    || ((performance as Performance & { navigation?: { type?: number } }).navigation?.type === 1);
+
+  if (isReload) {
+    return;
+  }
   disableDeveloperMode();
 }
 

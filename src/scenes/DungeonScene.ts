@@ -7,6 +7,12 @@ import { drawFramedPanel, drawNestedButton, buttonLabelStyle, neonTitleStyle, bo
 import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { isDeveloperModeEnabled, registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
+import {
+  clearRefreshResume,
+  isRefreshResumeEnabled,
+  setRefreshResume,
+  setRefreshResumeEnabled,
+} from '../dev/refreshResume';
 import { resetMemoryRunState } from '../state/memoryState';
 import { HouseController } from '../ui/HouseController';
 import { VirtualJoystick } from '../ui/VirtualJoystick';
@@ -109,6 +115,9 @@ export class DungeonScene extends Scene {
   private devSetCoinsButtonBg?: Phaser.GameObjects.Graphics;
   private devSetCoinsButtonLabel?: Phaser.GameObjects.Text;
   private devSetCoinsButtonZone?: Phaser.GameObjects.Zone;
+  private devRefreshToggleButtonBg?: Phaser.GameObjects.Graphics;
+  private devRefreshToggleButtonLabel?: Phaser.GameObjects.Text;
+  private devRefreshToggleButtonZone?: Phaser.GameObjects.Zone;
   private devModeLabel?: Phaser.GameObjects.Text;
 
   private stairsSprite!: Phaser.GameObjects.Image;
@@ -116,6 +125,7 @@ export class DungeonScene extends Scene {
 
   private hud!: HUD;
   private _lastHudCoins = -1;
+  private _lastResumeCoins = -1;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: {
@@ -130,6 +140,7 @@ export class DungeonScene extends Scene {
   private mapLogic!: number[][];
   private displayFloorNumber!: number;
   private lastTablePos!: { col: number; row: number };
+  private resumeMinigame: string | null = null;
 
   private crossingMode = false;
   private crossingColumns: CrossingColumn[] = [];
@@ -161,9 +172,10 @@ export class DungeonScene extends Scene {
     super({ key: 'DungeonScene' });
   }
 
-  init(data?: { floor?: number; fromTransition?: boolean }): void {
+  init(data?: { floor?: number; fromTransition?: boolean; resumeMinigame?: string }): void {
     this.currentFloor = data?.floor ?? getFloor() ?? 1;
     this.fromTransition = data?.fromTransition ?? false;
+    this.resumeMinigame = data?.resumeMinigame ?? null;
     this.config = FLOOR_CONFIG[this.currentFloor] ?? FLOOR_CONFIG[1];
     this.displayFloorNumber = this.config.displayFloorNumber ?? this.currentFloor;
     this.crossingMode = this.config.mode === 'crossing';
@@ -456,14 +468,13 @@ export class DungeonScene extends Scene {
       this.floorEntrySpeechTimer = null;
     });
     this._lastHudCoins = getCoins();
+    this._lastResumeCoins = getCoins();
     this.cameras.main.ignore(this.hud.getObjects());
 
-    // Joystick + touch buttons must be created AFTER uiCam.ignore so the
-    // uiCam renders them; tell main camera (5x zoom world cam) to ignore them.
-    // (pointer: coarse) + (hover: none) = real touch-only device (phone/tablet)
-    // Mac trackpads report coarse but DO support hover, so this excludes them
-    const hasTouch = window.matchMedia('(pointer: coarse) and (hover: none)').matches;
-    if (hasTouch) {
+    // Joystick + touch buttons should only render on phone devices.
+    // They must be created AFTER uiCam.ignore so the uiCam renders them;
+    // main camera (5x zoom world cam) ignores them.
+    if (this.shouldShowMobileControls()) {
       this.joystick = new VirtualJoystick(this);
       this.cameras.main.ignore(this.joystick.getObjects());
       this.buildTouchActionButtons();
@@ -483,6 +494,7 @@ export class DungeonScene extends Scene {
       }
       this.destroyDevLevelSelector();
       this.destroyDevSetCoinsButton();
+      this.destroyDevRefreshToggleButton();
       this.devModeLabel?.destroy();
       this.devModeLabel = undefined;
       this.joystick?.destroy();
@@ -528,6 +540,14 @@ export class DungeonScene extends Scene {
     }
 
     this.applyDevModeState();
+    this._syncFloorRefreshResume();
+    if (this.resumeMinigame) {
+      const pendingMinigame = this.resumeMinigame;
+      this.resumeMinigame = null;
+      this.time.delayedCall(60, () => {
+        this._launchMinigameDirect(pendingMinigame);
+      });
+    }
   }
 
   private _setupCrossingMode(): void {
@@ -541,8 +561,13 @@ export class DungeonScene extends Scene {
     const laneBottom = crossing.laneBottom;
     const laneHeight = laneBottom - laneTop;
     const centerY = laneTop + laneHeight / 2;
-    const boardLeft = crossing.chipX - 16;
-    const boardWidth = crossing.columnSpacing * crossing.laneCount + 32;
+    // Barrier should only cover the flying-card lanes, not the home chip.
+    const firstLaneX = crossing.chipX + crossing.columnSpacing;
+    const lastLaneX = crossing.chipX + crossing.columnSpacing * crossing.laneCount;
+    const boardPadding = Math.max(18, Math.floor(crossing.barricadeWidth / 2) + 8);
+    const boardLeft = firstLaneX - boardPadding;
+    const boardRight = lastLaneX + boardPadding;
+    const boardWidth = boardRight - boardLeft;
 
     const boardGlow = this.add.rectangle(
       boardLeft + boardWidth / 2,
@@ -722,15 +747,11 @@ export class DungeonScene extends Scene {
       this.crossingRunActive
         ? 'Press E to jump right  |  C to bank and walk back'
         : (this.stairsUnlocked
-          ? 'Stairs are live above the action. Press your luck or head north.'
-          : `Need ${remainingToUnlock} more to open the stairs. Press E on the first chip to start.`),
+          ? 'Target reached. Press your luck or head north to leave.'
+          : `Need ${remainingToUnlock} more  |  Press E on first chip to start.`),
     ]);
 
-    this.crossingGoalText.setText(
-      this.stairsUnlocked
-        ? 'STAIRS OPEN  |  Head straight up when you are ready'
-        : `STAIRS OPEN AT ${this.config.target}  |  ${remainingToUnlock} MORE NEEDED`,
-    );
+    this.crossingGoalText.setText('');
 
     if (this.crossingRunActive) {
       this.crossingStatusText.setText(
@@ -743,7 +764,7 @@ export class DungeonScene extends Scene {
       return;
     }
     if (this.stairsUnlocked) {
-      this.crossingStatusText.setText('The stairs are live above the card band. Play again or just walk north and leave.');
+      this.crossingStatusText.setText('Target reached. Play again or walk north to leave.');
       return;
     }
     this.crossingStatusText.setText(
@@ -845,14 +866,19 @@ export class DungeonScene extends Scene {
   private _cashOutCrossingRun(): void {
     if (!this.crossingRunActive || this.crossingBusy || this.crossingReturning) return;
 
+    const wasBelowTarget = getCoins() < this.config.target;
     const grossPayout = Math.max(this.selectedCrossingBet, Math.round(this.selectedCrossingBet * this.crossingMultiplier));
     const profit = grossPayout - this.selectedCrossingBet;
     setCoins(getCoins() + profit);
     this.crossingRunActive = false;
     this.setTouchCrossingBtnsVisible(false);
     this.hud.showSpeech(`You bank ${grossPayout}. The House lets you breathe for a second.`);
-    AudioManager.playSfx(this, 'goal-victory', { volume: 0.5, cooldownMs: 250, allowOverlap: false });
+    AudioManager.playSfx(this, 'chip-cross-bank', { volume: 0.9, cooldownMs: 180, allowOverlap: false });
 
+    const reachedTargetNow = wasBelowTarget && getCoins() >= this.config.target;
+    if (reachedTargetNow) {
+      AudioManager.playSfx(this, 'goal-victory', { volume: 0.6, cooldownMs: 250, allowOverlap: false });
+    }
     if (getCoins() >= this.config.target) {
       this._unlockStairs();
     }
@@ -1137,6 +1163,10 @@ export class DungeonScene extends Scene {
         this.hud.setProgress(coins, this.config.target);
         this._refreshCrossingHud();
       }
+      if (coins !== this._lastResumeCoins) {
+        this._lastResumeCoins = coins;
+        this._syncFloorRefreshResume();
+      }
       return;
     }
     this._updatePlayerMovement(true);
@@ -1146,6 +1176,10 @@ export class DungeonScene extends Scene {
       this._lastHudCoins = coins;
       this.hud.setCoins(coins);
       this.hud.setProgress(coins, this.config.target);
+    }
+    if (coins !== this._lastResumeCoins) {
+      this._lastResumeCoins = coins;
+      this._syncFloorRefreshResume();
     }
 
     // Clear exit cooldown once player is far enough from the last-used table
@@ -1170,6 +1204,11 @@ export class DungeonScene extends Scene {
     this.lastTablePos = pos;
     this.floorEntrySpeechTimer?.remove(false);
     this.floorEntrySpeechTimer = null;
+    setRefreshResume({
+      floor: this.currentFloor,
+      coins: getCoins(),
+      minigameSceneKey: gameSceneKey,
+    });
     AudioManager.playSfx(this, 'ui-click', { volume: 0.9, cooldownMs: 40, allowOverlap: false });
     if (gameSceneKey === 'WheelScene' || gameSceneKey === 'VaultScene') {
       AudioManager.stopMusic(this);
@@ -1200,6 +1239,42 @@ export class DungeonScene extends Scene {
     this.cameras.main.once('camerafadeoutcomplete', () => {
       launchMinigame();
     });
+  }
+
+  private _launchMinigameDirect(gameSceneKey: string): void {
+    if (!this.scene.manager.keys[gameSceneKey]) {
+      return;
+    }
+
+    setRefreshResume({
+      floor: this.currentFloor,
+      coins: getCoins(),
+      minigameSceneKey: gameSceneKey,
+    });
+
+    this.doorTriggered = true;
+    this.lastTablePos = this._resolveTablePosForScene(gameSceneKey);
+    this.floorEntrySpeechTimer?.remove(false);
+    this.floorEntrySpeechTimer = null;
+
+    if (gameSceneKey === 'WheelScene' || gameSceneKey === 'VaultScene') {
+      AudioManager.stopMusic(this);
+    }
+
+    if (this.scene.isActive(gameSceneKey) || this.scene.isPaused(gameSceneKey)) {
+      this.scene.stop(gameSceneKey);
+    }
+    this.player.setVelocity(0, 0);
+    this.scene.launch(gameSceneKey, { coins: getCoins(), floor: this.currentFloor });
+    this.scene.pause('DungeonScene');
+  }
+
+  private _resolveTablePosForScene(gameSceneKey: string): { col: number; row: number } {
+    if (this.config.gameSceneKey === gameSceneKey) {
+      return this.config.tablePos;
+    }
+    const secondary = (this.config.interactables ?? []).find((it) => it.gameSceneKey === gameSceneKey);
+    return secondary?.pos ?? this.config.tablePos;
   }
 
   private _onStairsOverlap(): void {
@@ -1263,6 +1338,7 @@ export class DungeonScene extends Scene {
   }
 
   private _onGameComplete({ coins, won }: { coins: number; won: boolean }): void {
+    clearRefreshResume();
     setCoins(coins);
 
     if (won) {
@@ -1467,6 +1543,7 @@ export class DungeonScene extends Scene {
     this.ensureDevModeLabel();
     this.ensureDevLevelSelector();
     this.ensureDevSetCoinsButton();
+    this.ensureDevRefreshToggleButton();
 
     if (isDeveloperModeEnabled()) {
       this._unlockStairs(false);
@@ -1608,6 +1685,59 @@ export class DungeonScene extends Scene {
     });
   }
 
+  private ensureDevRefreshToggleButton(): void {
+    if (!isDeveloperModeEnabled()) {
+      this.destroyDevRefreshToggleButton();
+      return;
+    }
+    if (this.devRefreshToggleButtonBg) {
+      this.devRefreshToggleButtonLabel?.setText(`Refresh Resume: ${isRefreshResumeEnabled() ? 'ON' : 'OFF'}`);
+      return;
+    }
+
+    const x = 252;
+    const y = 62;
+    const w = 170;
+    const h = 24;
+    const depth = 1000;
+
+    this.devRefreshToggleButtonBg = this.add.graphics().setScrollFactor(0).setDepth(depth);
+    this.devRefreshToggleButtonLabel = this.add.text(x, y, '', {
+      fontFamily: 'Courier New',
+      fontSize: '11px',
+      color: '#f5e5c7',
+      stroke: '#24130e',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(depth + 1);
+    this.devRefreshToggleButtonZone = this.add.zone(x, y, w, h).setScrollFactor(0).setDepth(depth + 2);
+
+    const redraw = (hovered: boolean): void => {
+      this.devRefreshToggleButtonBg?.clear();
+      this.devRefreshToggleButtonBg?.fillStyle(hovered ? 0xf1cc82 : 0xc8a364, 1);
+      this.devRefreshToggleButtonBg?.fillRect(x - w / 2, y - h / 2, w, h);
+      this.devRefreshToggleButtonBg?.fillStyle(0x3b2417, 1);
+      this.devRefreshToggleButtonBg?.fillRect(x - w / 2 + 3, y - h / 2 + 3, w - 6, h - 6);
+      this.devRefreshToggleButtonBg?.fillStyle(hovered ? 0x6e2937 : 0x5a2230, 0.92);
+      this.devRefreshToggleButtonBg?.fillRect(x - w / 2 + 6, y - h / 2 + 6, w - 12, h - 12);
+    };
+
+    redraw(false);
+    this.devRefreshToggleButtonLabel.setText(`Refresh Resume: ${isRefreshResumeEnabled() ? 'ON' : 'OFF'}`);
+    this.devRefreshToggleButtonZone.setInteractive({ cursor: 'pointer' });
+    this.devRefreshToggleButtonZone.on('pointerover', () => {
+      redraw(true);
+      AudioManager.playSfx(this, 'ui-hover', { volume: 0.8, cooldownMs: 45, allowOverlap: false });
+    });
+    this.devRefreshToggleButtonZone.on('pointerout', () => redraw(false));
+    this.devRefreshToggleButtonZone.on('pointerdown', () => {
+      AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 45, allowOverlap: false });
+      const next = !isRefreshResumeEnabled();
+      setRefreshResumeEnabled(next);
+      this.devRefreshToggleButtonLabel?.setText(`Refresh Resume: ${next ? 'ON' : 'OFF'}`);
+      this.hud.showSpeech(next ? 'Refresh resume enabled.' : 'Refresh resume disabled.');
+    });
+  }
+
   private toggleDevLevelPanel(): void {
     if (this.devLevelPanel?.visible) {
       this.devLevelPanel.setVisible(false);
@@ -1715,11 +1845,35 @@ export class DungeonScene extends Scene {
     this.devSetCoinsButtonBg = undefined;
   }
 
+  private destroyDevRefreshToggleButton(): void {
+    this.devRefreshToggleButtonZone?.destroy();
+    this.devRefreshToggleButtonLabel?.destroy();
+    this.devRefreshToggleButtonBg?.destroy();
+    this.devRefreshToggleButtonZone = undefined;
+    this.devRefreshToggleButtonLabel = undefined;
+    this.devRefreshToggleButtonBg = undefined;
+  }
+
   private _scheduleEnvironmentSfx(): void {
     const delay = Phaser.Math.Between(7000, 14000);
     this.envTimer = this.time.delayedCall(delay, () => {
       this._playEnvironmentSfx();
       this._scheduleEnvironmentSfx();
+    });
+  }
+
+  private shouldShowMobileControls(): boolean {
+    const ua = window.navigator.userAgent.toLowerCase();
+    const phoneUa = /iphone|ipod|android.+mobile|windows phone|blackberry/i.test(ua);
+    const isDesktop = this.sys.game.device.os.desktop;
+    return phoneUa && !isDesktop;
+  }
+
+  private _syncFloorRefreshResume(): void {
+    setRefreshResume({
+      floor: this.currentFloor,
+      coins: getCoins(),
+      minigameSceneKey: null,
     });
   }
 

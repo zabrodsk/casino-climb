@@ -2,6 +2,8 @@ import { Scene, GameObjects } from 'phaser';
 import { AudioManager } from '../audio/AudioManager';
 import { generatePlayerTexture } from '../ui/playerSprite';
 import { getPalette } from '../state/wardrobeState';
+import { consumeRefreshResume } from '../dev/refreshResume';
+import { setCoins, setFloor } from '../state/coinState';
 
 export class BootScene extends Scene {
   constructor() {
@@ -57,6 +59,21 @@ export class BootScene extends Scene {
     this._generateFallbackTextures();
 
     AudioManager.init(this);
+
+    const resume = consumeRefreshResume();
+    if (resume) {
+      setCoins(resume.coins);
+      setFloor(resume.floor);
+      this.cameras.main.fadeOut(250, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('DungeonScene', {
+          floor: resume.floor,
+          fromTransition: false,
+          resumeMinigame: resume.minigameSceneKey ?? undefined,
+        });
+      });
+      return;
+    }
 
     this.cameras.main.fadeOut(400, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {

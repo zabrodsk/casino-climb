@@ -1,7 +1,7 @@
 <div align="center">
   <img src="public/assets/logo.png" alt="Casino Climb logo" width="200" />
   <h1>Casino Climb</h1>
-  <p><strong>Escape the dungeon. Outsmart the House. Climb or lose everything.</strong></p>
+  <p><strong>Escape the Casino. Climb or lose everything.</strong></p>
 
   <p>
     <a href="https://zabrodsk.github.io/casino-climb/">
@@ -13,13 +13,12 @@
     <img src="https://img.shields.io/badge/Mobile-Ready-success?style=for-the-badge" alt="Mobile Ready" />
   </p>
 
-  <img src="menu.png" alt="Casino Climb main menu" width="720" />
+  <img src="public/assets/readme/menu.png" alt="Casino Climb main menu" width="720" />
 </div>
 
 ---
 
-> You wake up inside a casino dungeon with no memory, **200 coins**, and one rule:
-> **The House always gets paid.**
+> You wake up inside a casino dungeon with no memory and 200 coins
 
 Casino Climb is a pixel-art dungeon crawler where every room is a different casino minigame. Walk the floor, find the tables, beat the odds — or go bust trying.
 
@@ -30,21 +29,21 @@ Casino Climb is a pixel-art dungeon crawler where every room is a different casi
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="after-play.png" alt="Story intro" width="100%" />
+      <img src="public/assets/readme/after-play.png" alt="Story intro" width="100%" />
       <br/><em>Every run starts with a mystery</em>
     </td>
     <td align="center" width="50%">
-      <img src="after-intro-keys.png" alt="Dungeon exploration" width="100%" />
+      <img src="public/assets/readme/after-intro-keys.png" alt="Dungeon exploration" width="100%" />
       <br/><em>Explore the dungeon, find the tables</em>
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
-      <img src="levelpanel.png" alt="Target reached" width="100%" />
+      <img src="public/assets/readme/levelpanel.png" alt="Target reached" width="100%" />
       <br/><em>Hit the coin target to unlock the next floor</em>
     </td>
     <td align="center" width="50%">
-      <img src="public/assets/bg.png" alt="Casino atmosphere" width="100%" />
+      <img src="public/assets/readme/bg.png" alt="Casino atmosphere" width="100%" />
       <br/><em>Neon casino energy meets pixel dungeon grit</em>
     </td>
   </tr>

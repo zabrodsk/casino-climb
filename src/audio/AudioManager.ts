@@ -41,7 +41,8 @@ export type SfxKey =
   | 'vault-enter'
   | 'dev-mode-on'
   | 'dev-mode-off'
-  | 'card-woosh';
+  | 'card-woosh'
+  | 'chip-cross-bank';
 
 export type AudioLevels = {
   master: number;
@@ -115,6 +116,7 @@ const SFX_ASSETS: Record<SfxKey, string> = {
   'dev-mode-on': 'assets/audio/sfx/devMode-On.mp3',
   'dev-mode-off': 'assets/audio/sfx/devMode-Off.mp3',
   'card-woosh': 'assets/audio/sfx/card-woosh.mp3',
+  'chip-cross-bank': 'assets/audio/sfx/chip-cross-bank.mp3',
 };
 
 class AudioManagerImpl {

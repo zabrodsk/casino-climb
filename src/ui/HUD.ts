@@ -87,14 +87,11 @@ export class HUD {
       this._hideMarqueDots();
       return;
     }
-
     this.progressLabel.setVisible(true);
     this.progressBg.setVisible(true);
     this.progressFill.setVisible(true);
-
     const ratio = Math.min(current / target, 1);
     this._drawProgressFill(ratio);
-
     if (ratio >= 1) {
       this.progressLabel.setText('TARGET REACHED');
       this.progressLabel.setColor(COLOR.pink);
@@ -113,13 +110,13 @@ export class HUD {
       }
       this._showMarqueDots();
     } else {
-      this.progressLabel.setText(`— ADVANCE AT ${target} COINS —`);
-      this.progressLabel.setColor(COLOR.ivorySoft);
-      this.progressLabel.setAlpha(0.7);
+      const remaining = Math.max(0, target - current);
+      this.progressLabel.setText(`NEED ${remaining} MORE TO ADVANCE`);
+      this.progressLabel.setColor(COLOR.ivory);
+      this.progressLabel.setAlpha(1);
       this._hideMarqueDots();
     }
   }
-
   showSpeech(text: string): void {
     DialogueBus.say(this.scene, text);
   }
@@ -254,24 +251,24 @@ export class HUD {
     const { width: sw } = this.scene.scale;
     const barX = (sw - HUD.BAR_W) / 2;
     const barY = this._currentBarY;
-
     // Label above bar
-    this.progressLabel = this.scene.add.text(sw / 2, barY - 2, `— ADVANCE AT ${this._target} COINS —`, {
-      fontSize: '12px',
+    this.progressLabel = this.scene.add.text(sw / 2, barY - 2, `NEED ${this._target} MORE TO ADVANCE`, {
+      fontSize: '14px',
       fontFamily: FONT.mono,
-      color: COLOR.ivorySoft,
-    }).setAlpha(0.7).setOrigin(0.5, 1).setScrollFactor(0).setDepth(HUD.DEPTH);
-
+      fontStyle: 'bold',
+      color: COLOR.ivory,
+      stroke: COLOR.woodDeep,
+      strokeThickness: 3,
+      shadow: { offsetX: 0, offsetY: 1, color: '#000000', blur: 0, stroke: true, fill: true },
+    }).setAlpha(1).setOrigin(0.5, 1).setScrollFactor(0).setDepth(HUD.DEPTH);
     // Background flat rect with gold border
     this.progressBg = this.scene.add.graphics();
     this.progressBg.setScrollFactor(0).setDepth(HUD.DEPTH);
     this._redrawProgressBg(barX, barY);
-
     // Fill (drawn separately so we can redraw)
     this.progressFill = this.scene.add.graphics();
     this.progressFill.setScrollFactor(0).setDepth(HUD.DEPTH + 1);
     this._drawProgressFill(0);
-
     // Marquee dots below bar (hidden until target reached)
     const dotY = barY + HUD.BAR_H + 6;
     const dotPositions = [barX + 20, barX + 80, barX + 160, barX + 240, barX + 300];
@@ -281,7 +278,6 @@ export class HUD {
       this._marqueDots.push(dot);
     });
   }
-
   private _redrawProgressBg(barX: number, barY: number): void {
     this.progressBg.clear();
     this.progressBg.fillStyle(THEME.bgPanelDark, 0.9);
@@ -383,3 +379,4 @@ export class HUD {
     );
   }
 }
+

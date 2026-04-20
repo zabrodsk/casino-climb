@@ -20,7 +20,6 @@ import { getDiscountedBetAmount, hasDiscountForFloor } from '../state/coinState'
 import { HouseController } from '../ui/HouseController';
 
 const WIN_TARGET = 450;
-const HANDS_TO_WIN = 3;
 const BET_OPTIONS = [10, 25, 50];
 
 const SUIT_TEXT: Record<Card['suit'], string> = {
@@ -153,13 +152,13 @@ export class BlackjackScene extends Scene {
       fontFamily: FONT.mono,
     }).setOrigin(1, 0.5);
 
-    this.handsWonText = this.add.text(40, 48, `Hands Won: ${this.handsWon}/${HANDS_TO_WIN}`, {
+    this.handsWonText = this.add.text(40, 48, `Hands Won: ${this.handsWon}`, {
       fontSize: '20px',
       color: COLOR.ivory,
       fontFamily: FONT.mono,
     }).setOrigin(0, 0.5);
 
-    this.add.text(40, 78, `Reach ${WIN_TARGET} coins or win 3 hands.`, {
+    this.add.text(40, 78, `Reach ${WIN_TARGET} coins to advance.`, {
       fontSize: '16px',
       color: COLOR.goldText,
       fontFamily: FONT.mono,
@@ -174,15 +173,15 @@ export class BlackjackScene extends Scene {
     this._createHandsArea();
     this._createActions();
 
-    this.resultText = this.add.text(W / 2, 556, '', {
+    this.resultText = this.add.text(W / 2, 550, '', {
       fontSize: '22px',
       color: COLOR.winGreen,
       fontFamily: FONT.mono,
       align: 'center',
     }).setOrigin(0.5);
 
-    this.targetReachedText = this.add.text(W / 2, 590, '', {
-      fontSize: '18px',
+    this.targetReachedText = this.add.text(W / 2, 585, '', {
+      fontSize: '20px',
       color: COLOR.pink,
       fontFamily: FONT.mono,
     }).setOrigin(0.5).setVisible(false);
@@ -212,19 +211,17 @@ export class BlackjackScene extends Scene {
   private _drawTableSurface(): void {
     const g = this.add.graphics();
     g.fillStyle(0x17452b, 1);
-    g.fillRoundedRect(132, 160, 760, 340, 18);
+    g.fillRoundedRect(132, 148, 760, 424, 18);
     g.lineStyle(4, THEME.goldDim, 1);
-    g.strokeRoundedRect(132, 160, 760, 340, 18);
-    g.lineStyle(2, 0xd2c292, 0.4);
-    g.strokeRoundedRect(150, 178, 724, 304, 14);
+    g.strokeRoundedRect(132, 148, 760, 424, 18);
 
-    this.add.text(512, 196, 'THE HOUSE', {
+    this.add.text(512, 180, 'THE HOUSE', {
       fontFamily: FONT.mono,
       fontSize: '20px',
       color: COLOR.goldText,
     }).setOrigin(0.5);
 
-    this.add.text(512, 414, 'PLAYER', {
+    this.add.text(512, 400, 'PLAYER', {
       fontFamily: FONT.mono,
       fontSize: '20px',
       color: COLOR.goldText,
@@ -241,9 +238,9 @@ export class BlackjackScene extends Scene {
 
     this.add.text(W / 2, 614, 'SELECT BET', {
       fontFamily: FONT.mono,
-      fontSize: '14px',
+      fontSize: '16px',
       color: COLOR.goldText,
-    }).setOrigin(0.5);
+    }).setOrigin(0.5, 1);
 
     this.betButtons = [];
 
@@ -294,7 +291,7 @@ export class BlackjackScene extends Scene {
     this.playerCardsContainer = this.add.container(0, 0);
     this.activeHandMarker = this.add.graphics();
 
-    this.dealerScoreText = this.add.text(160, 226, 'Dealer: --', {
+    this.dealerScoreText = this.add.text(160, 172, 'Dealer: --', {
       fontFamily: FONT.mono,
       fontSize: '18px',
       color: COLOR.ivory,
@@ -306,7 +303,7 @@ export class BlackjackScene extends Scene {
     const btnW = 118;
     const btnH = 46;
 
-    this.dealAction = this._makeActionButton(292, actionY, 170, 54, 'DEAL', 24, () => {
+    this.dealAction = this._makeActionButton(512, actionY, 170, 54, 'DEAL', 24, () => {
       if (this.canDeal()) {
         AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 50, allowOverlap: false });
         betFlash(this);
@@ -692,7 +689,7 @@ export class BlackjackScene extends Scene {
     if (this.currentCoins < 120) {
       this.time.delayedCall(3000, () => HouseController.say(this, 'playerActions', 'lowChips'));
     }
-    this.handsWonText.setText(`Hands Won: ${this.handsWon}/${HANDS_TO_WIN}`);
+    this.handsWonText.setText(`Hands Won: ${this.handsWon}`);
 
     const overallColor = totalWins > totalLosses
       ? COLOR.winGreen
@@ -720,7 +717,7 @@ export class BlackjackScene extends Scene {
     }
     void totalPushes;
 
-    if (this.currentCoins >= WIN_TARGET || this.handsWon >= HANDS_TO_WIN) {
+    if (this.currentCoins >= WIN_TARGET) {
       this.targetReachedText.setText('Target reached! You may advance.').setVisible(true);
     }
 
@@ -744,12 +741,12 @@ export class BlackjackScene extends Scene {
     this.activeHandMarker.clear();
 
     // Dealer
-    this.renderHand(this.dealerCardsContainer, this.dealerHand, 222, 256, !this.revealDealer);
+    this.renderHand(this.dealerCardsContainer, this.dealerHand, 222, 256, !this.revealDealer, null);
 
     // Player hands (1 or 2)
     const handsCount = this.playerHands.length;
     if (handsCount <= 1) {
-      this.renderHand(this.playerCardsContainer, this.playerHands[0] ?? [], 222, 474, false);
+      this.renderHand(this.playerCardsContainer, this.playerHands[0] ?? [], 222, 474, false, 'Player');
     } else {
       // Two hands: left side and right side
       this.renderCompactHand(this.playerCardsContainer, this.playerHands[0], 200, 474, 0);
@@ -775,6 +772,7 @@ export class BlackjackScene extends Scene {
     startX: number,
     y: number,
     hideHoleCard: boolean,
+    scoreLabelPrefix: string | null,
   ): void {
     const spacing = 96;
 
@@ -787,7 +785,7 @@ export class BlackjackScene extends Scene {
     if (cards.length === 0) {
       const placeholder = this.add.text(startX, y, 'No cards', {
         fontFamily: FONT.mono,
-        fontSize: '18px',
+        fontSize: '24px',
         color: COLOR.ivorySoft,
       }).setOrigin(0.5);
       container.add(placeholder);
@@ -797,13 +795,16 @@ export class BlackjackScene extends Scene {
     const total = cards.length > 0
       ? (hideHoleCard ? evaluateHand(cards.slice(0, 1)).total : evaluateHand(cards).total)
       : null;
-    const labelY = y + 72;
-    const labelText = this.add.text(startX - 40, labelY, `Player: ${total ?? '--'}`, {
-      fontFamily: FONT.mono,
-      fontSize: '16px',
-      color: COLOR.ivory,
-    });
-    container.add(labelText);
+    if (scoreLabelPrefix) {
+      const labelY = scoreLabelPrefix === 'Player' ? y - 84 : y + 1;
+      const labelX = scoreLabelPrefix === 'Player' ? startX - 62 : startX - 40;
+      const labelText = this.add.text(labelX, labelY, `${scoreLabelPrefix}: ${total ?? '--'}`, {
+        fontFamily: FONT.mono,
+        fontSize: '18px',
+        color: COLOR.ivory,
+      });
+      container.add(labelText);
+    }
   }
 
   private renderCompactHand(
@@ -821,7 +822,7 @@ export class BlackjackScene extends Scene {
 
     const busted = evaluateHand(cards).busted;
     const total = evaluateHand(cards).total;
-    const label = this.add.text(startX - 40, y + 60, `H${handIndex + 1}: ${total}${busted ? ' BUST' : ''}  Bet ${this.handBets[handIndex]}`, {
+    const label = this.add.text(startX - 40, y + 50, `H${handIndex + 1}: ${total}${busted ? ' BUST' : ''}  Bet ${this.handBets[handIndex]}`, {
       fontFamily: FONT.mono,
       fontSize: '14px',
       color: busted ? COLOR.loseRed : COLOR.ivory,
@@ -893,7 +894,7 @@ export class BlackjackScene extends Scene {
   }
 
   private leave(): void {
-    const won = this.currentCoins >= WIN_TARGET || this.handsWon >= HANDS_TO_WIN;
+    const won = this.currentCoins >= WIN_TARGET;
 
     try {
       this.scene.get('DungeonScene').events.emit('game-complete', {
