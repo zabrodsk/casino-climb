@@ -1353,27 +1353,19 @@ export class DungeonScene extends Scene {
       HouseController.resetWinStreak();
     }
 
-    if (won && getCoins() >= this.config.target) {
-      if (this.currentFloor === 6) {
-        this.scene.resume('DungeonScene');
-        this._applyFloorAmbience();
-        this.cameras.main.fadeOut(350, 0, 0, 0);
-        this.cameras.main.once('camerafadeoutcomplete', () => {
-          this.scene.start('EndScene', { coins });
-        });
-        return;
-      }
+    const targetMet = won && getCoins() >= this.config.target;
 
-      this.hud.showSpeech('The stairs unlock. Take them.');
-      try { this._unlockStairs(); } catch (_) {}
-      if (!this.goalSoundsPlayed) {
-        AudioManager.playSfx(this, 'door-open', { volume: 1.8, cooldownMs: 300, allowOverlap: true });
-        if (this.config.gameSceneKey !== 'WheelScene') {
-          AudioManager.playSfx(this, 'goal-victory', { volume: 0.6, cooldownMs: 300, allowOverlap: false });
-        }
-        this.goalSoundsPlayed = true;
-      }
-    } else if (coins <= 0) {
+    if (targetMet && this.currentFloor === 6) {
+      this.scene.resume('DungeonScene');
+      this._applyFloorAmbience();
+      this.cameras.main.fadeOut(350, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('EndScene', { coins });
+      });
+      return;
+    }
+
+    if (coins <= 0) {
       this.hud.showSpeech('The house always wins.');
       AudioManager.playSfx(this, 'game-over', { volume: 1.0, cooldownMs: 300, allowOverlap: false });
       resetMemoryRunState();
@@ -1385,26 +1377,38 @@ export class DungeonScene extends Scene {
       });
       return;
     }
-    if (!won) {
-      // Allow win fanfare to play again only after objective status is lost.
-      this.goalSoundsPlayed = false;
-    }
 
-    // Nudge player out of trigger zone after minigame close.
-    // Slot machines in the Fate room sit on the left wall, so move right instead of down.
-    const exitPos = this.lastTablePos;
-    if (this.config.gameSceneKey === 'WheelScene' && exitPos.col <= 1) {
-      this.player.setPosition((exitPos.col + 2) * TILE_SIZE + 8, exitPos.row * TILE_SIZE + 8);
-    } else {
-      this.player.setPosition(exitPos.col * TILE_SIZE + 8, (exitPos.row + 2) * TILE_SIZE + 8);
-    }
-    this.justExitedTable = true;
+    // Normal return: player still has coins.
+    // Use try/finally so scene.resume + fadeIn are guaranteed even if something throws.
+    try {
+      if (targetMet) {
+        this.hud.showSpeech('The stairs unlock. Take them.');
+        try { this._unlockStairs(); } catch (_) {}
+        if (!this.goalSoundsPlayed) {
+          AudioManager.playSfx(this, 'door-open', { volume: 1.8, cooldownMs: 300, allowOverlap: true });
+          if (this.config.gameSceneKey !== 'WheelScene') {
+            AudioManager.playSfx(this, 'goal-victory', { volume: 0.6, cooldownMs: 300, allowOverlap: false });
+          }
+          this.goalSoundsPlayed = true;
+        }
+      } else {
+        this.goalSoundsPlayed = false;
+      }
 
-    this.scene.resume('DungeonScene');
-    this._applyFloorAmbience();
-    AudioManager.playSfx(this, 'ui-click', { volume: 0.8, cooldownMs: 40, allowOverlap: false });
-    this.cameras.main.fadeIn(300, 0, 0, 0);
-    this.doorTriggered = false;
+      const exitPos = this.lastTablePos;
+      if (this.config.gameSceneKey === 'WheelScene' && exitPos.col <= 1) {
+        this.player.setPosition((exitPos.col + 2) * TILE_SIZE + 8, exitPos.row * TILE_SIZE + 8);
+      } else {
+        this.player.setPosition(exitPos.col * TILE_SIZE + 8, (exitPos.row + 2) * TILE_SIZE + 8);
+      }
+      this.justExitedTable = true;
+    } finally {
+      try { this.scene.resume('DungeonScene'); } catch (_) {}
+      try { this._applyFloorAmbience(); } catch (_) {}
+      try { AudioManager.playSfx(this, 'ui-click', { volume: 0.8, cooldownMs: 40, allowOverlap: false }); } catch (_) {}
+      try { this.cameras.main.fadeIn(300, 0, 0, 0); } catch (_) {}
+      this.doorTriggered = false;
+    }
   }
 
   private _applyFloorAmbience(): void {
