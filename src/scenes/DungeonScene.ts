@@ -1406,7 +1406,16 @@ export class DungeonScene extends Scene {
       try { this.scene.resume('DungeonScene'); } catch (_) {}
       try { this._applyFloorAmbience(); } catch (_) {}
       try { AudioManager.playSfx(this, 'ui-click', { volume: 0.8, cooldownMs: 40, allowOverlap: false }); } catch (_) {}
-      try { this.cameras.main.fadeIn(300, 0, 0, 0); } catch (_) {}
+      try {
+        this.cameras.main.resetFX();
+        this.cameras.main.setAlpha(1);
+        this.cameras.main.fadeIn(300, 0, 0, 0);
+      } catch (_) {}
+      try {
+        this.uiCam.resetFX();
+        this.uiCam.setAlpha(1);
+        this.uiCam.fadeIn(300, 0, 0, 0);
+      } catch (_) {}
       this.doorTriggered = false;
     }
   }

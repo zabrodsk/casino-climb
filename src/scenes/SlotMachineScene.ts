@@ -892,31 +892,14 @@ export class SlotMachineScene extends Scene {
     this.resultLeaveZone.disableInteractive();
     this.wagerButtons.forEach(({ zone }) => zone.disableInteractive());
     this.allInWagerButton.zone.disableInteractive();
-    this.cameras.main.fadeOut(300, 0, 0, 0);
-    this.cameras.main.once('camerafadeoutcomplete', () => {
-      const dungeon = this.scene.manager.getScene('DungeonScene');
-      // Failsafe: ensure dungeon scene/camera is visible before any event logic.
-      if (dungeon) {
-        dungeon.cameras.main.resetFX();
-        dungeon.cameras.main.setAlpha(1);
-      }
-      if (this.scene.isPaused('DungeonScene')) this.scene.resume('DungeonScene');
-      try {
-        if (dungeon) {
-          dungeon.events.emit('game-complete', {
-            coins: this.currentCoins,
-            won: this.currentCoins > 0,
-          });
-        }
-      } catch (_) {
-        // Keep gameplay recoverable even if event delivery fails.
-        if (dungeon) {
-          dungeon.cameras.main.resetFX();
-          dungeon.cameras.main.setAlpha(1);
-        }
-        if (this.scene.isPaused('DungeonScene')) this.scene.resume('DungeonScene');
-      }
-      this.scene.stop('SlotMachineScene');
-    });
+    try {
+      this.scene.get('DungeonScene').events.emit('game-complete', {
+        coins: this.currentCoins,
+        won: this.currentCoins > 0,
+      });
+    } catch (_) {
+      // DungeonScene may not exist in isolated testing.
+    }
+    this.scene.stop('SlotMachineScene');
   }
 }
