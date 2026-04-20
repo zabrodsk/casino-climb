@@ -151,8 +151,8 @@ export class DungeonScene extends Scene {
   private lastCardWooshAt = 0;
 
   private joystick: VirtualJoystick | null = null;
-  private touchCollectBtn: { arc: GameObjects.Arc; label: GameObjects.Text; zone: GameObjects.Zone } | null = null;
-  private touchCashBtn: { arc: GameObjects.Arc; label: GameObjects.Text; zone: GameObjects.Zone } | null = null;
+  private touchCollectBtn: { arc: GameObjects.Graphics; label: GameObjects.Text; zone: GameObjects.Zone } | null = null;
+  private touchCashBtn: { arc: GameObjects.Graphics; label: GameObjects.Text; zone: GameObjects.Zone } | null = null;
   private touchCollectPressed = false;
   private touchCashPressed = false;
 
@@ -748,8 +748,9 @@ export class DungeonScene extends Scene {
   private buildTouchActionButtons(): void {
     const H = this.scale.height;
     const makeBtn = (x: number, y: number, label: string, color: number, onPress: () => void) => {
-      const arc = this.add.arc(x, y, 38).setFillStyle(color, 0.80)
-        .setStrokeStyle(2, 0xe0a242, 0.85).setScrollFactor(0).setDepth(200).setVisible(false);
+      const arc = this.add.graphics().setScrollFactor(0).setDepth(200).setVisible(false);
+      arc.fillStyle(color, 0.80); arc.fillCircle(x, y, 38);
+      arc.lineStyle(2, 0xe0a242, 0.85); arc.strokeCircle(x, y, 38);
       const txt = this.add.text(x, y, label, {
         fontSize: '11px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setVisible(false);
