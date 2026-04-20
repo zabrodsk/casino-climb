@@ -13,13 +13,13 @@ import {
 import { generatePlayerTexture, SpritePalette } from '../ui/playerSprite';
 import { AudioManager } from '../audio/AudioManager';
 
-type Tab = 'hair' | 'outfit' | 'accessory';
+type Tab = 'figure' | 'hair' | 'outfit' | 'accessory';
 
 export class WardrobeScene extends Scene {
   private readonly W = 1024;
   private readonly H = 768;
 
-  private activeTab: Tab = 'hair';
+  private activeTab: Tab = 'figure';
   private selectedItem: WardrobeItem | null = null;
   private previewPalette: SpritePalette = {};
   private previewSprite!: Phaser.GameObjects.Sprite;
@@ -127,9 +127,9 @@ export class WardrobeScene extends Scene {
   }
 
   private drawTabs(panelX: number, panelY: number, panelW: number): void {
-    const tabs: Tab[] = ['hair', 'outfit', 'accessory'];
-    const labels = ['HAIR', 'OUTFIT', 'ACCESSORY'];
-    const tabW = Math.floor(panelW / 3);
+    const tabs: Tab[] = ['figure', 'hair', 'outfit', 'accessory'];
+    const labels = ['FIGURE', 'HAIR', 'OUTFIT', 'ACCESSORY'];
+    const tabW = Math.floor(panelW / 4);
 
     tabs.forEach((tab, i) => {
       const tx = panelX + i * tabW;
@@ -140,7 +140,7 @@ export class WardrobeScene extends Scene {
       container.add(f);
 
       const label = this.add.text(tx + tabW / 2, ty + 28, labels[i], {
-        fontFamily: 'Courier New', fontSize: '18px', color: '#f0cf98', letterSpacing: 1,
+        fontFamily: 'Courier New', fontSize: '15px', color: '#f0cf98', letterSpacing: 1,
       }).setOrigin(0.5);
       container.add(label);
 
@@ -184,7 +184,21 @@ export class WardrobeScene extends Scene {
 
   private drawItemGrid(panelX: number, panelY: number): void {
     this.itemCards = [];
-    const items = WARDROBE_CATALOG.filter(i => i.category === this.activeTab);
+    let items = WARDROBE_CATALOG.filter(i => i.category === this.activeTab);
+
+    // For figure tab, prepend the free default "Street Gambler"
+    if (this.activeTab === 'figure') {
+      const defaultFigure: WardrobeItem = {
+        id: 'figure-gambler',
+        name: 'Street Gambler',
+        category: 'figure',
+        price: 0,
+        description: 'Where it all started.',
+        palette: { characterId: 'gambler' },
+      };
+      items = [defaultFigure, ...items];
+    }
+
     const cardW = 160, cardH = 180, cols = 3;
     const startX = panelX + 30;
     const startY = panelY + 68;
@@ -200,10 +214,12 @@ export class WardrobeScene extends Scene {
 
   private createItemCard(item: WardrobeItem, x: number, y: number, w: number, h: number): GameObjects.Container {
     const container = this.add.container(0, 0);
-    const owned = isOwned(item.id);
-    const equipped = getEquipped()[item.category] === item.id;
+    const owned = item.id === 'figure-gambler' ? true : isOwned(item.id);
+    const equipped = item.category === 'figure'
+      ? getEquipped().figure === item.id
+      : getEquipped()[item.category] === item.id;
     const selected = this.selectedItem?.id === item.id;
-    const canAfford = getGold() >= item.price;
+    const canAfford = item.price === 0 || getGold() >= item.price;
 
     const bg = this.add.graphics();
     container.add(bg);
@@ -224,7 +240,25 @@ export class WardrobeScene extends Scene {
 
     // Color swatch
     const swatchG = this.add.graphics();
-    if (item.palette.goldChain) {
+    if (item.category === 'figure') {
+      // Draw a mini character silhouette swatch
+      swatchG.fillStyle(0x1a1a2a);
+      swatchG.fillRoundedRect(x + w / 2 - 24, y + 10, 48, 44, 4);
+      swatchG.lineStyle(1, 0x4a4a6a);
+      swatchG.strokeRoundedRect(x + w / 2 - 24, y + 10, 48, 44, 4);
+      // Primary color dot for this character
+      const charColors: Record<string, number> = {
+        'gambler':     0x616770,
+        'high-roller': 0xe0a242,
+        'card-shark':  0x3a7a34,
+        'dealer':      0x1c1c22,
+        'outlaw':      0x6a4a28,
+      };
+      const charId = item.palette.characterId ?? 'gambler';
+      const dotColor = charColors[charId] ?? 0x5a5a5a;
+      swatchG.fillStyle(dotColor);
+      swatchG.fillCircle(x + w / 2, y + 32, 14);
+    } else if (item.palette.goldChain) {
       swatchG.fillStyle(0xe0a242);
       swatchG.fillRect(x + w / 2 - 20, y + 20, 40, 8);
       swatchG.fillStyle(0xffd878);
@@ -259,7 +293,9 @@ export class WardrobeScene extends Scene {
     container.add(descText);
 
     const priceColor = owned ? '#4aaa4a' : canAfford ? '#e0a242' : '#7a5a5a';
-    const priceLabel = owned ? (equipped ? 'EQUIPPED' : 'OWNED') : `${item.price.toLocaleString()} G`;
+    const priceLabel = owned
+      ? (equipped ? 'EQUIPPED' : 'OWNED')
+      : item.price === 0 ? 'FREE' : `${item.price.toLocaleString()} G`;
     const priceText = this.add.text(x + w / 2, y + h - 24, priceLabel, {
       fontFamily: 'Courier New', fontSize: '14px', color: priceColor, letterSpacing: 1,
     }).setOrigin(0.5);
@@ -277,8 +313,10 @@ export class WardrobeScene extends Scene {
         bg.lineStyle(2, borderColor, 1);
         bg.strokeRoundedRect(x, y, w, h, 8);
       }
-      // Show preview with this item's palette
-      const previewP = { ...getPalette(), ...item.palette };
+      // For figure items, preview overrides everything with just the characterId
+      const previewP: SpritePalette = item.category === 'figure'
+        ? { ...item.palette }
+        : { ...getPalette(), ...item.palette };
       generatePlayerTexture(this, 'wardrobe-preview', previewP);
       this.previewSprite.setTexture('wardrobe-preview');
     });
@@ -367,9 +405,11 @@ export class WardrobeScene extends Scene {
       return;
     }
 
-    const owned = isOwned(item.id);
-    const equipped = getEquipped()[item.category] === item.id;
-    const canAfford = gold >= item.price;
+    const owned = item.id === 'figure-gambler' ? true : isOwned(item.id);
+    const equipped = item.category === 'figure'
+      ? getEquipped().figure === item.id
+      : getEquipped()[item.category] === item.id;
+    const canAfford = item.price === 0 || gold >= item.price;
 
     if (equipped) {
       this.actionBtnFrame.fillStyle(0x3a2510);
@@ -402,8 +442,10 @@ export class WardrobeScene extends Scene {
     const item = this.selectedItem;
     if (!item) return;
 
-    const equipped = getEquipped()[item.category] === item.id;
-    const owned = isOwned(item.id);
+    const equipped = item.category === 'figure'
+      ? getEquipped().figure === item.id
+      : getEquipped()[item.category] === item.id;
+    const owned = item.id === 'figure-gambler' ? true : isOwned(item.id);
 
     if (equipped) {
       unequipCategory(item.category);

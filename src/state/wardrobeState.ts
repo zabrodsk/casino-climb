@@ -9,7 +9,7 @@ const KEYS = {
 export interface WardrobeItem {
   id: string;
   name: string;
-  category: 'hair' | 'outfit' | 'accessory';
+  category: 'hair' | 'outfit' | 'accessory' | 'figure';
   price: number;
   palette: SpritePalette;
   description: string;
@@ -19,9 +19,44 @@ export interface WardrobeEquipped {
   hair?: string;
   outfit?: string;
   accessory?: string;
+  figure?: string;
 }
 
 export const WARDROBE_CATALOG: WardrobeItem[] = [
+  // --- Figures ---
+  {
+    id: 'figure-high-roller',
+    name: 'High Roller',
+    category: 'figure',
+    price: 6000,
+    description: 'Tuxedo, cufflinks, gold tie. Born at the top table.',
+    palette: { characterId: 'high-roller' },
+  },
+  {
+    id: 'figure-card-shark',
+    name: 'Card Shark',
+    category: 'figure',
+    price: 6000,
+    description: 'Green vest, red tie. Counts cards, beats houses.',
+    palette: { characterId: 'card-shark' },
+  },
+  {
+    id: 'figure-dealer',
+    name: 'The Dealer',
+    category: 'figure',
+    price: 6000,
+    description: 'White shirt, black vest, gold bow tie. The house.',
+    palette: { characterId: 'dealer' },
+  },
+  {
+    id: 'figure-outlaw',
+    name: 'Outlaw',
+    category: 'figure',
+    price: 6000,
+    description: 'Duster coat, bandana, stubble. Rides in, takes all.',
+    palette: { characterId: 'outlaw' },
+  },
+  // --- Hair ---
   {
     id: 'hair-blonde',
     name: 'Casino Blonde',
@@ -46,6 +81,7 @@ export const WARDROBE_CATALOG: WardrobeItem[] = [
     description: 'The color of experience — and winning.',
     palette: { hairDark: 0x8a8a8a, hairMid: 0xb8b8b8, hairLight: 0xe0e0e0 },
   },
+  // --- Outfits ---
   {
     id: 'outfit-red',
     name: 'Red Jacket',
@@ -70,6 +106,7 @@ export const WARDROBE_CATALOG: WardrobeItem[] = [
     description: "For those who've reached the top floor.",
     palette: { shirtDark: 0x181818, shirtMid: 0xd0d0d8, shirtLight: 0xeceff5, shirtHighlight: 0xffffff },
   },
+  // --- Accessories ---
   {
     id: 'acc-chain',
     name: 'Gold Chain',
@@ -122,6 +159,13 @@ export function getEquipped(): WardrobeEquipped {
 }
 
 export function equipItem(id: string): void {
+  // figure-gambler is the free default — always equippable without ownership check
+  if (id === 'figure-gambler') {
+    const eq = getEquipped();
+    (eq as Record<string, string>)['figure'] = id;
+    lsSet(KEYS.equip, JSON.stringify(eq));
+    return;
+  }
   const item = WARDROBE_CATALOG.find(i => i.id === id);
   if (!item || !isOwned(id)) return;
   const eq = getEquipped();
@@ -138,6 +182,16 @@ export function unequipCategory(cat: string): void {
 export function getPalette(): SpritePalette {
   const eq = getEquipped();
   const result: SpritePalette = {};
+  // Apply figure first (sets characterId)
+  if (eq.figure) {
+    if (eq.figure === 'figure-gambler') {
+      result.characterId = 'gambler';
+    } else {
+      const item = WARDROBE_CATALOG.find(i => i.id === eq.figure);
+      if (item) Object.assign(result, item.palette);
+    }
+  }
+  // Then hair/outfit/accessory overrides (only meaningful on Street Gambler base)
   for (const cat of ['hair', 'outfit', 'accessory'] as const) {
     const id = eq[cat];
     if (!id) continue;
