@@ -105,8 +105,8 @@ export class WardrobeScene extends Scene {
 
     // Placeholder — sprite added in refreshPreview
     generatePlayerTexture(this, 'wardrobe-preview', this.previewPalette);
-    this.previewSprite = this.add.sprite(px + pw / 2, py + ph / 2 + 20, 'wardrobe-preview', 0);
-    this.previewSprite.setScale(5).play('player-idle');
+    this.previewSprite = this.add.sprite(px + pw / 2, py + ph / 2 + 20, 'wardrobe-preview', 1);
+    this.previewSprite.setScale(5);
 
     // Equipped summary
     this.add.text(px + pw / 2, py + ph - 30, 'Currently equipped', {

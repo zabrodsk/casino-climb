@@ -132,14 +132,6 @@ function drawPlayerFrame(
   g.fillRect(cx - 6, headTop + 15, 4, 2);  // left shoulder highlight
   g.fillRect(cx + 2, headTop + 15, 4, 2);  // right shoulder highlight
 
-  // Gold chain accessory
-  if (palette.goldChain) {
-    g.fillStyle(0xe0a242);
-    g.fillRect(cx - 4, headTop + 17, 8, 1);
-    g.fillStyle(0xffd878);
-    g.fillRect(cx - 2, headTop + 17, 4, 1);
-  }
-
   // Body: shirt
   const torsoTop = upperY + 22;
   g.fillStyle(shirtDark);
@@ -169,6 +161,14 @@ function drawPlayerFrame(
   g.fillStyle(grimeDark);
   g.fillRect(cx - 6, torsoTop + 10, 2, 1);
   g.fillRect(cx + 3, torsoTop + 9, 2, 1);
+
+  // Gold chain accessory — drawn after collar so it isn't overwritten
+  if (palette.goldChain) {
+    g.fillStyle(0xe0a242);
+    g.fillRect(cx - 4, torsoTop + 1, 8, 1);
+    g.fillStyle(0xffd878);
+    g.fillRect(cx - 2, torsoTop + 1, 4, 1);
+  }
 
   // Shirt seams/creases
   g.fillStyle(seam);
