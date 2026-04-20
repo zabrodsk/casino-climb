@@ -32,21 +32,21 @@ export class BootScene extends Scene {
   }
 
   create(): void {
-    // Generate procedural hooded-gambler player spritesheet (288x48, 9 frames)
+    // Generate procedural hooded-gambler player spritesheet (384x48, 12 frames)
     const g = this.add.graphics();
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 12; i++) {
       this._drawPlayerFrame(g, i * 32, 0, i);
     }
-    g.generateTexture('player', 288, 48);
+    g.generateTexture('player', 384, 48);
     g.destroy();
 
-    // Register 9 sliced frames so generateFrameNumbers works
+    // Register 12 sliced frames so generateFrameNumbers works
     const tex = this.textures.get('player');
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 12; i++) {
       tex.add(i, 0, i * 32, 0, 32, 48);
     }
 
-    // Idle: frames 0-3 (first 4 frames, standing)
+    // Idle: frames 0-3
     this.anims.create({
       key: 'player-idle',
       frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
@@ -54,11 +54,11 @@ export class BootScene extends Scene {
       repeat: -1,
     });
 
-    // Walk: frames 4-8 (remaining 5 frames)
+    // Walk: frames 4-11 (8-frame cycle)
     this.anims.create({
       key: 'player-walk',
-      frames: this.anims.generateFrameNumbers('player', { start: 4, end: 8 }),
-      frameRate: 10,
+      frames: this.anims.generateFrameNumbers('player', { start: 4, end: 11 }),
+      frameRate: 12,
       repeat: -1,
     });
 
@@ -79,11 +79,36 @@ export class BootScene extends Scene {
    */
   private _drawPlayerFrame(g: GameObjects.Graphics, ox: number, oy: number, frameIdx: number): void {
     const idle = frameIdx <= 3;
-    const breath = idle && (frameIdx === 1 || frameIdx === 3) ? 1 : 0;
+
+    // Idle breathing (upper body only)
+    const breath  = idle && (frameIdx === 1 || frameIdx === 3) ? 1 : 0;
     const headDip = idle && frameIdx === 2 ? 1 : 0;
-    const walkBob = !idle && (frameIdx === 5 || frameIdx === 7) ? 1 : 0;
-    const baseY = oy + walkBob;
-    const upperY = baseY + breath;
+
+    // 8-frame walk table: [bodyBob, lDX, rDX, lLift, rLift, armSwing]
+    //   bodyBob: -1=body rises, 0=neutral, 1=body dips
+    //   lDX/rDX: horizontal foot offset (±1px forward/back)
+    //   lLift/rLift: leg shortened by N px (knee-up / passing phase)
+    const WALK: Array<[number,number,number,number,number,number]> = [
+      [ 0, -1,  1,  0,  0,  1],  // f4:  right foot contact
+      [ 1,  0,  0,  0,  0,  0],  // f5:  recoil — body dips
+      [ 0,  1, -1,  2,  0, -1],  // f6:  left knee up (passing)
+      [-1,  1, -1,  0,  0, -1],  // f7:  left foot contact — body rises
+      [ 0,  1, -1,  0,  0, -1],  // f8:  left foot settling
+      [ 1,  0,  0,  0,  0,  0],  // f9:  recoil — body dips
+      [ 0, -1,  1,  0,  2,  1],  // f10: right knee up (passing)
+      [-1, -1,  1,  0,  0,  1],  // f11: right foot contact — body rises
+    ];
+
+    let bodyBob = 0, legLeftDX = 0, legRightDX = 0;
+    let legLeftLift = 0, legRightLift = 0, armSwing = 0;
+    if (!idle) {
+      [bodyBob, legLeftDX, legRightDX, legLeftLift, legRightLift, armSwing] = WALK[frameIdx - 4];
+    }
+
+    // For idle: only upper body breathes; waist is anchored.
+    // For walk: entire body bobs with bodyBob.
+    const baseY  = idle ? oy               : oy + Math.max(0, bodyBob);
+    const upperY = idle ? baseY + breath   : oy + bodyBob;
 
     const cx = ox + 16;
 
@@ -104,8 +129,7 @@ export class BootScene extends Scene {
     const belt = 0x6d4727;
     const shoe = 0x2a1f19;
 
-    const armSwing = !idle && frameIdx === 5 ? 1 : !idle && frameIdx === 7 ? -1 : 0;
-    const legSwing = armSwing;
+    const legSwing = armSwing; // unused legacy alias kept for arm drawing below
 
     // Head (large chibi head with messy brown hair)
     const headTop = upperY + 5 + headDip;
@@ -219,26 +243,13 @@ export class BootScene extends Scene {
     g.fillStyle(0x222225);
     g.fillRect(cx - 1, waistY + 3, 2, 4);
 
-    // Legs
-    let leftLegX = cx - 4;
-    let rightLegX = cx + 1;
-    let leftLegY = waistY + 7;
-    let rightLegY = waistY + 7;
-    let leftLegH = 4;
-    let rightLegH = 4;
-    if (!idle) {
-      if (legSwing > 0) {
-        leftLegY += 1;
-        leftLegH = 3;
-        rightLegY -= 1;
-        rightLegH = 5;
-      } else if (legSwing < 0) {
-        leftLegY -= 1;
-        leftLegH = 5;
-        rightLegY += 1;
-        rightLegH = 3;
-      }
-    }
+    // Legs — walk cycle drives horizontal offset + lift for passing phase
+    const leftLegX  = cx - 4 + legLeftDX;
+    const rightLegX = cx + 1 + legRightDX;
+    const leftLegY  = waistY + 7 + legLeftLift;
+    const rightLegY = waistY + 7 + legRightLift;
+    const leftLegH  = Math.max(1, 4 - legLeftLift);
+    const rightLegH = Math.max(1, 4 - legRightLift);
     g.fillStyle(pants);
     g.fillRect(leftLegX, leftLegY, 3, leftLegH);
     g.fillRect(rightLegX, rightLegY, 3, rightLegH);
