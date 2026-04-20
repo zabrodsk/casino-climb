@@ -33,6 +33,8 @@ function getDrawFn(id: string): (g: GameObjects.Graphics, ox: number, oy: number
     case 'card-shark':  return drawCardSharkFrame;
     case 'dealer':      return drawDealerFrame;
     case 'outlaw':      return drawOutlawFrame;
+    case 'tycoon':  return drawTycoonFrame;
+    case 'phantom': return drawPhantomFrame;
     default:            return drawPlayerFrame;
   }
 }
@@ -865,6 +867,374 @@ function drawOutlawFrame(
   g.fillStyle(bootHighlight);
   g.fillRect(leftLegX, leftLegY + leftLegH, 3, 1);
   g.fillRect(rightLegX, rightLegY + rightLegH, 3, 1);
+
+  // Ground shadow
+  g.fillStyle(0x0a0a0a, 0.3);
+  g.fillEllipse(cx, oy + 46, 11, 2);
+}
+
+function drawTycoonFrame(
+  g: GameObjects.Graphics,
+  ox: number,
+  oy: number,
+  frameIdx: number,
+  _palette: SpritePalette,
+): void {
+  const idle = frameIdx <= 3;
+  const breath  = idle && (frameIdx === 1 || frameIdx === 3) ? 1 : 0;
+  const headDip = idle && frameIdx === 2 ? 1 : 0;
+  const WALK: Array<[number,number,number,number,number,number]> = [
+    [ 0, -1,  1,  0,  0,  1],
+    [ 1,  0,  0,  0,  0,  0],
+    [ 0,  1, -1,  2,  0, -1],
+    [-1,  1, -1,  0,  0, -1],
+    [ 0,  1, -1,  0,  0, -1],
+    [ 1,  0,  0,  0,  0,  0],
+    [ 0, -1,  1,  0,  2,  1],
+    [-1, -1,  1,  0,  0,  1],
+  ];
+  let bodyBob = 0, legLeftDX = 0, legRightDX = 0;
+  let legLeftLift = 0, legRightLift = 0, armSwing = 0;
+  if (!idle) [bodyBob, legLeftDX, legRightDX, legLeftLift, legRightLift, armSwing] = WALK[frameIdx - 4];
+  const baseY  = idle ? oy               : oy + Math.max(0, bodyBob);
+  const upperY = idle ? baseY + breath   : oy + bodyBob;
+  const cx = ox + 16;
+
+  const skin = 0xecd4b4, skinShade = 0xc8a882;
+  const hatBlack = 0x18181e, hatDark = 0x242430, hatBand = 0xc9a242;
+  const silverHair = 0x9898a8, silverLight = 0xb8b8c8;
+  const mustache = 0xb0a898;
+  const monocle = 0xd4a030;
+  const suitDark = 0x18202e, suitMid = 0x263040;
+  const vestDark = 0x7a5a10, vestMid = 0xb08030, vestLight = 0xd4a040;
+  const chainGold = 0xffc840;
+  const shirtWhite = 0xf0ece0;
+  const pantsDark = 0x141422, pantsMid = 0x202032;
+  const shoe = 0x08080e;
+
+  const headTop = upperY + 5 + headDip;
+
+  // Top hat crown (sits above normal headTop)
+  g.fillStyle(hatBlack);
+  g.fillRect(cx - 5, headTop - 4, 10, 4);
+  g.fillStyle(hatDark);
+  g.fillRect(cx - 4, headTop - 3, 8, 3);
+  // Gold band
+  g.fillStyle(hatBand);
+  g.fillRect(cx - 5, headTop - 1, 10, 1);
+  // Brim
+  g.fillStyle(hatBlack);
+  g.fillRect(cx - 8, headTop, 16, 2);
+  g.fillStyle(hatDark);
+  g.fillRect(cx - 8, headTop, 16, 1);
+
+  // Silver hair at sides below brim
+  g.fillStyle(silverHair);
+  g.fillRect(cx - 8, headTop + 2, 2, 4);
+  g.fillRect(cx + 6, headTop + 2, 2, 4);
+  g.fillStyle(silverLight);
+  g.fillRect(cx - 7, headTop + 2, 1, 2);
+  g.fillRect(cx + 6, headTop + 2, 1, 2);
+
+  // Face (pale, distinguished)
+  g.fillStyle(skin);
+  g.fillRect(cx - 6, headTop + 2, 12, 12);
+  g.fillStyle(skinShade);
+  g.fillRect(cx - 6, headTop + 13, 12, 1);
+  g.fillRect(cx - 2, headTop + 10, 4, 1);
+
+  // Left eye
+  g.fillStyle(0x1a1410);
+  g.fillRect(cx - 3, headTop + 7, 2, 1);
+  // Right eye with monocle
+  g.fillStyle(0x1a1410);
+  g.fillRect(cx + 1, headTop + 7, 2, 1);
+  g.fillStyle(monocle);
+  g.fillRect(cx + 1, headTop + 6, 2, 1);
+  g.fillRect(cx + 1, headTop + 8, 2, 1);
+  g.fillRect(cx, headTop + 7, 1, 1);
+  g.fillRect(cx + 3, headTop + 7, 1, 1);
+  g.fillRect(cx + 3, headTop + 8, 1, 2);
+
+  // Full silver mustache
+  g.fillStyle(mustache);
+  g.fillRect(cx - 3, headTop + 10, 6, 2);
+  g.fillStyle(silverLight);
+  g.fillRect(cx - 2, headTop + 10, 4, 1);
+
+  // Neck + white collar
+  g.fillStyle(skin);
+  g.fillRect(cx - 2, headTop + 14, 4, 3);
+  g.fillStyle(skinShade);
+  g.fillRect(cx - 2, headTop + 15, 4, 2);
+  g.fillStyle(shirtWhite);
+  g.fillRect(cx - 3, headTop + 14, 2, 3);
+  g.fillRect(cx + 1, headTop + 14, 2, 3);
+  g.fillStyle(suitDark);
+  g.fillRect(cx - 7, headTop + 14, 5, 3);
+  g.fillRect(cx + 2, headTop + 14, 5, 3);
+  g.fillStyle(suitMid);
+  g.fillRect(cx - 6, headTop + 15, 4, 2);
+  g.fillRect(cx + 2, headTop + 15, 4, 2);
+
+  // Body: charcoal suit with gold waistcoat
+  const torsoTop = upperY + 22;
+  g.fillStyle(suitDark);
+  g.fillRect(cx - 7, torsoTop, 14, 12);
+  // Gold waistcoat center
+  g.fillStyle(vestDark);
+  g.fillRect(cx - 2, torsoTop, 4, 12);
+  g.fillStyle(vestMid);
+  g.fillRect(cx - 1, torsoTop + 1, 2, 10);
+  g.fillStyle(vestLight);
+  g.fillRect(cx - 1, torsoTop + 2, 1, 8);
+  // Waistcoat buttons
+  g.fillStyle(hatBand);
+  g.fillRect(cx, torsoTop + 2, 1, 1);
+  g.fillRect(cx, torsoTop + 5, 1, 1);
+  g.fillRect(cx, torsoTop + 8, 1, 1);
+  // White shirt collar visible at top
+  g.fillStyle(shirtWhite);
+  g.fillRect(cx - 4, torsoTop, 2, 2);
+  g.fillRect(cx + 2, torsoTop, 2, 2);
+  // Suit lapels
+  g.fillStyle(suitMid);
+  g.fillRect(cx - 7, torsoTop, 5, 7);
+  g.fillRect(cx + 2, torsoTop, 5, 7);
+  g.fillStyle(0x30384a);
+  g.fillRect(cx - 6, torsoTop + 1, 3, 5);
+  g.fillRect(cx + 3, torsoTop + 1, 3, 5);
+  // Gold watch chain
+  g.fillStyle(chainGold);
+  g.fillRect(cx - 1, torsoTop + 9, 5, 1);
+
+  // Arms: suit sleeves with white cuffs
+  const leftArmTop = torsoTop + 8 + armSwing;
+  const rightArmTop = torsoTop + 8 - armSwing;
+  g.fillStyle(suitDark);
+  g.fillRect(cx - 8, leftArmTop, 2, 4);
+  g.fillRect(cx + 6, rightArmTop, 2, 4);
+  g.fillStyle(suitMid);
+  g.fillRect(cx - 8, leftArmTop, 2, 3);
+  g.fillRect(cx + 6, rightArmTop, 2, 3);
+  g.fillStyle(shirtWhite);
+  g.fillRect(cx - 8, leftArmTop + 4, 2, 2);
+  g.fillRect(cx + 6, rightArmTop + 4, 2, 2);
+  g.fillStyle(chainGold);
+  g.fillRect(cx - 8, leftArmTop + 4, 1, 1);
+  g.fillRect(cx + 7, rightArmTop + 4, 1, 1);
+
+  // Belt
+  const waistY = baseY + 34;
+  g.fillStyle(0x181820);
+  g.fillRect(cx - 6, waistY, 12, 1);
+  g.fillStyle(pantsDark);
+  g.fillRect(cx - 6, waistY + 1, 12, 6);
+  g.fillStyle(pantsMid);
+  g.fillRect(cx - 5, waistY + 2, 3, 4);
+  g.fillRect(cx + 2, waistY + 2, 2, 4);
+  g.fillStyle(0x0c0c1a);
+  g.fillRect(cx - 1, waistY + 3, 2, 4);
+
+  // Legs
+  const leftLegX  = cx - 4 + legLeftDX;
+  const rightLegX = cx + 1 + legRightDX;
+  const leftLegY  = waistY + 7 + legLeftLift;
+  const rightLegY = waistY + 7 + legRightLift;
+  const leftLegH  = Math.max(1, 4 - legLeftLift);
+  const rightLegH = Math.max(1, 4 - legRightLift);
+  g.fillStyle(pantsDark);
+  g.fillRect(leftLegX, leftLegY, 3, leftLegH);
+  g.fillRect(rightLegX, rightLegY, 3, rightLegH);
+
+  // Polished shoes with highlight
+  g.fillStyle(shoe);
+  g.fillRect(leftLegX - 1, leftLegY + leftLegH, 4, 2);
+  g.fillRect(rightLegX - 1, rightLegY + rightLegH, 4, 2);
+  g.fillStyle(0x1a1a2a);
+  g.fillRect(leftLegX, leftLegY + leftLegH, 2, 1);
+  g.fillRect(rightLegX, rightLegY + rightLegH, 2, 1);
+
+  // Ground shadow
+  g.fillStyle(0x0a0a0a, 0.3);
+  g.fillEllipse(cx, oy + 46, 11, 2);
+}
+
+function drawPhantomFrame(
+  g: GameObjects.Graphics,
+  ox: number,
+  oy: number,
+  frameIdx: number,
+  _palette: SpritePalette,
+): void {
+  const idle = frameIdx <= 3;
+  const breath  = idle && (frameIdx === 1 || frameIdx === 3) ? 1 : 0;
+  const headDip = idle && frameIdx === 2 ? 1 : 0;
+  const WALK: Array<[number,number,number,number,number,number]> = [
+    [ 0, -1,  1,  0,  0,  1],
+    [ 1,  0,  0,  0,  0,  0],
+    [ 0,  1, -1,  2,  0, -1],
+    [-1,  1, -1,  0,  0, -1],
+    [ 0,  1, -1,  0,  0, -1],
+    [ 1,  0,  0,  0,  0,  0],
+    [ 0, -1,  1,  0,  2,  1],
+    [-1, -1,  1,  0,  0,  1],
+  ];
+  let bodyBob = 0, legLeftDX = 0, legRightDX = 0;
+  let legLeftLift = 0, legRightLift = 0, armSwing = 0;
+  if (!idle) [bodyBob, legLeftDX, legRightDX, legLeftLift, legRightLift, armSwing] = WALK[frameIdx - 4];
+  const baseY  = idle ? oy               : oy + Math.max(0, bodyBob);
+  const upperY = idle ? baseY + breath   : oy + bodyBob;
+  const cx = ox + 16;
+
+  const skin = 0xdfc7b1, skinShade = 0xbd9a80;
+  const hairCol = 0x06060c, hairHigh = 0x10101c;
+  const maskIvory = 0xf4f0e8, maskShadow = 0xd8d4c8, maskEdge = 0xb0aca4;
+  const amberEye = 0xc08818;
+  const cravatWhite = 0xf0ece0, cravatCream = 0xd8d4c4;
+  const coatBlack = 0x06060a, coatDark = 0x0e0e18, coatEdge = 0x1c1c2a;
+  const shirtWhite = 0xf0ece0;
+  const pants = 0x08080e, pantsMid = 0x121220;
+  const shoe = 0x04040a;
+  const buckle = 0xb8b8c0;
+
+  const headTop = upperY + 5 + headDip;
+
+  // Slicked-back hair with widow's peak
+  g.fillStyle(hairCol);
+  g.fillRect(cx - 7, headTop, 14, 3);
+  g.fillRect(cx - 8, headTop + 2, 2, 5);
+  g.fillRect(cx + 6, headTop + 2, 2, 5);
+  g.fillStyle(hairHigh);
+  g.fillRect(cx - 4, headTop, 3, 1);
+  g.fillRect(cx + 1, headTop, 3, 1);
+  // Widow's peak center dip
+  g.fillStyle(hairCol);
+  g.fillRect(cx, headTop + 3, 1, 1);
+
+  // Face — left half skin, right half masked
+  g.fillStyle(skin);
+  g.fillRect(cx - 7, headTop + 4, 8, 10);
+  g.fillStyle(skinShade);
+  g.fillRect(cx - 7, headTop + 13, 8, 1);
+  g.fillRect(cx - 2, headTop + 10, 3, 1);
+
+  // White mask — right half of face
+  g.fillStyle(maskIvory);
+  g.fillRect(cx, headTop + 4, 8, 10);
+  g.fillStyle(maskShadow);
+  g.fillRect(cx, headTop + 13, 8, 1);
+  // Mask left edge
+  g.fillStyle(maskEdge);
+  g.fillRect(cx, headTop + 4, 1, 10);
+  // Subtle mask highlight
+  g.fillStyle(0xfcf8f0);
+  g.fillRect(cx + 2, headTop + 5, 3, 2);
+
+  // Left eye (normal)
+  g.fillStyle(0x1a1410);
+  g.fillRect(cx - 3, headTop + 8, 2, 1);
+
+  // Right eye — amber, on mask
+  g.fillStyle(amberEye);
+  g.fillRect(cx + 1, headTop + 8, 2, 1);
+  g.fillStyle(0xf0c030);
+  g.fillRect(cx + 1, headTop + 8, 1, 1);
+
+  // Subtle mouth (left side only)
+  g.fillStyle(0x7a5a48);
+  g.fillRect(cx - 2, headTop + 11, 2, 1);
+
+  // White ruffled cravat at neck
+  g.fillStyle(skin);
+  g.fillRect(cx - 2, headTop + 14, 4, 3);
+  g.fillStyle(cravatWhite);
+  g.fillRect(cx - 3, headTop + 14, 6, 3);
+  g.fillStyle(cravatCream);
+  g.fillRect(cx - 2, headTop + 15, 4, 2);
+  g.fillRect(cx - 1, headTop + 14, 2, 1);
+  g.fillStyle(0xc4c0b0);
+  g.fillRect(cx - 3, headTop + 15, 1, 2);
+  g.fillRect(cx + 2, headTop + 15, 1, 2);
+
+  // Jacket shoulders
+  g.fillStyle(coatBlack);
+  g.fillRect(cx - 7, headTop + 14, 5, 3);
+  g.fillRect(cx + 2, headTop + 14, 5, 3);
+  g.fillStyle(coatDark);
+  g.fillRect(cx - 6, headTop + 15, 4, 2);
+  g.fillRect(cx + 2, headTop + 15, 4, 2);
+
+  // Body: tailcoat
+  const torsoTop = upperY + 22;
+  g.fillStyle(coatBlack);
+  g.fillRect(cx - 8, torsoTop, 16, 12);
+  // White shirt front (ruffled)
+  g.fillStyle(shirtWhite);
+  g.fillRect(cx - 2, torsoTop, 4, 10);
+  g.fillStyle(0xe0dcd0);
+  g.fillRect(cx - 1, torsoTop + 1, 2, 8);
+  // Ruffle lines on shirt
+  g.fillStyle(0xc8c4b8);
+  g.fillRect(cx - 2, torsoTop + 2, 1, 6);
+  g.fillRect(cx + 1, torsoTop + 2, 1, 6);
+  // Cravat bow at collar
+  g.fillStyle(cravatWhite);
+  g.fillRect(cx - 1, torsoTop, 2, 2);
+  // Lapels
+  g.fillStyle(coatDark);
+  g.fillRect(cx - 8, torsoTop, 6, 8);
+  g.fillRect(cx + 2, torsoTop, 6, 8);
+  g.fillStyle(coatEdge);
+  g.fillRect(cx - 7, torsoTop + 1, 4, 6);
+  g.fillRect(cx + 3, torsoTop + 1, 4, 6);
+  // Pocket square (white)
+  g.fillStyle(shirtWhite);
+  g.fillRect(cx - 6, torsoTop + 2, 2, 2);
+
+  // Arms: tailcoat sleeves
+  const leftArmTop = torsoTop + 8 + armSwing;
+  const rightArmTop = torsoTop + 8 - armSwing;
+  g.fillStyle(coatBlack);
+  g.fillRect(cx - 8, leftArmTop, 2, 4);
+  g.fillRect(cx + 6, rightArmTop, 2, 4);
+  g.fillStyle(coatDark);
+  g.fillRect(cx - 8, leftArmTop, 2, 3);
+  g.fillRect(cx + 6, rightArmTop, 2, 3);
+  g.fillStyle(shirtWhite);
+  g.fillRect(cx - 8, leftArmTop + 4, 2, 2);
+  g.fillRect(cx + 6, rightArmTop + 4, 2, 2);
+
+  // Belt
+  const waistY = baseY + 34;
+  g.fillStyle(0x0a0a0a);
+  g.fillRect(cx - 6, waistY, 12, 1);
+  g.fillStyle(pants);
+  g.fillRect(cx - 6, waistY + 1, 12, 6);
+  g.fillStyle(pantsMid);
+  g.fillRect(cx - 5, waistY + 2, 3, 4);
+  g.fillRect(cx + 2, waistY + 2, 2, 4);
+  g.fillStyle(0x060612);
+  g.fillRect(cx - 1, waistY + 3, 2, 4);
+
+  // Legs
+  const leftLegX  = cx - 4 + legLeftDX;
+  const rightLegX = cx + 1 + legRightDX;
+  const leftLegY  = waistY + 7 + legLeftLift;
+  const rightLegY = waistY + 7 + legRightLift;
+  const leftLegH  = Math.max(1, 4 - legLeftLift);
+  const rightLegH = Math.max(1, 4 - legRightLift);
+  g.fillStyle(pants);
+  g.fillRect(leftLegX, leftLegY, 3, leftLegH);
+  g.fillRect(rightLegX, rightLegY, 3, rightLegH);
+
+  // Black shoes with silver buckle
+  g.fillStyle(shoe);
+  g.fillRect(leftLegX - 1, leftLegY + leftLegH, 4, 2);
+  g.fillRect(rightLegX - 1, rightLegY + rightLegH, 4, 2);
+  g.fillStyle(buckle);
+  g.fillRect(leftLegX, leftLegY + leftLegH, 1, 1);
+  g.fillRect(rightLegX, rightLegY + rightLegH, 1, 1);
 
   // Ground shadow
   g.fillStyle(0x0a0a0a, 0.3);

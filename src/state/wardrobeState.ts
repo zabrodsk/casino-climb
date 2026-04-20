@@ -56,6 +56,22 @@ export const WARDROBE_CATALOG: WardrobeItem[] = [
     description: 'Duster coat, bandana, stubble. Rides in, takes all.',
     palette: { characterId: 'outlaw' },
   },
+  {
+    id: 'figure-tycoon',
+    name: 'The Tycoon',
+    category: 'figure',
+    price: 9000,
+    description: 'Old money, new schemes. Top hat, monocle, gold chain.',
+    palette: { characterId: 'tycoon' },
+  },
+  {
+    id: 'figure-phantom',
+    name: 'The Phantom',
+    category: 'figure',
+    price: 9000,
+    description: 'No one knows his face. Half-mask, tailcoat, amber eye.',
+    palette: { characterId: 'phantom' },
+  },
   // --- Hair ---
   {
     id: 'hair-blonde',
