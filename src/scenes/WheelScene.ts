@@ -9,7 +9,6 @@ import { COLOR, FONT, buttonLabelStyle, drawFramedPanel, drawNestedButton, neonT
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 import { HouseController } from '../ui/HouseController';
-import { DialogueBus } from '../ui/DialogueBus';
 
 const WHEEL_CX = 512;
 const WHEEL_CY = 334;
@@ -35,6 +34,9 @@ export class WheelScene extends Scene {
   private spinDurationMs = 5200;
   private spinSound: Phaser.Sound.BaseSound | null = null;
   private floorTwinkleTweens: Phaser.Tweens.Tween[] = [];
+  private wheelSpeechBg: GameObjects.Graphics | null = null;
+  private wheelSpeechText: GameObjects.Text | null = null;
+  private wheelSpeechDismissTimer: Phaser.Time.TimerEvent | null = null;
 
   constructor() {
     super('WheelScene');
@@ -72,6 +74,7 @@ export class WheelScene extends Scene {
       this.stopSpinSound();
       this.floorTwinkleTweens.forEach((tween) => tween.stop());
       this.floorTwinkleTweens = [];
+      this.clearWheelSpeech();
     });
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
@@ -399,8 +402,7 @@ export class WheelScene extends Scene {
     passZone.on('pointerdown', () => {
       passZone.destroy();
       fateZone.destroy();
-      this.showSpeech('You walk past the wheel. Wise... or cowardly?');
-      this.time.delayedCall(1800, () => this.leave());
+      this.leave();
     });
 
     fateZone.on('pointerover', () => this.drawFateButton(fateBtn, W / 2 + 140, 660, 200, 56, true));
@@ -439,7 +441,7 @@ export class WheelScene extends Scene {
     const totalRotation = extraSpins * 360 + delta;
 
     this.playSpinSound();
-    this.showSpeech('The wheel turns...');
+    this.showWheelSpeech('The wheel turns...', 1600, WHEEL_CY + WHEEL_R + 18);
 
     this.tweens.add({
       targets: this.wheelContainer,
@@ -481,7 +483,7 @@ export class WheelScene extends Scene {
     this.continueBtnText.setVisible(true);
     this.continueZone.setInteractive({ cursor: 'pointer' });
 
-    this.showSpeech(seg.flavor);
+    // Result panel is the only end-of-spin dialogue surface.
 
     if (seg.coinDelta <= -150) {
       HouseController.say(this, 'gameSpecific', 'wheelLoseAll');
@@ -494,12 +496,14 @@ export class WheelScene extends Scene {
 
   private buildResultPanel(): void {
     const W = 1024;
+    const RESULT_DEPTH = 40;
     const panelW = 480;
     const panelH = 160;
     const px = (W - panelW) / 2;
-    const py = 505;
+    const py = 470;
 
     this.resultPanel = this.add.graphics().setVisible(false);
+    this.resultPanel.setDepth(RESULT_DEPTH);
     drawFramedPanel(this.resultPanel, px, py, panelW, panelH, { borderWidth: 2, alpha: 0.95 });
 
     this.resultTitle = this.add.text(W / 2, py + 36, '', {
@@ -507,7 +511,7 @@ export class WheelScene extends Scene {
       fontFamily: FONT.mono,
       fontStyle: 'bold',
       color: COLOR.winGreen,
-    }).setOrigin(0.5).setVisible(false).setResolution(2);
+    }).setOrigin(0.5).setVisible(false).setResolution(2).setDepth(RESULT_DEPTH + 1);
 
     this.resultCoins = this.add.text(W / 2, py + 80, '', {
       fontSize: '18px',
@@ -515,7 +519,7 @@ export class WheelScene extends Scene {
       color: '#ffffff',
       align: 'center',
       wordWrap: { width: 430 },
-    }).setOrigin(0.5).setVisible(false).setResolution(2);
+    }).setOrigin(0.5).setVisible(false).setResolution(2).setDepth(RESULT_DEPTH + 1);
 
     this.resultFlavor = this.add.text(W / 2, py + 118, '', {
       fontSize: '15px',
@@ -523,14 +527,14 @@ export class WheelScene extends Scene {
       color: '#e5e7eb',
       align: 'center',
       wordWrap: { width: 430 },
-    }).setOrigin(0.5).setVisible(false).setResolution(2);
+    }).setOrigin(0.5).setVisible(false).setResolution(2).setDepth(RESULT_DEPTH + 1);
 
     const contY = py + panelH + 30;
-    this.continueBtn = this.add.graphics().setVisible(false);
-    this.continueBtnText = this.add.text(W / 2, contY, 'CONTINUE', buttonLabelStyle(22)).setOrigin(0.5).setVisible(false);
+    this.continueBtn = this.add.graphics().setVisible(false).setDepth(RESULT_DEPTH + 1);
+    this.continueBtnText = this.add.text(W / 2, contY, 'CONTINUE', buttonLabelStyle(22)).setOrigin(0.5).setVisible(false).setDepth(RESULT_DEPTH + 2);
     drawNestedButton(this.continueBtn, W / 2, contY, 200, 52, false);
 
-    this.continueZone = this.add.zone(W / 2, contY, 200, 52);
+    this.continueZone = this.add.zone(W / 2, contY, 200, 52).setDepth(RESULT_DEPTH + 3);
     this.continueZone.on('pointerover', () => drawNestedButton(this.continueBtn, W / 2, contY, 200, 52, true));
     this.continueZone.on('pointerout', () => drawNestedButton(this.continueBtn, W / 2, contY, 200, 52, false));
     this.continueZone.on('pointerdown', () => {
@@ -561,8 +565,44 @@ export class WheelScene extends Scene {
     });
   }
 
-  private showSpeech(text: string): void {
-    DialogueBus.say(this, text);
+  private showWheelSpeech(text: string, durationMs = 1600, centerY = WHEEL_CY - 2): void {
+    this.clearWheelSpeech();
+
+    const bubbleW = 420;
+    const bubbleH = 68;
+    const bx = WHEEL_CX - bubbleW / 2;
+    const by = centerY - bubbleH / 2;
+
+    this.wheelSpeechBg = this.add.graphics();
+    drawFramedPanel(this.wheelSpeechBg, bx, by, bubbleW, bubbleH, { borderWidth: 3, alpha: 0.95 });
+    this.wheelSpeechBg.setDepth(22);
+
+    this.wheelSpeechText = this.add.text(WHEEL_CX, by + bubbleH / 2, text, {
+      fontSize: '18px',
+      fontFamily: FONT.mono,
+      color: COLOR.ivory,
+      align: 'center',
+      wordWrap: { width: bubbleW - 24 },
+    }).setOrigin(0.5).setDepth(23).setResolution(2);
+
+    this.wheelSpeechDismissTimer = this.time.delayedCall(durationMs, () => {
+      if (!this.wheelSpeechBg || !this.wheelSpeechText) return;
+      this.tweens.add({
+        targets: [this.wheelSpeechBg, this.wheelSpeechText],
+        alpha: 0,
+        duration: 220,
+        onComplete: () => this.clearWheelSpeech(),
+      });
+    });
+  }
+
+  private clearWheelSpeech(): void {
+    this.wheelSpeechDismissTimer?.remove(false);
+    this.wheelSpeechDismissTimer = null;
+    this.wheelSpeechBg?.destroy();
+    this.wheelSpeechText?.destroy();
+    this.wheelSpeechBg = null;
+    this.wheelSpeechText = null;
   }
 
   private resolveSpinDurationMs(): number {

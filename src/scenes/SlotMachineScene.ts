@@ -26,7 +26,6 @@ import {
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 import { HouseController } from '../ui/HouseController';
-import { DialogueBus } from '../ui/DialogueBus';
 
 const WAGERS = [10, 25, 50, 100] as const;
 
@@ -512,7 +511,6 @@ export class SlotMachineScene extends Scene {
 
     const result = spinReels();
     this.playSpinSound();
-    this.showSpeech('Cross your fingers...');
 
     // Build a 32-symbol strip per reel. Result at index 2.
     // Container starts PRE_SCROLL symbols above normal so 22 symbols blur past before result lands.
@@ -678,7 +676,6 @@ export class SlotMachineScene extends Scene {
     this.resultLeaveBtnText.setVisible(true);
     this.resultLeaveZone.setInteractive({ cursor: 'pointer' });
 
-    this.showSpeech(net > 0 ? 'The reels smile on you.' : net < 0 ? 'No dice.' : 'Near miss.');
     this.syncUiToRoundState();
   }
 
@@ -836,10 +833,6 @@ export class SlotMachineScene extends Scene {
     this.spinSound = null;
   }
 
-  private showSpeech(text: string): void {
-    DialogueBus.say(this, text);
-  }
-
   private isLowCoinWagerMode(): boolean {
     return this.currentCoins > 0 && this.currentCoins < 10;
   }
@@ -901,12 +894,28 @@ export class SlotMachineScene extends Scene {
     this.allInWagerButton.zone.disableInteractive();
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
+      const dungeon = this.scene.manager.getScene('DungeonScene');
+      // Failsafe: ensure dungeon scene/camera is visible before any event logic.
+      if (dungeon) {
+        dungeon.cameras.main.resetFX();
+        dungeon.cameras.main.setAlpha(1);
+      }
+      if (this.scene.isPaused('DungeonScene')) this.scene.resume('DungeonScene');
       try {
-        this.scene.get('DungeonScene').events.emit('game-complete', {
-          coins: this.currentCoins,
-          won: this.currentCoins > 0,
-        });
-      } catch (_) { /* no-op */ }
+        if (dungeon) {
+          dungeon.events.emit('game-complete', {
+            coins: this.currentCoins,
+            won: this.currentCoins > 0,
+          });
+        }
+      } catch (_) {
+        // Keep gameplay recoverable even if event delivery fails.
+        if (dungeon) {
+          dungeon.cameras.main.resetFX();
+          dungeon.cameras.main.setAlpha(1);
+        }
+        if (this.scene.isPaused('DungeonScene')) this.scene.resume('DungeonScene');
+      }
       this.scene.stop('SlotMachineScene');
     });
   }
