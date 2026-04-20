@@ -1353,7 +1353,7 @@ export class DungeonScene extends Scene {
       HouseController.resetWinStreak();
     }
 
-    if (won) {
+    if (won && getCoins() >= this.config.target) {
       if (this.currentFloor === 6) {
         this.scene.resume('DungeonScene');
         this._applyFloorAmbience();
@@ -1365,7 +1365,7 @@ export class DungeonScene extends Scene {
       }
 
       this.hud.showSpeech('The stairs unlock. Take them.');
-      this._unlockStairs();
+      try { this._unlockStairs(); } catch (_) {}
       if (!this.goalSoundsPlayed) {
         AudioManager.playSfx(this, 'door-open', { volume: 1.8, cooldownMs: 300, allowOverlap: true });
         if (this.config.gameSceneKey !== 'WheelScene') {
