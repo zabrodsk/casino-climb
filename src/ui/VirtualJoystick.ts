@@ -1,84 +1,53 @@
 import Phaser from 'phaser';
+import RexVirtualJoystick from 'phaser3-rex-plugins/plugins/virtualjoystick.js';
+
+interface RexJoystick {
+  forceX: number;
+  forceY: number;
+  force: number;
+  destroy(): void;
+}
 
 export class VirtualJoystick {
-  private base: Phaser.GameObjects.Arc;
-  private thumb: Phaser.GameObjects.Arc;
-  private scene: Phaser.Scene;
-  private activePointerId = -1;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private rex: RexJoystick;
 
-  readonly maxRadius = 52;
   readonly bx: number;
   readonly by: number;
 
-  dx = 0;
-  dy = 0;
+  get dx(): number { return this.rex.forceX; }
+  get dy(): number { return this.rex.forceY; }
 
   constructor(scene: Phaser.Scene) {
-    this.scene = scene;
     this.bx = 90;
     this.by = scene.scale.height - 90;
 
-    this.base = scene.add.arc(this.bx, this.by, this.maxRadius)
+    const base = scene.add.arc(this.bx, this.by, 52)
       .setFillStyle(0x000000, 0.30)
       .setStrokeStyle(2, 0xe0a242, 0.65)
       .setScrollFactor(0)
       .setDepth(200);
 
-    this.thumb = scene.add.arc(this.bx, this.by, 24)
+    const thumb = scene.add.arc(this.bx, this.by, 24)
       .setFillStyle(0xe0a242, 0.75)
       .setStrokeStyle(1, 0xffffff, 0.4)
       .setScrollFactor(0)
       .setDepth(201);
 
-    scene.input.on('pointerdown',      this.onDown, this);
-    scene.input.on('pointermove',      this.onMove, this);
-    scene.input.on('pointerup',        this.onUp,   this);
-    scene.input.on('pointerupoutside', this.onUp,   this);
-  }
-
-  private onDown(p: Phaser.Input.Pointer): void {
-    if (this.activePointerId !== -1) return;
-    const W = this.scene.scale.width;
-    const H = this.scene.scale.height;
-    if (p.x > W / 2 || p.y < H / 2) return;
-    this.activePointerId = p.id;
-    this.updateThumb(p.x, p.y);
-  }
-
-  private onMove(p: Phaser.Input.Pointer): void {
-    if (p.id !== this.activePointerId) return;
-    this.updateThumb(p.x, p.y);
-  }
-
-  private onUp(p: Phaser.Input.Pointer): void {
-    if (p.id !== this.activePointerId) return;
-    this.activePointerId = -1;
-    this.thumb.setPosition(this.bx, this.by);
-    this.dx = 0;
-    this.dy = 0;
-  }
-
-  private updateThumb(px: number, py: number): void {
-    const dx = px - this.bx;
-    const dy = py - this.by;
-    const dist = Math.hypot(dx, dy);
-    const clamped = Math.min(dist, this.maxRadius);
-    const angle = Math.atan2(dy, dx);
-    this.thumb.setPosition(
-      this.bx + Math.cos(angle) * clamped,
-      this.by + Math.sin(angle) * clamped,
-    );
-    const deadzone = 8;
-    this.dx = dist > deadzone ? Math.cos(angle) : 0;
-    this.dy = dist > deadzone ? Math.sin(angle) : 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.rex = new (RexVirtualJoystick as any)(scene, {
+      x: this.bx,
+      y: this.by,
+      radius: 60,
+      base,
+      thumb,
+      dir: '8dir',
+      forceMin: 8,
+      fixed: true,
+    }) as RexJoystick;
   }
 
   destroy(): void {
-    this.scene.input.off('pointerdown',      this.onDown, this);
-    this.scene.input.off('pointermove',      this.onMove, this);
-    this.scene.input.off('pointerup',        this.onUp,   this);
-    this.scene.input.off('pointerupoutside', this.onUp,   this);
-    this.base.destroy();
-    this.thumb.destroy();
+    this.rex.destroy();
   }
 }
