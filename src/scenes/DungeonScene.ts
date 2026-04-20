@@ -459,9 +459,12 @@ export class DungeonScene extends Scene {
 
     // Joystick + touch buttons must be created AFTER uiCam.ignore so the
     // uiCam renders them; tell main camera (5x zoom world cam) to ignore them.
-    this.joystick = new VirtualJoystick(this);
-    this.cameras.main.ignore(this.joystick.getObjects());
-    this.buildTouchActionButtons();
+    const hasTouch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+    if (hasTouch) {
+      this.joystick = new VirtualJoystick(this);
+      this.cameras.main.ignore(this.joystick.getObjects());
+      this.buildTouchActionButtons();
+    }
 
     this.ensureDevModeLabel();
 
