@@ -1,5 +1,5 @@
 import { Scene, GameObjects } from 'phaser';
-import { resolve, nextCrashPoint, isValidBet } from '../games/crash';
+import { resolve, nextCrashPoint, isValidBet, CRASH_K, crashTimeFromPoint } from '../games/crash';
 import { THEME, COLOR, FONT, drawNestedButton, neonTitleStyle, buttonLabelStyle } from '../ui/theme';
 import { AudioManager } from '../audio/AudioManager';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
@@ -23,9 +23,15 @@ export class CrashScene extends Scene {
   private cashedOut: boolean = false;
   private successfulCashOuts: number = 0;
   private warningPlayed: boolean = false;
-
-  // Ticker
-  private tickEvent: Phaser.Time.TimerEvent | null = null;
+  private autoCashout: number = 0;          // 0 = disabled
+  private roundHistory: number[] = [];       // last crash points
+  private inBetPhase: boolean = false;
+  private betPhaseEnd: number = 0;
+  private roundStartTime: number = 0;
+  private crashTimeForRound: number = 0;
+  private lastGraphTime: number = 0;
+  private lastSoundTime: number = 0;
+  private lastPulseTime: number = 0;
 
   // Graph points
   private graphPoints: Array<{ x: number; y: number }> = [];
@@ -44,6 +50,10 @@ export class CrashScene extends Scene {
   private betButtons!: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; bet: number; zone: GameObjects.Zone }>;
   private allInBetButton!: { bg: GameObjects.Graphics; label: GameObjects.Text; zone: GameObjects.Zone };
   private flashOverlay!: GameObjects.Graphics;
+  private autoCashoutBtns!: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; value: number; zone: GameObjects.Zone }>;
+  private historyContainer!: GameObjects.Graphics;
+  private historyLabels!: GameObjects.Text[];
+  private countdownText!: GameObjects.Text;
 
   // Zone refs stored for enable/disable
   private _playZone!: GameObjects.Zone;
@@ -63,7 +73,6 @@ export class CrashScene extends Scene {
     this.successfulCashOuts = 0;
     this.warningPlayed = false;
     this.graphPoints = [];
-    this.tickEvent = null;
   }
 
   create() {
@@ -125,9 +134,54 @@ export class CrashScene extends Scene {
     divider.lineStyle(1, THEME.goldDim, 0.3);
     divider.lineBetween(60, 118, W - 60, 118);
 
+    // ── Auto-cashout row ───────────────────────────────────────────────────
+    this.add.text(W / 2, 145, 'AUTO CASHOUT', {
+      fontSize: '13px',
+      color: COLOR.goldText,
+      fontFamily: FONT.mono,
+    }).setOrigin(0.5);
+
+    const AUTO_OPTIONS = [0, 1.5, 2, 3, 5];
+    const AUTO_LABELS  = ['OFF', '1.5×', '2×', '3×', '5×'];
+    const autoBtnW = 72, autoBtnH = 30, autoGap = 10;
+    const autoStartX = W / 2 - ((AUTO_OPTIONS.length * (autoBtnW + autoGap)) - autoGap) / 2 + autoBtnW / 2;
+    this.autoCashoutBtns = [];
+    AUTO_OPTIONS.forEach((val, i) => {
+      const ax = autoStartX + i * (autoBtnW + autoGap);
+      const ay = 170;
+      const abg = this.add.graphics();
+      drawNestedButton(abg, ax, ay, autoBtnW, autoBtnH, i === 0);
+      if (i === 0) {
+        abg.lineStyle(2, THEME.ivory, 0.6);
+        abg.strokeRect(ax - autoBtnW / 2, ay - autoBtnH / 2, autoBtnW, autoBtnH);
+      }
+      const albl = this.add.text(ax, ay, AUTO_LABELS[i], { ...buttonLabelStyle(14), fontSize: '14px' }).setOrigin(0.5);
+      if (i !== 0) albl.setColor(COLOR.ivory).setStroke(COLOR.woodDeep, 5);
+      const azone = this.add.zone(ax, ay, autoBtnW, autoBtnH).setInteractive({ cursor: 'pointer' });
+      azone.on('pointerdown', () => { if (!this.playing && !this.inBetPhase) this.setAutoCashout(val); });
+      this.autoCashoutBtns.push({ bg: abg, label: albl, value: val, zone: azone });
+    });
+
+    // ── Round history strip ────────────────────────────────────────────────
+    this.add.text(W / 2, 208, 'RECENT ROUNDS', {
+      fontSize: '11px',
+      color: COLOR.goldText,
+      fontFamily: FONT.mono,
+      alpha: 0.7,
+    }).setOrigin(0.5);
+    this.historyContainer = this.add.graphics();
+    this.historyLabels = [];
+    for (let hi = 0; hi < 8; hi++) {
+      this.historyLabels.push(
+        this.add.text(0, 0, '', { fontSize: '11px', fontFamily: FONT.mono, color: '#ffffff' })
+          .setOrigin(0.5).setVisible(false),
+      );
+    }
+    this._drawHistory();
+
     // --- Bet buttons ---
-    const betY = 175;
-    this.add.text(W / 2, 140, 'SELECT BET', {
+    const betY = 245;
+    this.add.text(W / 2, 240, 'SELECT BET', {
       fontSize: '14px',
       color: COLOR.goldText,
       fontFamily: FONT.mono,
@@ -170,15 +224,21 @@ export class CrashScene extends Scene {
     this.allInBetButton = { bg: allInBg, label: allInLabel, zone: allInZone };
 
     // --- Multiplier display (center) ---
-    this.multDisplay = this.add.text(W / 2, 310, '1.00x', {
+    this.multDisplay = this.add.text(W / 2, 340, '1.00x', {
       fontSize: '72px',
       color: COLOR.goldBright,
       fontFamily: FONT.mono,
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
+    this.countdownText = this.add.text(W / 2, 395, '', {
+      fontSize: '20px',
+      color: COLOR.goldText,
+      fontFamily: FONT.mono,
+    }).setOrigin(0.5).setVisible(false);
+
     // --- Graph ---
-    const graphY = 360;
+    const graphY = 415;
     const graphH = 120;
     const graphW = 600;
     const graphX = (W - graphW) / 2;
@@ -190,21 +250,21 @@ export class CrashScene extends Scene {
     this.graphGraphics = this.add.graphics();
 
     // --- Result text ---
-    this.resultText = this.add.text(W / 2, 500, '', {
+    this.resultText = this.add.text(W / 2, 560, '', {
       fontSize: '22px',
       color: COLOR.winGreen,
       fontFamily: FONT.mono,
     }).setOrigin(0.5);
 
     // --- Target reached text ---
-    this.targetReachedText = this.add.text(W / 2, 535, '', {
+    this.targetReachedText = this.add.text(W / 2, 590, '', {
       fontSize: '18px',
       color: COLOR.pink,
       fontFamily: FONT.mono,
     }).setOrigin(0.5).setVisible(false);
 
     // --- PLAY button ---
-    const playY = 590;
+    const playY = 630;
     this.playBtn = this.add.graphics();
     this.playBtnText = this.add.text(W / 2, playY, 'PLAY', buttonLabelStyle(28)).setOrigin(0.5);
     this._drawDisabledBtn(this.playBtn, W / 2, playY, 200, 60);
@@ -220,7 +280,7 @@ export class CrashScene extends Scene {
     this._playZone.on('pointerdown', () => { if (this.canPlay()) this.startRound(); });
 
     // --- CASH OUT button (hidden until round starts) ---
-    const cashOutY = 590;
+    const cashOutY = 630;
     this.cashOutBtn = this.add.graphics().setVisible(false);
     this.cashOutBtnText = this.add.text(W / 2, cashOutY, 'CASH OUT', buttonLabelStyle(28)).setOrigin(0.5).setVisible(false);
     drawNestedButton(this.cashOutBtn, W / 2, cashOutY, 220, 60, false);
@@ -237,14 +297,14 @@ export class CrashScene extends Scene {
     this.flashOverlay.setDepth(90);
 
     // --- EXIT TO HALL button ---
-    const leaveY = 700;
+    const leaveY = 720;
     this.leaveBtn = this.add.graphics();
     this.add.text(W / 2, leaveY, 'EXIT TO HALL', buttonLabelStyle(18)).setOrigin(0.5);
-    drawNestedButton(this.leaveBtn, W / 2, leaveY, 220, 46, false);
+    drawNestedButton(this.leaveBtn, W / 2, leaveY, 220, 36, false);
 
-    const leaveZone = this.add.zone(W / 2, leaveY, 220, 46).setInteractive({ cursor: 'pointer' });
-    leaveZone.on('pointerover', () => { if (!this.playing) drawNestedButton(this.leaveBtn, W / 2, leaveY, 220, 46, true); });
-    leaveZone.on('pointerout', () => { if (!this.playing) drawNestedButton(this.leaveBtn, W / 2, leaveY, 220, 46, false); });
+    const leaveZone = this.add.zone(W / 2, leaveY, 220, 36).setInteractive({ cursor: 'pointer' });
+    leaveZone.on('pointerover', () => { if (!this.playing) drawNestedButton(this.leaveBtn, W / 2, leaveY, 220, 36, true); });
+    leaveZone.on('pointerout', () => { if (!this.playing) drawNestedButton(this.leaveBtn, W / 2, leaveY, 220, 36, false); });
     leaveZone.on('pointerdown', () => { if (!this.playing) this.leave(); });
 
     addCrtScanlines(this);
@@ -298,7 +358,7 @@ export class CrashScene extends Scene {
 
   private refreshBetButtons() {
     const W = 1024;
-    const betY = 175;
+    const betY = 245;
     const btnW = 110;
     const btnH = 50;
     const betSpacing = 140;
@@ -374,7 +434,7 @@ export class CrashScene extends Scene {
 
   private updatePlayButton() {
     const W = 1024;
-    const playY = 590;
+    const playY = 630;
     if (this.canPlay()) {
       drawNestedButton(this.playBtn, W / 2, playY, 200, 60, false);
       this.playBtnText.setColor(COLOR.ivory).setStroke(COLOR.woodDeep, 5);
@@ -394,13 +454,16 @@ export class CrashScene extends Scene {
 
   private startRound() {
     AudioManager.playSfx(this, 'ui-click', { volume: 0.85, cooldownMs: 50, allowOverlap: false });
-    this.playing = true;
     this.cashedOut = false;
     this.warningPlayed = false;
     this.currentMult = 1.0;
     this.graphPoints = [];
+    this.lastGraphTime = 0;
+    this.lastSoundTime = 0;
+    this.lastPulseTime = 0;
 
     this.crashPoint = nextCrashPoint();
+    this.crashTimeForRound = crashTimeFromPoint(this.crashPoint);
 
     this.resultText.setText('');
     this.targetReachedText.setVisible(false);
@@ -408,65 +471,99 @@ export class CrashScene extends Scene {
     this.playBtn.setVisible(false);
     this.playBtnText.setVisible(false);
     this._playZone.setVisible(false);
-    this.cashOutBtn.setVisible(true);
-    this.cashOutBtnText.setVisible(true);
-    this._cashOutZone.setVisible(true);
+    this.cashOutBtn.setVisible(false);
+    this.cashOutBtnText.setVisible(false);
+    this._cashOutZone.setVisible(false);
 
     this.refreshBetButtons();
-
-    this.multDisplay.setText('1.00x');
-    this.multDisplay.setColor(COLOR.goldBright);
     this.graphGraphics.clear();
+    this.multDisplay.setText('STARTING...');
+    this.multDisplay.setColor(COLOR.goldText);
+    this.countdownText.setVisible(false);
 
-    this._scheduleTick();
+    this.inBetPhase = true;
+    this.playing = false;
+    this.betPhaseEnd = this.time.now + 1500;
   }
 
-  private _scheduleTick() {
-    const baseDelay = 50;
-    const delay = baseDelay / Math.max(1, Math.pow(this.currentMult, 0.3));
+  update(): void {
+    if (!this.inBetPhase && !this.playing) return;
+    const now = this.time.now;
 
-    this.tickEvent = this.time.delayedCall(delay, () => {
-      this._tick();
-    });
-  }
-
-  private _tick() {
-    if (!this.playing) return;
-
-    const increment = 0.02 + this.currentMult * 0.005;
-    this.currentMult = Math.round((this.currentMult + increment) * 100) / 100;
-
-    const color = this.multColor(this.currentMult);
-    this.multDisplay.setText(this.currentMult.toFixed(2) + 'x');
-    this.multDisplay.setColor(color);
-    AudioManager.playSfx(this, 'ui-hover', {
-      volume: Math.min(0.16 + this.currentMult * 0.02, 0.28),
-      rate: Math.min(1 + this.currentMult * 0.03, 1.35),
-      cooldownMs: 180,
-      allowOverlap: false,
-    });
-
-    this.tweens.add({
-      targets: this.multDisplay,
-      scaleX: { from: 1.05, to: 1.0 },
-      scaleY: { from: 1.05, to: 1.0 },
-      duration: 80,
-      ease: 'Sine.easeOut',
-    });
-
-    this._drawGraph();
-
-    if (!this.warningPlayed && this.crashPoint - this.currentMult <= 0.35) {
-      this.warningPlayed = true;
-      AudioManager.playSfx(this, 'crash-warning', { volume: 1.35, cooldownMs: 200, allowOverlap: false });
+    // ── Betting countdown phase ──────────────────────────────────────────
+    if (this.inBetPhase) {
+      const remaining = this.betPhaseEnd - now;
+      if (remaining <= 0) {
+        this.inBetPhase = false;
+        this.playing = true;
+        this.roundStartTime = now;
+        this.multDisplay.setText('1.00x');
+        this.multDisplay.setColor(COLOR.goldBright);
+        this.cashOutBtn.setVisible(true);
+        this.cashOutBtnText.setVisible(true);
+        this._cashOutZone.setVisible(true);
+        this.countdownText.setVisible(false);
+      }
+      return;
     }
 
-    if (this.currentMult >= this.crashPoint) {
+    // ── Running phase ────────────────────────────────────────────────────
+    const t = (now - this.roundStartTime) / 1000;
+    const mult = Math.exp(CRASH_K * t);
+    this.currentMult = Math.floor(mult * 100) / 100;
+
+    // Check crash
+    if (t >= this.crashTimeForRound) {
+      this.currentMult = this.crashPoint;
       this._doCrash();
       return;
     }
 
-    this._scheduleTick();
+    // Auto-cashout
+    if (this.autoCashout > 0 && this.currentMult >= this.autoCashout && !this.cashedOut) {
+      this.doCashOut();
+      return;
+    }
+
+    // Warn when close to crash
+    if (!this.warningPlayed && (this.crashTimeForRound - t) <= 0.5) {
+      this.warningPlayed = true;
+      AudioManager.playSfx(this, 'crash-warning', { volume: 1.35, cooldownMs: 200, allowOverlap: false });
+    }
+
+    // Update multiplier display
+    const color = this.multColor(this.currentMult);
+    this.multDisplay.setText(this.currentMult.toFixed(2) + 'x');
+    this.multDisplay.setColor(color);
+
+    // Pulse animation (rate-limited)
+    if (now - this.lastPulseTime > 100) {
+      this.lastPulseTime = now;
+      this.tweens.add({
+        targets: this.multDisplay,
+        scaleX: { from: 1.04, to: 1.0 },
+        scaleY: { from: 1.04, to: 1.0 },
+        duration: 80,
+        ease: 'Sine.easeOut',
+      });
+    }
+
+    // Tick sound (rate-limited)
+    if (now - this.lastSoundTime > 180) {
+      this.lastSoundTime = now;
+      AudioManager.playSfx(this, 'ui-hover', {
+        volume: Math.min(0.16 + this.currentMult * 0.02, 0.28),
+        rate: Math.min(1 + this.currentMult * 0.03, 1.35),
+        cooldownMs: 180,
+        allowOverlap: false,
+      });
+    }
+
+    // Graph (rate-limited to ~15fps)
+    if (now - this.lastGraphTime > 66) {
+      this.lastGraphTime = now;
+      this._drawGraph();
+    }
   }
 
   private _drawGraph() {
@@ -474,7 +571,7 @@ export class CrashScene extends Scene {
     const graphW = 600;
     const graphH = 120;
     const graphX = (W - graphW) / 2;
-    const graphY = 360;
+    const graphY = 415;
     const maxMult = Math.max(this.currentMult + 1, 3);
     const maxPoints = 120;
 
@@ -502,14 +599,56 @@ export class CrashScene extends Scene {
     this.graphGraphics.strokePath();
   }
 
+  private setAutoCashout(value: number): void {
+    this.autoCashout = value;
+    const W = 1024;
+    const autoBtnW = 72, autoBtnH = 30, autoGap = 10;
+    const autoStartX = W / 2 - ((this.autoCashoutBtns.length * (autoBtnW + autoGap)) - autoGap) / 2 + autoBtnW / 2;
+    this.autoCashoutBtns.forEach(({ bg, label, value: val }, i) => {
+      const ax = autoStartX + i * (autoBtnW + autoGap);
+      const ay = 170;
+      const selected = val === value;
+      drawNestedButton(bg, ax, ay, autoBtnW, autoBtnH, selected);
+      if (selected) {
+        bg.lineStyle(2, THEME.ivory, 0.6);
+        bg.strokeRect(ax - autoBtnW / 2, ay - autoBtnH / 2, autoBtnW, autoBtnH);
+      }
+      label.setColor(COLOR.ivory).setStroke(COLOR.woodDeep, 5);
+    });
+    AudioManager.playSfx(this, 'bet-select', { volume: 1.0, cooldownMs: 50, allowOverlap: false });
+  }
+
+  private _drawHistory(): void {
+    const W = 1024;
+    this.historyContainer.clear();
+    const pillW = 52, pillH = 18, pillGap = 6;
+    const count = Math.min(this.roundHistory.length, 8);
+    if (count === 0) return;
+    const totalW = count * (pillW + pillGap) - pillGap;
+    const startX = W / 2 - totalW / 2;
+    const py = 222;
+    for (let i = 0; i < count; i++) {
+      const cp = this.roundHistory[this.roundHistory.length - count + i];
+      const px = startX + i * (pillW + pillGap) + pillW / 2;
+      const col = cp < 1.5 ? 0xb83030 : cp < 3 ? 0xb8821a : 0x22a022;
+      this.historyContainer.fillStyle(col, 0.85);
+      this.historyContainer.fillRoundedRect(px - pillW / 2, py - pillH / 2, pillW, pillH, 4);
+      this.historyLabels[i].setVisible(true);
+      this.historyLabels[i].setPosition(px, py);
+      this.historyLabels[i].setText(cp.toFixed(2) + 'x');
+    }
+    for (let i = count; i < 8; i++) {
+      this.historyLabels[i].setVisible(false);
+    }
+  }
+
   private _doCrash() {
     AudioManager.playSfx(this, 'crash', { volume: 1.45, cooldownMs: 250, allowOverlap: false });
     this.playing = false;
 
-    if (this.tickEvent) {
-      this.tickEvent.remove(false);
-      this.tickEvent = null;
-    }
+    this.roundHistory.push(this.crashPoint);
+    if (this.roundHistory.length > 8) this.roundHistory.shift();
+    this._drawHistory();
 
     this.cameras.main.shake(250, 0.01);
 
@@ -567,11 +706,11 @@ export class CrashScene extends Scene {
     this.cashedOut = true;
     const mult = this.currentMult;
 
-    if (this.tickEvent) {
-      this.tickEvent.remove(false);
-      this.tickEvent = null;
-    }
     this.playing = false;
+
+    this.roundHistory.push(this.crashPoint);
+    if (this.roundHistory.length > 8) this.roundHistory.shift();
+    this._drawHistory();
 
     const betCost = this.getBetCost();
     const result = resolve({

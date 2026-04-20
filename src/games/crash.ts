@@ -1,22 +1,20 @@
 export interface CrashInput {
   coins: number;
   bet: number;
-  cashOutAt?: number;   // multiplier at which player cashed out; undefined = never cashed out
-  crashPoint: number;   // where this round crashed
+  cashOutAt?: number;
+  crashPoint: number;
 }
 
 export interface CrashResult {
   won: boolean;
-  payout: number;       // total paid (bet * cashOutAt) or 0 if crashed before cashout
+  payout: number;
   newCoins: number;
-  displayMultiplier: string; // e.g. "1.87x" or "CRASHED"
+  displayMultiplier: string;
 }
 
 export function resolve(input: CrashInput): CrashResult {
   const { coins, bet, cashOutAt, crashPoint } = input;
-
   if (cashOutAt !== undefined && cashOutAt <= crashPoint) {
-    // Player cashed out before crash
     const payout = Math.floor(bet * cashOutAt);
     return {
       won: true,
@@ -25,8 +23,6 @@ export function resolve(input: CrashInput): CrashResult {
       displayMultiplier: cashOutAt.toFixed(2) + 'x',
     };
   }
-
-  // Crashed before cashout
   return {
     won: false,
     payout: 0,
@@ -36,20 +32,24 @@ export function resolve(input: CrashInput): CrashResult {
 }
 
 /**
- * RNG helper: returns a crash point between 1.05 and 6.0, strongly weighted
- * toward early crashes so high multipliers are uncommon.
- * Distribution: x = 1 / (1 - u^1.35) where u is random [0,1), clamped to [1.05, 6].
- * Sub-1.2 results are rerolled ~85% of the time to keep instant-bust crashes rare.
+ * Standard crash distribution with 1% house edge:
+ *   crashPoint = floor((0.99 / (1 - u)) * 100) / 100
+ * Minimum 1.00. Produces the correct long-tail distribution.
  */
 export function nextCrashPoint(): number {
-  while (true) {
-    const u = Math.random();
-    const raw = 1 / (1 - Math.pow(u, 1.35));
-    const point = Math.min(6, Math.max(1.05, raw));
-    if (point >= 1.2 || Math.random() < 0.15) return point;
-  }
+  const u = Math.random();
+  const raw = 0.99 / (1 - u);
+  return Math.max(1.00, Math.floor(raw * 100) / 100);
 }
 
 export function isValidBet(coins: number, bet: number): boolean {
   return bet >= 5 && bet <= 50 && bet <= coins;
+}
+
+/** Growth rate constant — multiplier = e^(CRASH_K * seconds) */
+export const CRASH_K = 0.07;
+
+/** Time (seconds) at which crashPoint is reached under exponential growth. */
+export function crashTimeFromPoint(cp: number): number {
+  return Math.log(Math.max(cp, 1.001)) / CRASH_K;
 }
