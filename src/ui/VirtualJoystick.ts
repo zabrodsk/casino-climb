@@ -73,6 +73,10 @@ export class VirtualJoystick {
     this.dy = dist > deadzone ? Math.sin(angle) : 0;
   }
 
+  getObjects(): Phaser.GameObjects.Arc[] {
+    return [this.base, this.thumb];
+  }
+
   destroy(): void {
     this.scene.input.off('pointerdown',      this.onDown, this);
     this.scene.input.off('pointermove',      this.onMove, this);

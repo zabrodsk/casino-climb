@@ -344,9 +344,6 @@ export class DungeonScene extends Scene {
       right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
 
-    this.joystick = new VirtualJoystick(this);
-    this.buildTouchActionButtons();
-
     // ── Camera ────────────────────────────────────────────────────────────
     this.cameras.main.setBounds(-TILE_SIZE, -TILE_SIZE, mapW + TILE_SIZE * 2, mapH + TILE_SIZE * 2);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -459,6 +456,13 @@ export class DungeonScene extends Scene {
     });
     this._lastHudCoins = getCoins();
     this.cameras.main.ignore(this.hud.getObjects());
+
+    // Joystick + touch buttons must be created AFTER uiCam.ignore so the
+    // uiCam renders them; tell main camera (5x zoom world cam) to ignore them.
+    this.joystick = new VirtualJoystick(this);
+    this.cameras.main.ignore(this.joystick.getObjects());
+    this.buildTouchActionButtons();
+
     this.ensureDevModeLabel();
 
     // ── game-complete listener ─────────────────────────────────────────────
@@ -756,6 +760,10 @@ export class DungeonScene extends Scene {
     };
     this.touchCollectBtn = makeBtn(934, H - 90, 'COLLECT', 0x1d5a1d, () => { this.touchCollectPressed = true; });
     this.touchCashBtn    = makeBtn(820, H - 90, 'CASH',    0x5a1d1d, () => { this.touchCashPressed = true; });
+    this.cameras.main.ignore([
+      this.touchCollectBtn.arc, this.touchCollectBtn.label,
+      this.touchCashBtn.arc,    this.touchCashBtn.label,
+    ]);
   }
 
   private setTouchCrossingBtnsVisible(v: boolean): void {
