@@ -726,6 +726,8 @@ export class SlotMachineScene extends Scene {
     this.clearTransientEffects();
     this.resetReelPresentation();
     this.syncUiToRoundState();
+    // Re-enable wager controls after a completed round when spinning again.
+    this.refreshWagerControls();
   }
 
   private syncUiToRoundState(): void {
@@ -786,17 +788,20 @@ export class SlotMachineScene extends Scene {
   private cleanupSceneState(): void {
     this.pendingResultTimer?.remove(false);
     this.pendingResultTimer = null;
-    this.tweens.killTweensOf([
-      this.statusText,
-      this.leverKnob,
-      this.paylineGraphics,
-      ...this.reelContainers,
-      ...this.transientEffects,
-    ]);
-    this.clearTransientEffects();
-    this.resetReelPresentation();
-    this.stopSpinSound();
-    this.hideResultPanel();
+    try {
+      this.tweens.killTweensOf([
+        this.statusText,
+        this.leverKnob,
+        this.paylineGraphics,
+        ...this.reelContainers,
+        ...this.transientEffects,
+      ]);
+    } catch {
+      // Best-effort cleanup only; avoid shutdown-time crashes.
+    }
+    try { this.clearTransientEffects(); } catch { /* no-op */ }
+    try { this.stopSpinSound(); } catch { /* no-op */ }
+    // Avoid forcing extra UI mutations during shutdown; scene stop handles teardown.
     this.input.keyboard?.off('keydown-ESC', this.handleEsc);
   }
 
@@ -828,6 +833,8 @@ export class SlotMachineScene extends Scene {
   }
 
   private stopSpinSound(): void {
+    // Force-stop any orphaned spin SFX instances by key.
+    try { this.sound.stopByKey('wheel-spin'); } catch { /* no-op */ }
     if (!this.spinSound) return;
     try { this.spinSound.stop(); this.spinSound.destroy(); } catch { /* no-op */ }
     this.spinSound = null;
@@ -892,13 +899,22 @@ export class SlotMachineScene extends Scene {
     this.resultLeaveZone.disableInteractive();
     this.wagerButtons.forEach(({ zone }) => zone.disableInteractive());
     this.allInWagerButton.zone.disableInteractive();
+    const dungeon = this.scene.manager.getScene('DungeonScene');
+    // No fade-out on exit. Let DungeonScene own the transition via game-complete.
     try {
-      this.scene.get('DungeonScene').events.emit('game-complete', {
-        coins: this.currentCoins,
-        won: this.currentCoins > 0,
-      });
+      if (dungeon) {
+        dungeon.events.emit('game-complete', {
+          coins: this.currentCoins,
+          won: this.currentCoins > 0,
+        });
+      }
     } catch (_) {
-      // DungeonScene may not exist in isolated testing.
+      // Fallback path if event delivery fails.
+      if (dungeon) {
+        dungeon.cameras.main.resetFX();
+        dungeon.cameras.main.setAlpha(1);
+      }
+      if (this.scene.isPaused('DungeonScene')) this.scene.resume('DungeonScene');
     }
     this.scene.stop('SlotMachineScene');
   }

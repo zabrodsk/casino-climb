@@ -37,6 +37,7 @@ export class WheelScene extends Scene {
   private wheelSpeechBg: GameObjects.Graphics | null = null;
   private wheelSpeechText: GameObjects.Text | null = null;
   private wheelSpeechDismissTimer: Phaser.Time.TimerEvent | null = null;
+  private exitRequested = false;
 
   constructor() {
     super('WheelScene');
@@ -44,6 +45,7 @@ export class WheelScene extends Scene {
 
   init(data: { coins: number }): void {
     this.currentCoins = data.coins ?? 200;
+    this.exitRequested = false;
   }
 
   create(): void {
@@ -550,19 +552,25 @@ export class WheelScene extends Scene {
   }
 
   private leave(): void {
+    if (this.exitRequested) return;
+    this.exitRequested = true;
     this.stopSpinSound();
-    this.cameras.main.fadeOut(300, 0, 0, 0);
-    this.cameras.main.once('camerafadeoutcomplete', () => {
-      try {
-        this.scene.get('DungeonScene').events.emit('game-complete', {
+    const dungeon = this.scene.manager.getScene('DungeonScene');
+    try {
+      if (dungeon) {
+        dungeon.events.emit('game-complete', {
           coins: this.currentCoins,
           won: true,
         });
-      } catch (_) {
-        // no-op
       }
-      this.scene.stop('WheelScene');
-    });
+    } catch (_) {
+      if (dungeon) {
+        dungeon.cameras.main.resetFX();
+        dungeon.cameras.main.setAlpha(1);
+      }
+      if (this.scene.isPaused('DungeonScene')) this.scene.resume('DungeonScene');
+    }
+    this.scene.stop('WheelScene');
   }
 
   private showWheelSpeech(text: string, durationMs = 1600, centerY = WHEEL_CY - 2): void {
@@ -646,6 +654,7 @@ export class WheelScene extends Scene {
   }
 
   private stopSpinSound(): void {
+    try { this.sound.stopByKey('wheel-spin'); } catch { /* no-op */ }
     if (!this.spinSound) return;
     try {
       this.spinSound.stop();

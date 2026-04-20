@@ -1227,6 +1227,11 @@ export class DungeonScene extends Scene {
     };
 
     this.player.setVelocity(0, 0);
+    // Reset camera FX state before starting a new transition; prevents stuck black state on re-entry.
+    this.cameras.main.resetFX();
+    this.cameras.main.setAlpha(1);
+    this.uiCam.resetFX();
+    this.uiCam.setAlpha(1);
     if (gameSceneKey === 'VaultScene') {
       // Vault is sensitive to cross-scene fade state on re-entry; launch directly.
       this.cameras.main.resetFX();
@@ -1409,11 +1414,9 @@ export class DungeonScene extends Scene {
       try {
         this.cameras.main.resetFX();
         this.cameras.main.setAlpha(1);
-        this.cameras.main.fadeIn(300, 0, 0, 0);
-      } catch (_) {}
-      try {
         this.uiCam.resetFX();
         this.uiCam.setAlpha(1);
+        this.cameras.main.fadeIn(300, 0, 0, 0);
         this.uiCam.fadeIn(300, 0, 0, 0);
       } catch (_) {}
       this.doorTriggered = false;

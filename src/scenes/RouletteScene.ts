@@ -78,6 +78,7 @@ export class RouletteScene extends Scene {
   private totalBetText!: GameObjects.Text;
 
   private spinning = false;
+  private exitRequested = false;
 
   constructor() {
     super('RouletteScene');
@@ -87,6 +88,7 @@ export class RouletteScene extends Scene {
     this.currentCoins = data.coins ?? 200;
     this.bets = [];
     this.spinning = false;
+    this.exitRequested = false;
   }
 
   create(): void {
@@ -794,6 +796,7 @@ export class RouletteScene extends Scene {
   }
 
   private stopSpinSound(): void {
+    try { this.sound.stopByKey('wheel-spin'); } catch { /* no-op */ }
     if (!this.spinSound) return;
     try { this.spinSound.stop(); this.spinSound.destroy(); } catch { /* no-op */ }
     this.spinSound = null;
@@ -804,16 +807,24 @@ export class RouletteScene extends Scene {
   }
 
   private leave(): void {
+    if (this.exitRequested) return;
+    this.exitRequested = true;
     this.stopSpinSound();
-    this.cameras.main.fadeOut(300, 0, 0, 0);
-    this.cameras.main.once('camerafadeoutcomplete', () => {
-      try {
-        this.scene.get('DungeonScene').events.emit('game-complete', {
+    const dungeon = this.scene.manager.getScene('DungeonScene');
+    try {
+      if (dungeon) {
+        dungeon.events.emit('game-complete', {
           coins: this.currentCoins,
           won: this.currentCoins > 0,
         });
-      } catch (_) { /* no-op */ }
-      this.scene.stop('RouletteScene');
-    });
+      }
+    } catch (_) {
+      if (dungeon) {
+        dungeon.cameras.main.resetFX();
+        dungeon.cameras.main.setAlpha(1);
+      }
+      if (this.scene.isPaused('DungeonScene')) this.scene.resume('DungeonScene');
+    }
+    this.scene.stop('RouletteScene');
   }
 }
