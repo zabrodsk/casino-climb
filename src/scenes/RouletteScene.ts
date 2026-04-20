@@ -79,6 +79,7 @@ export class RouletteScene extends Scene {
 
   private spinning = false;
   private exitRequested = false;
+  private readonly handleEsc = () => this.leave();
 
   constructor() {
     super('RouletteScene');
@@ -86,6 +87,8 @@ export class RouletteScene extends Scene {
 
   init(data: { coins: number }): void {
     this.currentCoins = data.coins ?? 200;
+    this.chipSelector = [];
+    this.betSpots = [];
     this.bets = [];
     this.spinning = false;
     this.exitRequested = false;
@@ -96,6 +99,9 @@ export class RouletteScene extends Scene {
     this.events.once('shutdown', () => {
       HouseController.enable();
       this.stopSpinSound();
+      this.input.keyboard?.off('keydown-ESC', this.handleEsc);
+      this.chipSelector = [];
+      this.betSpots = [];
     });
     this.cameras.main.setRoundPixels(true);
 
@@ -122,7 +128,8 @@ export class RouletteScene extends Scene {
 
     addGameplaySettingsGear(this, 'RouletteScene');
     registerDeveloperUnlockHotkey(this, () => this.leave());
-    this.input.keyboard?.on('keydown-ESC', () => this.leave());
+    this.input.keyboard?.off('keydown-ESC', this.handleEsc);
+    this.input.keyboard?.on('keydown-ESC', this.handleEsc);
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }

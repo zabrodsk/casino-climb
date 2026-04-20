@@ -96,6 +96,9 @@ export class SlotMachineScene extends Scene {
 
   init(data: { coins: number }): void {
     this.currentCoins = data.coins ?? 200;
+    this.reelContainers = [];
+    this.reelStrips = [];
+    this.wagerButtons = [];
     this.roundState = createSlotMachineRoundState();
     this.pendingResultTimer = null;
     this.transientEffects = [];
@@ -134,6 +137,7 @@ export class SlotMachineScene extends Scene {
 
     addGameplaySettingsGear(this, 'SlotMachineScene');
     registerDeveloperUnlockHotkey(this, () => this.leave());
+    this.input.keyboard?.off('keydown-ESC', this.handleEsc);
     this.input.keyboard?.on('keydown-ESC', this.handleEsc);
 
     this.cameras.main.fadeIn(300, 0, 0, 0);
@@ -803,6 +807,9 @@ export class SlotMachineScene extends Scene {
     try { this.stopSpinSound(); } catch { /* no-op */ }
     // Avoid forcing extra UI mutations during shutdown; scene stop handles teardown.
     this.input.keyboard?.off('keydown-ESC', this.handleEsc);
+    this.reelContainers = [];
+    this.reelStrips = [];
+    this.wagerButtons = [];
   }
 
   // ── Audio ────────────────────────────────────────────────────────────
