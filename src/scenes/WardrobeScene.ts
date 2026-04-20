@@ -10,7 +10,7 @@ import {
   getEquipped,
   getPalette,
 } from '../state/wardrobeState';
-import { generatePlayerTexture, SpritePalette } from '../ui/playerSprite';
+import { generatePlayerTexture, SpritePalette, syncPlayerPresentation } from '../ui/playerSprite';
 import { AudioManager } from '../audio/AudioManager';
 
 type Tab = 'figure' | 'hair' | 'outfit' | 'accessory';
@@ -526,6 +526,6 @@ export class WardrobeScene extends Scene {
   }
 
   private refreshPlayerTexture(): void {
-    generatePlayerTexture(this, 'player', getPalette());
+    syncPlayerPresentation(this, getPalette());
   }
 }

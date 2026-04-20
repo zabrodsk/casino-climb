@@ -27,6 +27,34 @@ export function generatePlayerTexture(
   }
 }
 
+export function syncPlayerPresentation(
+  scene: Phaser.Scene,
+  palette: SpritePalette = {},
+  key = 'player',
+): void {
+  generatePlayerTexture(scene, key, palette);
+
+  if (scene.anims.exists('player-idle')) {
+    scene.anims.remove('player-idle');
+  }
+  scene.anims.create({
+    key: 'player-idle',
+    frames: scene.anims.generateFrameNumbers(key, { start: 0, end: 3 }),
+    frameRate: 4,
+    repeat: -1,
+  });
+
+  if (scene.anims.exists('player-walk')) {
+    scene.anims.remove('player-walk');
+  }
+  scene.anims.create({
+    key: 'player-walk',
+    frames: scene.anims.generateFrameNumbers(key, { start: 4, end: 11 }),
+    frameRate: 12,
+    repeat: -1,
+  });
+}
+
 function getDrawFn(id: string): (g: GameObjects.Graphics, ox: number, oy: number, frameIdx: number, palette: SpritePalette) => void {
   switch (id) {
     case 'high-roller': return drawHighRollerFrame;

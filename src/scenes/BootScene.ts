@@ -1,6 +1,6 @@
 import { Scene, GameObjects } from 'phaser';
 import { AudioManager } from '../audio/AudioManager';
-import { generatePlayerTexture } from '../ui/playerSprite';
+import { syncPlayerPresentation } from '../ui/playerSprite';
 import { getPalette } from '../state/wardrobeState';
 import { consumeRefreshResume } from '../dev/refreshResume';
 import { setCoins, setFloor } from '../state/coinState';
@@ -36,24 +36,8 @@ export class BootScene extends Scene {
   }
 
   create(): void {
-    // Generate procedural hooded-gambler player spritesheet (384x48, 12 frames)
-    generatePlayerTexture(this, 'player', getPalette());
-
-    // Idle: frames 0-3
-    this.anims.create({
-      key: 'player-idle',
-      frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
-      frameRate: 4,
-      repeat: -1,
-    });
-
-    // Walk: frames 4-11 (8-frame cycle)
-    this.anims.create({
-      key: 'player-walk',
-      frames: this.anims.generateFrameNumbers('player', { start: 4, end: 11 }),
-      frameRate: 12,
-      repeat: -1,
-    });
+    // Generate the procedural player spritesheet and matching animations.
+    syncPlayerPresentation(this, getPalette());
 
     // Also generate legacy programmatic textures for stairs/door overlays
     this._generateFallbackTextures();

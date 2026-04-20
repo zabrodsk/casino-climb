@@ -3,7 +3,7 @@ import { AudioManager } from '../audio/AudioManager';
 import { resetRun } from '../state/coinState';
 import { resetNarrativeRunState } from '../state/narrativeState';
 import { getPalette } from '../state/wardrobeState';
-import { generatePlayerTexture } from '../ui/playerSprite';
+import { syncPlayerPresentation } from '../ui/playerSprite';
 
 /**
  * OutdoorScene — shown when the player chooses "LEAVE" after beating the vault.
@@ -255,7 +255,7 @@ export class OutdoorScene extends Scene {
     });
 
     // Player sprite at 4× scale facing right
-    generatePlayerTexture(this, 'player', getPalette());
+    syncPlayerPresentation(this, getPalette());
     if (this.textures.exists('player')) {
       const sprite = this.add.sprite(px, py, 'player', 0);
       sprite.setOrigin(0.5, 1).setScale(4);

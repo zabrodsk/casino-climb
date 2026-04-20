@@ -5,7 +5,7 @@ import { HUD } from '../ui/HUD';
 import { FLOOR_CONFIG, FloorConfig } from '../data/floorConfig';
 import { drawFramedPanel, drawNestedButton, buttonLabelStyle, neonTitleStyle, bodyTextStyle } from '../ui/theme';
 import { AudioManager } from '../audio/AudioManager';
-import { generatePlayerTexture } from '../ui/playerSprite';
+import { syncPlayerPresentation } from '../ui/playerSprite';
 import { addGameplaySettingsGear } from '../ui/gameplaySettings';
 import { isDeveloperModeEnabled, registerDeveloperUnlockHotkey } from '../dev/developerHotkeys';
 import {
@@ -329,7 +329,7 @@ export class DungeonScene extends Scene {
 
     const startX = playerStart.col * TILE_SIZE + 8;
     const startY = playerStart.row * TILE_SIZE + 8;
-    generatePlayerTexture(this, 'player', getPalette());
+    syncPlayerPresentation(this, getPalette());
     this.player = this.physics.add.sprite(startX, startY, 'player');
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(5);
