@@ -519,7 +519,7 @@ export class WardrobeScene extends Scene {
       const success = buyItem(item.id);
       if (success) {
         equipItem(item.id);
-        AudioManager.playSfx(this, 'goal-victory', { volume: 0.4, cooldownMs: 100, allowOverlap: false });
+        AudioManager.playSfx(this, 'wardrobe-buy', { volume: 0.8, cooldownMs: 100, allowOverlap: false });
       } else {
         AudioManager.playSfx(this, 'ui-hover', { volume: 0.3, cooldownMs: 50, allowOverlap: false });
         return;
