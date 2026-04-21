@@ -28,7 +28,23 @@ export class WardrobeScene extends Scene {
   private actionBtnLabel!: GameObjects.Text;
   private actionBtnFrame!: GameObjects.Graphics;
   private itemCards: GameObjects.Container[] = [];
+  private itemGridContainer!: GameObjects.Container;
+  private itemViewportZone!: GameObjects.Zone;
+  private itemScrollTrack!: GameObjects.Graphics;
+  private itemScrollThumb!: GameObjects.Graphics;
+  private itemScrollOffset = 0;
+  private itemContentHeight = 0;
   private tabButtons: Map<Tab, GameObjects.Container> = new Map();
+
+  private readonly itemPanelX = 360;
+  private readonly itemPanelY = 100;
+  private readonly itemPanelW = 600;
+  private readonly itemPanelH = 540;
+  private readonly itemViewportX = 390;
+  private readonly itemViewportY = 168;
+  private readonly itemViewportW = 540;
+  private readonly itemViewportH = 452;
+  private readonly itemScrollStep = 96;
 
   constructor() { super('WardrobeScene'); }
 
@@ -115,12 +131,44 @@ export class WardrobeScene extends Scene {
   }
 
   private drawItemPanel(): void {
-    const px = 360, py = 100, pw = 600, ph = 540;
+    const px = this.itemPanelX, py = this.itemPanelY, pw = this.itemPanelW, ph = this.itemPanelH;
     const bg = this.add.graphics();
     bg.fillStyle(0x1a0c11, 0.95);
     bg.fillRoundedRect(px, py, pw, ph, 10);
     bg.lineStyle(2, 0xc8a364, 0.8);
     bg.strokeRoundedRect(px, py, pw, ph, 10);
+
+    const viewportFrame = this.add.graphics();
+    viewportFrame.lineStyle(1, 0x5a3a2a, 0.45);
+    viewportFrame.strokeRoundedRect(this.itemViewportX - 6, this.itemViewportY - 6, this.itemViewportW + 12, this.itemViewportH + 12, 8);
+
+    this.itemGridContainer = this.add.container(0, 0);
+    const maskGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+    maskGraphics.fillStyle(0xffffff);
+    maskGraphics.fillRect(this.itemViewportX, this.itemViewportY, this.itemViewportW, this.itemViewportH);
+    this.itemGridContainer.setMask(maskGraphics.createGeometryMask());
+
+    this.itemViewportZone = this.add.zone(
+      this.itemViewportX + this.itemViewportW / 2,
+      this.itemViewportY + this.itemViewportH / 2,
+      this.itemViewportW,
+      this.itemViewportH,
+    );
+    // Scene-level wheel listener scoped to the viewport bounds — avoids the
+    // interactive zone blocking pointerdown from reaching item cards beneath it.
+    this.input.on('wheel', (pointer: Phaser.Input.Pointer, _targets: unknown, _dx: number, dy: number) => {
+      if (
+        pointer.x >= this.itemViewportX &&
+        pointer.x <= this.itemViewportX + this.itemViewportW &&
+        pointer.y >= this.itemViewportY &&
+        pointer.y <= this.itemViewportY + this.itemViewportH
+      ) {
+        this.adjustScroll(dy);
+      }
+    });
+
+    this.itemScrollTrack = this.add.graphics();
+    this.itemScrollThumb = this.add.graphics();
 
     this.drawTabs(px, py, pw);
     this.drawItemGrid(px, py);
@@ -170,6 +218,7 @@ export class WardrobeScene extends Scene {
         AudioManager.playSfx(this, 'ui-click', { volume: 0.7, cooldownMs: 50, allowOverlap: false });
         this.activeTab = tab;
         this.selectedItem = null;
+        this.itemScrollOffset = 0;
         this.refreshTabs(panelX, panelY, tabW);
         this.rebuildItemGrid();
         this.updateActionButton();
@@ -203,8 +252,15 @@ export class WardrobeScene extends Scene {
       const row = Math.floor(idx / cols);
       const cx = startX + col * (cardW + 20);
       const cy = startY + row * (cardH + 16);
-      this.itemCards.push(this.createItemCard(item, cx, cy, cardW, cardH));
+      const card = this.createItemCard(item, cx, cy, cardW, cardH);
+      this.itemCards.push(card);
+      this.itemGridContainer.add(card);
     });
+
+    const rows = Math.max(1, Math.ceil(items.length / cols));
+    this.itemContentHeight = rows * cardH + Math.max(0, rows - 1) * 16;
+    this.applyScrollPosition();
+    this.redrawScrollBar();
   }
 
   private createItemCard(item: WardrobeItem, x: number, y: number, w: number, h: number): GameObjects.Container {
@@ -336,7 +392,8 @@ export class WardrobeScene extends Scene {
   private rebuildItemGrid(): void {
     this.itemCards.forEach(c => c.destroy());
     this.itemCards = [];
-    this.drawItemGrid(360, 100);
+    this.itemContentHeight = 0;
+    this.drawItemGrid(this.itemPanelX, this.itemPanelY);
   }
 
   private drawBottomBar(): void {
@@ -479,7 +536,7 @@ export class WardrobeScene extends Scene {
     generatePlayerTexture(this, 'wardrobe-preview', this.previewPalette);
     this.previewSprite.setTexture('wardrobe-preview');
     this.goldText.setText(`${getGold().toLocaleString()} G`);
-    this.refreshTabs(360, 100, Math.floor(600 / 4));
+    this.refreshTabs(this.itemPanelX, this.itemPanelY, Math.floor(this.itemPanelW / 4));
     this.rebuildItemGrid();
     this.updateActionButton();
   }
@@ -527,5 +584,53 @@ export class WardrobeScene extends Scene {
 
   private refreshPlayerTexture(): void {
     syncPlayerPresentation(this, getPalette());
+  }
+
+  private adjustScroll(deltaY: number): void {
+    if (this.itemContentHeight <= this.itemViewportH) return;
+    const direction = deltaY === 0 ? 0 : deltaY > 0 ? 1 : -1;
+    this.itemScrollOffset += direction * this.itemScrollStep;
+    this.applyScrollPosition();
+    this.redrawScrollBar();
+  }
+
+  private applyScrollPosition(): void {
+    const maxOffset = Math.max(0, this.itemContentHeight - this.itemViewportH);
+    this.itemScrollOffset = Phaser.Math.Clamp(this.itemScrollOffset, 0, maxOffset);
+    if (this.itemGridContainer) {
+      this.itemGridContainer.y = -this.itemScrollOffset;
+    }
+  }
+
+  private redrawScrollBar(): void {
+    if (!this.itemScrollTrack || !this.itemScrollThumb) return;
+
+    const trackX = this.itemPanelX + this.itemPanelW - 20;
+    const trackY = this.itemViewportY;
+    const trackH = this.itemViewportH;
+
+    this.itemScrollTrack.clear();
+    this.itemScrollThumb.clear();
+
+    this.itemScrollTrack.fillStyle(0x120a0d, 0.9);
+    this.itemScrollTrack.fillRoundedRect(trackX, trackY, 8, trackH, 4);
+    this.itemScrollTrack.lineStyle(1, 0x5a3a2a, 0.8);
+    this.itemScrollTrack.strokeRoundedRect(trackX, trackY, 8, trackH, 4);
+
+    if (this.itemContentHeight <= this.itemViewportH) {
+      this.itemScrollThumb.fillStyle(0x3a2a2a, 0.8);
+      this.itemScrollThumb.fillRoundedRect(trackX + 1, trackY + 1, 6, trackH - 2, 3);
+      return;
+    }
+
+    const maxOffset = this.itemContentHeight - this.itemViewportH;
+    const thumbH = Math.max(48, Math.round((this.itemViewportH / this.itemContentHeight) * trackH));
+    const thumbTravel = trackH - thumbH;
+    const thumbY = trackY + Math.round((this.itemScrollOffset / maxOffset) * thumbTravel);
+
+    this.itemScrollThumb.fillStyle(0xd4b27b, 0.95);
+    this.itemScrollThumb.fillRoundedRect(trackX + 1, thumbY, 6, thumbH, 3);
+    this.itemScrollThumb.lineStyle(1, 0xf0cf98, 0.9);
+    this.itemScrollThumb.strokeRoundedRect(trackX + 1, thumbY, 6, thumbH, 3);
   }
 }
