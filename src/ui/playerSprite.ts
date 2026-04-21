@@ -157,17 +157,17 @@ function drawPlayerFrame(
   g.fillStyle(0x7a604f);
   g.fillRect(cx - 2, headTop + 12, 4, 1);
 
-  // Neck + shoulders
+  // Neck + shoulders — keep a 1px air gap so only the neck connects the head to the body
   g.fillStyle(skin);
   g.fillRect(cx - 2, headTop + 14, 4, 3);
   g.fillStyle(skinShade);
   g.fillRect(cx - 2, headTop + 15, 4, 2);
   g.fillStyle(shirtDark);
-  g.fillRect(cx - 7, headTop + 14, 5, 3);  // left shoulder
-  g.fillRect(cx + 2, headTop + 14, 5, 3);  // right shoulder
+  g.fillRect(cx - 7, headTop + 15, 5, 2);  // left shoulder
+  g.fillRect(cx + 2, headTop + 15, 5, 2);  // right shoulder
   g.fillStyle(shirtMid);
-  g.fillRect(cx - 6, headTop + 15, 4, 2);  // left shoulder highlight
-  g.fillRect(cx + 2, headTop + 15, 4, 2);  // right shoulder highlight
+  g.fillRect(cx - 6, headTop + 16, 4, 1);  // left shoulder highlight
+  g.fillRect(cx + 2, headTop + 16, 4, 1);  // right shoulder highlight
 
   // Body: shirt
   const torsoTop = upperY + 22;
@@ -327,13 +327,13 @@ function drawHighRollerFrame(
   g.fillRect(cx - 2, headTop + 14, 4, 3);
   g.fillStyle(skinShade);
   g.fillRect(cx - 2, headTop + 15, 4, 2);
-  // Jacket shoulders
+  // Jacket shoulders — detached from the head so only the neck connects
   g.fillStyle(jacketDark);
-  g.fillRect(cx - 7, headTop + 14, 5, 3);
-  g.fillRect(cx + 2, headTop + 14, 5, 3);
+  g.fillRect(cx - 7, headTop + 15, 5, 2);
+  g.fillRect(cx + 2, headTop + 15, 5, 2);
   g.fillStyle(jacketMid);
-  g.fillRect(cx - 6, headTop + 15, 4, 2);
-  g.fillRect(cx + 2, headTop + 15, 4, 2);
+  g.fillRect(cx - 6, headTop + 16, 4, 1);
+  g.fillRect(cx + 2, headTop + 16, 4, 1);
 
   // Body: tuxedo jacket
   const torsoTop = upperY + 22;
@@ -475,17 +475,17 @@ function drawCardSharkFrame(
   g.fillRect(cx, headTop + 11, 3, 1);
   g.fillRect(cx - 1, headTop + 12, 2, 1);
 
-  // Neck + shoulders
+  // Neck + shoulders — leave the head connected only by the neck
   g.fillStyle(skin);
   g.fillRect(cx - 2, headTop + 14, 4, 3);
   g.fillStyle(skinShade);
   g.fillRect(cx - 2, headTop + 15, 4, 2);
   g.fillStyle(shirtMid);
-  g.fillRect(cx - 7, headTop + 14, 5, 3);
-  g.fillRect(cx + 2, headTop + 14, 5, 3);
+  g.fillRect(cx - 7, headTop + 15, 5, 2);
+  g.fillRect(cx + 2, headTop + 15, 5, 2);
   g.fillStyle(shirtLight);
-  g.fillRect(cx - 6, headTop + 15, 4, 2);
-  g.fillRect(cx + 2, headTop + 15, 4, 2);
+  g.fillRect(cx - 6, headTop + 16, 4, 1);
+  g.fillRect(cx + 2, headTop + 16, 4, 1);
 
   // Body: vest over shirt
   const torsoTop = upperY + 22;
@@ -627,17 +627,17 @@ function drawDealerFrame(
   g.fillStyle(0x8b6e5a);
   g.fillRect(cx - 2, headTop + 11, 4, 1);
 
-  // Neck + shoulders
+  // Neck + shoulders — keep the shoulders one row lower than the head silhouette
   g.fillStyle(skin);
   g.fillRect(cx - 2, headTop + 14, 4, 3);
   g.fillStyle(skinShade);
   g.fillRect(cx - 2, headTop + 15, 4, 2);
   g.fillStyle(shirtWhite);
-  g.fillRect(cx - 7, headTop + 14, 5, 3);
-  g.fillRect(cx + 2, headTop + 14, 5, 3);
+  g.fillRect(cx - 7, headTop + 15, 5, 2);
+  g.fillRect(cx + 2, headTop + 15, 5, 2);
   g.fillStyle(shirtShadow);
-  g.fillRect(cx - 6, headTop + 15, 4, 2);
-  g.fillRect(cx + 2, headTop + 15, 4, 2);
+  g.fillRect(cx - 6, headTop + 16, 4, 1);
+  g.fillRect(cx + 2, headTop + 16, 4, 1);
 
   // Body: white shirt + black vest
   const torsoTop = upperY + 22;
@@ -808,13 +808,13 @@ function drawOutlawFrame(
   g.fillStyle(bandanaDark);
   g.fillRect(cx - 3, headTop + 16, 6, 1);
 
-  // Duster coat shoulders
+  // Duster coat shoulders — sit below the head so the neck is the only bridge
   g.fillStyle(dusterDark);
-  g.fillRect(cx - 8, headTop + 14, 6, 3);
-  g.fillRect(cx + 2, headTop + 14, 6, 3);
+  g.fillRect(cx - 8, headTop + 15, 6, 2);
+  g.fillRect(cx + 2, headTop + 15, 6, 2);
   g.fillStyle(dusterMid);
-  g.fillRect(cx - 7, headTop + 15, 4, 2);
-  g.fillRect(cx + 3, headTop + 15, 4, 2);
+  g.fillRect(cx - 7, headTop + 16, 4, 1);
+  g.fillRect(cx + 3, headTop + 16, 4, 1);
 
   // Body: duster coat (wider silhouette)
   const torsoTop = upperY + 22;
@@ -999,11 +999,11 @@ function drawTycoonFrame(
   g.fillRect(cx - 3, headTop + 14, 2, 3);
   g.fillRect(cx + 1, headTop + 14, 2, 3);
   g.fillStyle(suitDark);
-  g.fillRect(cx - 7, headTop + 14, 5, 3);
-  g.fillRect(cx + 2, headTop + 14, 5, 3);
+  g.fillRect(cx - 7, headTop + 15, 5, 2);
+  g.fillRect(cx + 2, headTop + 15, 5, 2);
   g.fillStyle(suitMid);
-  g.fillRect(cx - 6, headTop + 15, 4, 2);
-  g.fillRect(cx + 2, headTop + 15, 4, 2);
+  g.fillRect(cx - 6, headTop + 16, 4, 1);
+  g.fillRect(cx + 2, headTop + 16, 4, 1);
 
   // Body: charcoal suit with gold waistcoat
   const torsoTop = upperY + 22;
@@ -1185,13 +1185,13 @@ function drawPhantomFrame(
   g.fillRect(cx - 3, headTop + 15, 1, 2);
   g.fillRect(cx + 2, headTop + 15, 1, 2);
 
-  // Jacket shoulders
+  // Jacket shoulders — keep the side silhouette detached from the head
   g.fillStyle(coatBlack);
-  g.fillRect(cx - 7, headTop + 14, 5, 3);
-  g.fillRect(cx + 2, headTop + 14, 5, 3);
+  g.fillRect(cx - 7, headTop + 15, 5, 2);
+  g.fillRect(cx + 2, headTop + 15, 5, 2);
   g.fillStyle(coatDark);
-  g.fillRect(cx - 6, headTop + 15, 4, 2);
-  g.fillRect(cx + 2, headTop + 15, 4, 2);
+  g.fillRect(cx - 6, headTop + 16, 4, 1);
+  g.fillRect(cx + 2, headTop + 16, 4, 1);
 
   // Body: tailcoat
   const torsoTop = upperY + 22;
