@@ -30,6 +30,11 @@ export class CrashScene extends Scene {
   private lastSoundTime: number = 0;
   private lastPulseTime: number = 0;
 
+  private rocketContainer!: GameObjects.Container;
+  private rocketFlame!: GameObjects.Graphics;
+  private graphStars: Array<{ x: number; y: number; r: number }> = [];
+  private graphFill!: GameObjects.Graphics;
+
   // Graph points
   private graphPoints: Array<{ x: number; y: number }> = [];
 
@@ -213,11 +218,57 @@ export class CrashScene extends Scene {
     const graphW = 600;
     const graphX = (W - graphW) / 2;
 
+    // Pre-generate stars inside graph area (drawn behind everything)
+    const gx = (1024 - 600) / 2, gy = 415, gw = 600, gh = 120;
+    for (let s = 0; s < 28; s++) {
+      this.graphStars.push({
+        x: gx + Math.random() * gw,
+        y: gy + Math.random() * gh,
+        r: Math.random() < 0.3 ? 1.5 : 1,
+      });
+    }
+    this.graphFill = this.add.graphics();
+
     const graphBorder = this.add.graphics();
     graphBorder.lineStyle(1, THEME.goldDim, 0.2);
     graphBorder.strokeRect(graphX, graphY, graphW, graphH);
 
     this.graphGraphics = this.add.graphics();
+
+    // Pixel-art rocket — drawn in local coords (nose points toward -y)
+    const rocketBody = this.add.graphics();
+    // body
+    rocketBody.fillStyle(0xdce8f0, 1);
+    rocketBody.fillRect(-4, -8, 8, 14);
+    // nose cone (3 stacked rectangles tapering)
+    rocketBody.fillStyle(0xf0f8ff, 1);
+    rocketBody.fillRect(-3, -12, 6, 4);
+    rocketBody.fillRect(-2, -15, 4, 3);
+    rocketBody.fillRect(-1, -17, 2, 2);
+    // red accent stripe
+    rocketBody.fillStyle(0xdd2222, 1);
+    rocketBody.fillRect(-4, -2, 8, 3);
+    // porthole window
+    rocketBody.fillStyle(0x44ddff, 1);
+    rocketBody.fillRect(-2, -7, 4, 4);
+    rocketBody.fillStyle(0x88eeff, 0.6);
+    rocketBody.fillRect(-1, -6, 2, 2);
+    // left fin
+    rocketBody.fillStyle(0xdce8f0, 1);
+    rocketBody.fillRect(-8, 2, 4, 6);
+    rocketBody.fillRect(-7, 0, 3, 3);
+    // right fin
+    rocketBody.fillRect(4, 2, 4, 6);
+    rocketBody.fillRect(4, 0, 3, 3);
+    // engine nozzle
+    rocketBody.fillStyle(0x888899, 1);
+    rocketBody.fillRect(-3, 6, 6, 3);
+
+    this.rocketFlame = this.add.graphics();
+
+    this.rocketContainer = this.add.container(0, 0, [rocketBody, this.rocketFlame]);
+    this.rocketContainer.setVisible(false);
+    this.rocketContainer.setDepth(10);
 
     // --- Result text ---
     this.resultText = this.add.text(W / 2, 560, '', {
@@ -447,6 +498,8 @@ export class CrashScene extends Scene {
 
     this.refreshBetButtons();
     this.graphGraphics.clear();
+    this.graphFill.clear();
+    this.rocketContainer.setVisible(false);
     this.multDisplay.setText('1.00x');
     this.multDisplay.setColor(COLOR.goldBright);
 
@@ -518,6 +571,9 @@ export class CrashScene extends Scene {
       this.lastGraphTime = now;
       this._drawGraph();
     }
+
+    // Smooth flame flicker at full framerate
+    if (this.rocketContainer.visible) this._updateFlame();
   }
 
   private _drawGraph() {
@@ -531,26 +587,118 @@ export class CrashScene extends Scene {
 
     this.graphPoints.push({ x: this.currentMult, y: this.currentMult });
 
+    // ── Fill layer: stars + area under curve ────────────────────────────
+    this.graphFill.clear();
+
+    // Starfield
+    this.graphFill.fillStyle(0xffffff, 0.7);
+    for (const star of this.graphStars) {
+      this.graphFill.fillCircle(star.x, star.y, star.r);
+    }
+
+    // Area fill under the curve
+    if (this.graphPoints.length >= 2) {
+      const startIdx = Math.max(0, this.graphPoints.length - maxPoints);
+      const fillPts: { x: number; y: number }[] = [];
+
+      // Bottom-left corner
+      fillPts.push({ x: graphX, y: graphY + graphH });
+
+      for (let i = startIdx; i < this.graphPoints.length; i++) {
+        const pt = this.graphPoints[i];
+        const px = graphX + ((i - startIdx) / Math.max(maxPoints - 1, 1)) * graphW;
+        const py = graphY + graphH - ((pt.y - 1) / (maxMult - 1)) * graphH;
+        fillPts.push({ x: px, y: Math.max(graphY, Math.min(graphY + graphH, py)) });
+      }
+
+      // Bottom-right: x of last plotted point, bottom of graph
+      const lastRelIdx = (this.graphPoints.length - 1) - startIdx;
+      const lastScreenX = graphX + (lastRelIdx / Math.max(maxPoints - 1, 1)) * graphW;
+      fillPts.push({ x: lastScreenX, y: graphY + graphH });
+
+      this.graphFill.fillStyle(0xff44aa, 0.13);
+      this.graphFill.fillPoints(fillPts, true);
+    }
+
+    // ── Line layer ────────────────────────────────────────────────────────
     this.graphGraphics.clear();
+
+    // Grid lines at integer multipliers
+    this.graphGraphics.lineStyle(1, 0xffffff, 0.07);
+    for (let m = 1; m <= Math.ceil(maxMult); m++) {
+      const gy = graphY + graphH - ((m - 1) / (maxMult - 1)) * graphH;
+      if (gy >= graphY && gy <= graphY + graphH) {
+        this.graphGraphics.lineBetween(graphX, gy, graphX + graphW, gy);
+      }
+    }
+
     if (this.graphPoints.length < 2) return;
 
-    // Pink neon polyline for rising trajectory
-    this.graphGraphics.lineStyle(2, THEME.pink, 0.8);
-    this.graphGraphics.beginPath();
-
     const startIdx = Math.max(0, this.graphPoints.length - maxPoints);
+
+    // Glow pass (thick + dim)
+    this.graphGraphics.lineStyle(5, 0xff44aa, 0.25);
+    this.graphGraphics.beginPath();
     for (let i = startIdx; i < this.graphPoints.length; i++) {
       const pt = this.graphPoints[i];
       const px = graphX + ((i - startIdx) / Math.max(maxPoints - 1, 1)) * graphW;
       const py = graphY + graphH - ((pt.y - 1) / (maxMult - 1)) * graphH;
       const clampedPy = Math.max(graphY, Math.min(graphY + graphH, py));
-      if (i === startIdx) {
-        this.graphGraphics.moveTo(px, clampedPy);
-      } else {
-        this.graphGraphics.lineTo(px, clampedPy);
-      }
+      if (i === startIdx) this.graphGraphics.moveTo(px, clampedPy);
+      else this.graphGraphics.lineTo(px, clampedPy);
     }
     this.graphGraphics.strokePath();
+
+    // Bright pass (thin + vivid)
+    this.graphGraphics.lineStyle(2, 0xff66cc, 1.0);
+    this.graphGraphics.beginPath();
+    for (let i = startIdx; i < this.graphPoints.length; i++) {
+      const pt = this.graphPoints[i];
+      const px = graphX + ((i - startIdx) / Math.max(maxPoints - 1, 1)) * graphW;
+      const py = graphY + graphH - ((pt.y - 1) / (maxMult - 1)) * graphH;
+      const clampedPy = Math.max(graphY, Math.min(graphY + graphH, py));
+      if (i === startIdx) this.graphGraphics.moveTo(px, clampedPy);
+      else this.graphGraphics.lineTo(px, clampedPy);
+    }
+    this.graphGraphics.strokePath();
+
+    // ── Rocket tip position ───────────────────────────────────────────────
+    const lastIdx = this.graphPoints.length - 1;
+    const lastRelIdx = lastIdx - startIdx;
+    const tipX = graphX + (lastRelIdx / Math.max(maxPoints - 1, 1)) * graphW;
+    const tipPy = graphY + graphH - ((this.graphPoints[lastIdx].y - 1) / (maxMult - 1)) * graphH;
+    const tipY = Math.max(graphY + 10, Math.min(graphY + graphH - 5, tipPy));
+
+    // Rocket angle: align nose with direction of travel
+    let rocketAngle = -Math.PI / 4; // default: upper-right
+    if (this.graphPoints.length >= 3) {
+      const prevIdx = Math.max(startIdx, lastIdx - 3);
+      const prevRelIdx = prevIdx - startIdx;
+      const prevX = graphX + (prevRelIdx / Math.max(maxPoints - 1, 1)) * graphW;
+      const prevPy = graphY + graphH - ((this.graphPoints[prevIdx].y - 1) / (maxMult - 1)) * graphH;
+      const prevY = Math.max(graphY, Math.min(graphY + graphH, prevPy));
+      const dx = tipX - prevX;
+      const dy = tipY - prevY;
+      rocketAngle = Math.atan2(dy, dx) + Math.PI / 2;
+    }
+
+    this.rocketContainer.setPosition(tipX, tipY).setRotation(rocketAngle).setVisible(true);
+    this._updateFlame();
+  }
+
+  private _updateFlame(): void {
+    this.rocketFlame.clear();
+    const fh = 6 + Math.random() * 6; // 6–12px flame height
+    const fw = 4 + Math.random() * 2;
+    // outer flame (orange)
+    this.rocketFlame.fillStyle(0xff6600, 0.9);
+    this.rocketFlame.fillRect(-fw / 2, 9, fw, fh);
+    // inner flame (yellow)
+    this.rocketFlame.fillStyle(0xffee00, 0.95);
+    this.rocketFlame.fillRect(-fw / 4, 9, fw / 2, fh * 0.6);
+    // white hot core
+    this.rocketFlame.fillStyle(0xffffff, 0.7);
+    this.rocketFlame.fillRect(-1, 9, 2, fh * 0.3);
   }
 
   private setAutoCashout(value: number): void {
@@ -575,6 +723,8 @@ export class CrashScene extends Scene {
   private _doCrash() {
     AudioManager.playSfx(this, 'crash', { volume: 1.45, cooldownMs: 250, allowOverlap: false });
     this.playing = false;
+    this.rocketContainer.setVisible(false);
+    this.graphFill.clear();
 
     this.cameras.main.shake(250, 0.01);
 
@@ -633,6 +783,7 @@ export class CrashScene extends Scene {
     const mult = this.currentMult;
 
     this.playing = false;
+    this.rocketContainer.setVisible(false);
 
     const betCost = this.getBetCost();
     const result = resolve({
