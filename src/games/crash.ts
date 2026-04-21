@@ -47,7 +47,7 @@ export function isValidBet(coins: number, bet: number): boolean {
 }
 
 /** Growth rate constant — multiplier = e^(CRASH_K * seconds) */
-export const CRASH_K = 0.07;
+export const CRASH_K = 0.18;
 
 /** Time (seconds) at which crashPoint is reached under exponential growth. */
 export function crashTimeFromPoint(cp: number): number {

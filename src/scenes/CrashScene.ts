@@ -24,9 +24,6 @@ export class CrashScene extends Scene {
   private successfulCashOuts: number = 0;
   private warningPlayed: boolean = false;
   private autoCashout: number = 0;          // 0 = disabled
-  private roundHistory: number[] = [];       // last crash points
-  private inBetPhase: boolean = false;
-  private betPhaseEnd: number = 0;
   private roundStartTime: number = 0;
   private crashTimeForRound: number = 0;
   private lastGraphTime: number = 0;
@@ -51,10 +48,6 @@ export class CrashScene extends Scene {
   private allInBetButton!: { bg: GameObjects.Graphics; label: GameObjects.Text; zone: GameObjects.Zone };
   private flashOverlay!: GameObjects.Graphics;
   private autoCashoutBtns!: Array<{ bg: GameObjects.Graphics; label: GameObjects.Text; value: number; zone: GameObjects.Zone }>;
-  private historyContainer!: GameObjects.Graphics;
-  private historyLabels!: GameObjects.Text[];
-  private countdownText!: GameObjects.Text;
-
   // Zone refs stored for enable/disable
   private _playZone!: GameObjects.Zone;
   private _cashOutZone!: GameObjects.Zone;
@@ -158,26 +151,9 @@ export class CrashScene extends Scene {
       const albl = this.add.text(ax, ay, AUTO_LABELS[i], { ...buttonLabelStyle(14), fontSize: '14px' }).setOrigin(0.5);
       if (i !== 0) albl.setColor(COLOR.ivory).setStroke(COLOR.woodDeep, 5);
       const azone = this.add.zone(ax, ay, autoBtnW, autoBtnH).setInteractive({ cursor: 'pointer' });
-      azone.on('pointerdown', () => { if (!this.playing && !this.inBetPhase) this.setAutoCashout(val); });
+      azone.on('pointerdown', () => { if (!this.playing) this.setAutoCashout(val); });
       this.autoCashoutBtns.push({ bg: abg, label: albl, value: val, zone: azone });
     });
-
-    // ── Round history strip ────────────────────────────────────────────────
-    this.add.text(W / 2, 208, 'RECENT ROUNDS', {
-      fontSize: '11px',
-      color: COLOR.goldText,
-      fontFamily: FONT.mono,
-      alpha: 0.7,
-    }).setOrigin(0.5);
-    this.historyContainer = this.add.graphics();
-    this.historyLabels = [];
-    for (let hi = 0; hi < 8; hi++) {
-      this.historyLabels.push(
-        this.add.text(0, 0, '', { fontSize: '11px', fontFamily: FONT.mono, color: '#ffffff' })
-          .setOrigin(0.5).setVisible(false),
-      );
-    }
-    this._drawHistory();
 
     // --- Bet buttons ---
     const betY = 245;
@@ -230,12 +206,6 @@ export class CrashScene extends Scene {
       fontFamily: FONT.mono,
       fontStyle: 'bold',
     }).setOrigin(0.5);
-
-    this.countdownText = this.add.text(W / 2, 395, '', {
-      fontSize: '20px',
-      color: COLOR.goldText,
-      fontFamily: FONT.mono,
-    }).setOrigin(0.5).setVisible(false);
 
     // --- Graph ---
     const graphY = 415;
@@ -477,35 +447,19 @@ export class CrashScene extends Scene {
 
     this.refreshBetButtons();
     this.graphGraphics.clear();
-    this.multDisplay.setText('STARTING...');
-    this.multDisplay.setColor(COLOR.goldText);
-    this.countdownText.setVisible(false);
+    this.multDisplay.setText('1.00x');
+    this.multDisplay.setColor(COLOR.goldBright);
 
-    this.inBetPhase = true;
-    this.playing = false;
-    this.betPhaseEnd = this.time.now + 1500;
+    this.playing = true;
+    this.roundStartTime = this.time.now;
+    this.cashOutBtn.setVisible(true);
+    this.cashOutBtnText.setVisible(true);
+    this._cashOutZone.setVisible(true);
   }
 
   update(): void {
-    if (!this.inBetPhase && !this.playing) return;
+    if (!this.playing) return;
     const now = this.time.now;
-
-    // ── Betting countdown phase ──────────────────────────────────────────
-    if (this.inBetPhase) {
-      const remaining = this.betPhaseEnd - now;
-      if (remaining <= 0) {
-        this.inBetPhase = false;
-        this.playing = true;
-        this.roundStartTime = now;
-        this.multDisplay.setText('1.00x');
-        this.multDisplay.setColor(COLOR.goldBright);
-        this.cashOutBtn.setVisible(true);
-        this.cashOutBtnText.setVisible(true);
-        this._cashOutZone.setVisible(true);
-        this.countdownText.setVisible(false);
-      }
-      return;
-    }
 
     // ── Running phase ────────────────────────────────────────────────────
     const t = (now - this.roundStartTime) / 1000;
@@ -618,37 +572,9 @@ export class CrashScene extends Scene {
     AudioManager.playSfx(this, 'bet-select', { volume: 1.0, cooldownMs: 50, allowOverlap: false });
   }
 
-  private _drawHistory(): void {
-    const W = 1024;
-    this.historyContainer.clear();
-    const pillW = 52, pillH = 18, pillGap = 6;
-    const count = Math.min(this.roundHistory.length, 8);
-    if (count === 0) return;
-    const totalW = count * (pillW + pillGap) - pillGap;
-    const startX = W / 2 - totalW / 2;
-    const py = 222;
-    for (let i = 0; i < count; i++) {
-      const cp = this.roundHistory[this.roundHistory.length - count + i];
-      const px = startX + i * (pillW + pillGap) + pillW / 2;
-      const col = cp < 1.5 ? 0xb83030 : cp < 3 ? 0xb8821a : 0x22a022;
-      this.historyContainer.fillStyle(col, 0.85);
-      this.historyContainer.fillRoundedRect(px - pillW / 2, py - pillH / 2, pillW, pillH, 4);
-      this.historyLabels[i].setVisible(true);
-      this.historyLabels[i].setPosition(px, py);
-      this.historyLabels[i].setText(cp.toFixed(2) + 'x');
-    }
-    for (let i = count; i < 8; i++) {
-      this.historyLabels[i].setVisible(false);
-    }
-  }
-
   private _doCrash() {
     AudioManager.playSfx(this, 'crash', { volume: 1.45, cooldownMs: 250, allowOverlap: false });
     this.playing = false;
-
-    this.roundHistory.push(this.crashPoint);
-    if (this.roundHistory.length > 8) this.roundHistory.shift();
-    this._drawHistory();
 
     this.cameras.main.shake(250, 0.01);
 
@@ -707,10 +633,6 @@ export class CrashScene extends Scene {
     const mult = this.currentMult;
 
     this.playing = false;
-
-    this.roundHistory.push(this.crashPoint);
-    if (this.roundHistory.length > 8) this.roundHistory.shift();
-    this._drawHistory();
 
     const betCost = this.getBetCost();
     const result = resolve({
