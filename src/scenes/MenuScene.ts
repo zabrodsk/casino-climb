@@ -56,6 +56,7 @@ export class MenuScene extends Scene {
 
   private readonly keyboardHandler = (event: KeyboardEvent) => this.handleKeyboardContinue(event);
   private readonly pointerHandler = (pointer: Input.Pointer) => this.handlePointerContinue(pointer);
+  private readonly resizeHandler = () => this.handleResize();
 
   constructor() {
     super('MenuScene');
@@ -114,9 +115,7 @@ export class MenuScene extends Scene {
     this.input.keyboard?.on('keydown', this.keyboardHandler);
     this.input.on('pointerdown', this.pointerHandler);
 
-    this.scale.on('resize', () => {
-      this.scene.restart();
-    });
+    this.scale.on('resize', this.resizeHandler);
 
     this.events.once('shutdown', () => {
       this.ambientDriftTweens.forEach((tween) => tween.stop());
@@ -125,6 +124,7 @@ export class MenuScene extends Scene {
       this.introTimers = [];
       this.input.keyboard?.off('keydown', this.keyboardHandler);
       this.input.off('pointerdown', this.pointerHandler);
+      this.scale.off('resize', this.resizeHandler);
     });
 
     this.startMenuMusic();
@@ -826,6 +826,13 @@ export class MenuScene extends Scene {
     this.introTargets.forEach((obj) => {
       (obj as GameObjects.GameObject & { setAlpha(value: number): unknown }).setAlpha(1);
     });
+  }
+
+  private handleResize(): void {
+    if (!this.scene.isActive()) {
+      return;
+    }
+    this.scene.restart();
   }
 
   private playUiHover(): void {
