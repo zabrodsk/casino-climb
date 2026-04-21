@@ -72,6 +72,22 @@ export const WARDROBE_CATALOG: WardrobeItem[] = [
     description: 'No one knows his face. Half-mask, tailcoat, amber eye.',
     palette: { characterId: 'phantom' },
   },
+  {
+    id: 'figure-spy',
+    name: 'The Spy',
+    category: 'figure',
+    price: 7500,
+    description: 'Black turtleneck, cold eyes. Never in the same room twice.',
+    palette: { characterId: 'spy' },
+  },
+  {
+    id: 'figure-pirate',
+    name: 'The Pirate',
+    category: 'figure',
+    price: 7500,
+    description: 'Eye patch, rum breath, cursed luck. Still wins.',
+    palette: { characterId: 'pirate' },
+  },
   // --- Hair ---
   {
     id: 'hair-blonde',
@@ -96,6 +112,38 @@ export const WARDROBE_CATALOG: WardrobeItem[] = [
     price: 3000,
     description: 'The color of experience — and winning.',
     palette: { hairDark: 0x8a8a8a, hairMid: 0xb8b8b8, hairLight: 0xe0e0e0 },
+  },
+  {
+    id: 'hair-midnight',
+    name: 'Midnight Black',
+    category: 'hair',
+    price: 600,
+    description: 'Pure black. No shine, no mercy.',
+    palette: { hairDark: 0x080810, hairMid: 0x101018, hairLight: 0x1c1c28 },
+  },
+  {
+    id: 'hair-copper',
+    name: 'Copper Flame',
+    category: 'hair',
+    price: 1200,
+    description: 'Warm auburn that catches the light.',
+    palette: { hairDark: 0x7a2808, hairMid: 0xb84818, hairLight: 0xe06020 },
+  },
+  {
+    id: 'hair-violet',
+    name: 'Violet Rush',
+    category: 'hair',
+    price: 2200,
+    description: 'Purple dye, purple reign.',
+    palette: { hairDark: 0x3a1060, hairMid: 0x6020a0, hairLight: 0x9040d0 },
+  },
+  {
+    id: 'hair-ocean',
+    name: 'Ocean Blue',
+    category: 'hair',
+    price: 2800,
+    description: 'Deep sea tones. Makes a statement.',
+    palette: { hairDark: 0x0a2060, hairMid: 0x1840a8, hairLight: 0x2a68d8 },
   },
   // --- Outfits ---
   {
@@ -122,6 +170,30 @@ export const WARDROBE_CATALOG: WardrobeItem[] = [
     description: "For those who've reached the top floor.",
     palette: { shirtDark: 0x181818, shirtMid: 0xd0d0d8, shirtLight: 0xeceff5, shirtHighlight: 0xffffff },
   },
+  {
+    id: 'outfit-emerald',
+    name: 'Emerald Suit',
+    category: 'outfit',
+    price: 1800,
+    description: 'Forest green. Cool, calm, collected.',
+    palette: { shirtDark: 0x0a3820, shirtMid: 0x1a6038, shirtLight: 0x2a8850, shirtHighlight: 0x40aa68 },
+  },
+  {
+    id: 'outfit-navy',
+    name: 'Navy Blues',
+    category: 'outfit',
+    price: 1600,
+    description: 'Sharp as a blade. Blue as the deep.',
+    palette: { shirtDark: 0x0a1840, shirtMid: 0x182860, shirtLight: 0x283880, shirtHighlight: 0x3a5098 },
+  },
+  {
+    id: 'outfit-purple',
+    name: 'Purple Reign',
+    category: 'outfit',
+    price: 2400,
+    description: 'Royal purple. Fit for the high table.',
+    palette: { shirtDark: 0x2a0a50, shirtMid: 0x44187a, shirtLight: 0x6030a8, shirtHighlight: 0x8050c8 },
+  },
   // --- Accessories ---
   {
     id: 'acc-chain',
@@ -130,6 +202,14 @@ export const WARDROBE_CATALOG: WardrobeItem[] = [
     price: 400,
     description: 'A little bling never hurt anybody.',
     palette: { goldChain: true },
+  },
+  {
+    id: 'acc-sunglasses',
+    name: 'Shades',
+    category: 'accessory',
+    price: 500,
+    description: 'Dark lenses. You see them, they don\'t see you.',
+    palette: { sunglasses: true },
   },
 ];
 
