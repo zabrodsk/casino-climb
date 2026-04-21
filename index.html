@@ -41,6 +41,25 @@
     <script>
       (function () {
         var btn = document.getElementById('fs-btn');
+        var keyboardLockActive = false;
+
+        async function lockEscapeKey() {
+          try {
+            if (!document.fullscreenElement) return;
+            if (!navigator.keyboard || !navigator.keyboard.lock) return;
+            await navigator.keyboard.lock(['Escape']);
+            keyboardLockActive = true;
+          } catch (e) {}
+        }
+
+        async function unlockEscapeKey() {
+          try {
+            if (!navigator.keyboard || !navigator.keyboard.unlock) return;
+            navigator.keyboard.unlock();
+          } catch (e) {}
+          keyboardLockActive = false;
+        }
+
         function toggleFS() {
           if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(function () {});
@@ -54,6 +73,11 @@
         });
         document.addEventListener('fullscreenchange', function () {
           btn.textContent = document.fullscreenElement ? '\u00D7' : '\u26F6';
+          if (document.fullscreenElement) {
+            lockEscapeKey();
+          } else if (keyboardLockActive) {
+            unlockEscapeKey();
+          }
         });
       })();
     </script>
